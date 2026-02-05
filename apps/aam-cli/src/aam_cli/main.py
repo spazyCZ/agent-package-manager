@@ -4,7 +4,7 @@ import click
 from rich.console import Console
 
 from aam_cli import __version__
-from aam_cli.commands import install, search, publish, config, registry
+from aam_cli.commands import create_package, install, search, publish, config, registry
 
 console = Console()
 
@@ -24,6 +24,7 @@ def cli(ctx: click.Context, verbose: bool) -> None:
 
 
 # Register command groups
+cli.add_command(create_package.create_package)
 cli.add_command(install.install)
 cli.add_command(search.search)
 cli.add_command(publish.publish)

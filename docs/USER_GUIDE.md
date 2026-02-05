@@ -421,7 +421,7 @@ Created python-best-practices/
   └── instructions/
 ```
 
-### 2.2 Package Structure
+### 3.2 Package Structure
 
 After initialization, your package looks like this:
 
@@ -434,7 +434,7 @@ python-best-practices/
 └── instructions/               # Platform instructions/rules
 ```
 
-### 2.3 The Manifest: `aam.yaml`
+### 3.3 The Manifest: `aam.yaml`
 
 The generated `aam.yaml` is the heart of your package:
 
@@ -467,7 +467,7 @@ platforms:
     merge_instructions: true
 ```
 
-### 2.4 Adding Artifacts
+### 3.4 Adding Artifacts
 
 #### Add a Skill
 
@@ -1259,7 +1259,7 @@ keywords:
   - mentor
 ```
 
-### 2.5 Validate Your Package
+### 3.5 Validate Your Package
 
 Before publishing, validate your package:
 
@@ -1293,9 +1293,9 @@ Dependencies:
 
 ---
 
-## 3. Publishing a Package
+## 4. Publishing a Package
 
-### 3.1 Create a Registry Account
+### 4.1 Create a Registry Account
 
 First, register on the AAM registry:
 
@@ -1313,7 +1313,7 @@ Confirm password: ********
 Please verify your email, then run `aam login` to authenticate.
 ```
 
-### 3.2 Login and Get API Token
+### 4.2 Login and Get API Token
 
 ```bash
 $ aam login
@@ -1328,7 +1328,7 @@ Token scopes: publish, yank
 Token expires: never (revoke with `aam logout`)
 ```
 
-### 3.3 Build the Package Archive
+### 4.3 Build the Package Archive
 
 ```bash
 $ aam pack
@@ -1345,7 +1345,7 @@ Building python-best-practices@1.0.0...
   Checksum: sha256:a1b2c3d4e5f6...
 ```
 
-### 3.4 Publish to Registry
+### 4.4 Publish to Registry
 
 #### Basic Publish (No Signature)
 
@@ -1403,7 +1403,7 @@ Uploading python-best-practices-1.0.0.aam...
   Signed by: ABC123DEF456
 ```
 
-### 3.5 Publish a New Version
+### 4.5 Publish a New Version
 
 Update `version` in `aam.yaml`:
 
@@ -1421,7 +1421,7 @@ $ aam validate && aam pack && aam publish --sign
 ✓ Published python-best-practices@1.1.0
 ```
 
-### 3.6 Yank a Bad Version
+### 4.6 Yank a Bad Version
 
 If you publish a version with issues, yank it (marks as "do not install" but doesn't delete):
 
@@ -1439,9 +1439,9 @@ Proceed? [y/N] y
 
 ---
 
-## 4. Installing a Package
+## 5. Installing a Package
 
-### 4.1 Basic Installation
+### 5.1 Basic Installation
 
 ```bash
 $ cd my-project/
@@ -1466,7 +1466,7 @@ Deploying to cursor...
 ✓ Installed 1 package (1 agent, 1 skill, 1 prompt, 1 instruction)
 ```
 
-### 4.2 Install Specific Version
+### 5.2 Install Specific Version
 
 ```bash
 $ aam install python-best-practices@1.0.0
@@ -1477,7 +1477,7 @@ Resolving python-best-practices@1.0.0...
 ...
 ```
 
-### 4.3 Install to Specific Platform
+### 5.3 Install to Specific Platform
 
 ```bash
 # Install only to Claude
@@ -1490,7 +1490,7 @@ Deploying to claude...
 ✓ Installed 1 package
 ```
 
-### 4.4 Install from Different Sources
+### 5.4 Install from Different Sources
 
 ```bash
 # From registry (default)
@@ -1506,7 +1506,7 @@ aam install ./my-local-package/
 aam install python-best-practices-1.0.0.aam
 ```
 
-### 4.5 Install Without Deploying
+### 5.5 Install Without Deploying
 
 Download and resolve dependencies without deploying artifacts:
 
@@ -1521,7 +1521,7 @@ Resolving python-best-practices@1.1.0...
 To deploy later, run: aam deploy
 ```
 
-### 4.6 View Installed Packages
+### 5.6 View Installed Packages
 
 ```bash
 $ aam list
@@ -1554,7 +1554,7 @@ python-best-practices@1.1.0
     cursor: .cursor/skills/, .cursor/rules/, .cursor/prompts/
 ```
 
-### 4.7 Uninstall a Package
+### 5.7 Uninstall a Package
 
 ```bash
 $ aam uninstall python-best-practices
@@ -1572,9 +1572,9 @@ Removing deployed artifacts from cursor...
 
 ---
 
-## 5. Adding Dependencies
+## 6. Adding Dependencies
 
-### 5.1 Declare Dependencies
+### 6.1 Declare Dependencies
 
 Suppose you want your package to depend on a `code-analysis` package. Add it to `aam.yaml`:
 
@@ -1605,7 +1605,7 @@ dependencies:
   utilities: "*"
 ```
 
-### 5.2 Version Constraint Syntax
+### 6.2 Version Constraint Syntax
 
 | Syntax | Meaning | Example |
 |--------|---------|---------|
@@ -1616,7 +1616,7 @@ dependencies:
 | `*` | Any version | Latest available |
 | `>=1.0.0,<2.0.0` | Range | Between 1.0.0 and 2.0.0 |
 
-### 5.3 Reference Dependency Artifacts
+### 6.3 Reference Dependency Artifacts
 
 Your artifacts can reference artifacts from dependencies.
 
@@ -1660,7 +1660,7 @@ This skill uses:
 3. Compile findings into structured review
 ```
 
-### 5.4 Install Package with Dependencies
+### 6.4 Install Package with Dependencies
 
 When users install your package, dependencies are resolved automatically:
 
@@ -1692,7 +1692,7 @@ Deploying to cursor...
 ✓ Installed 6 packages (2 agents, 5 skills, 8 prompts, 3 instructions)
 ```
 
-### 5.5 View Dependency Tree
+### 6.5 View Dependency Tree
 
 ```mermaid
 flowchart TD
@@ -1728,7 +1728,7 @@ python-best-practices@1.2.0
 └── formatting-utils@1.0.2
 ```
 
-### 5.6 Lock File
+### 6.6 Lock File
 
 After installation, AAM creates `.aam/aam-lock.yaml` for reproducible installs:
 
@@ -1783,7 +1783,7 @@ packages:
 
 **Commit this file to git** for reproducible installs across your team.
 
-### 5.7 Update Dependencies
+### 6.7 Update Dependencies
 
 ```bash
 # Update all packages to latest compatible versions
@@ -1804,7 +1804,7 @@ $ aam update code-analysis
 
 ---
 
-## 6. Complete Example: Building a Code Review Package
+## 7. Complete Example: Building a Code Review Package
 
 Let's build a complete package from scratch: a code review toolkit.
 
@@ -2870,7 +2870,8 @@ Deploying to cursor...
 
 | Task | Command |
 |------|---------|
-| Create package | `aam init` |
+| Create package from existing project | `aam create-package` |
+| Create package from scratch | `aam init` |
 | Validate package | `aam validate` |
 | Build archive | `aam pack` |
 | Publish to registry | `aam publish [--sign]` |

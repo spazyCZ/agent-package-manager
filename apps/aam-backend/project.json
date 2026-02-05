@@ -1,0 +1,79 @@
+{
+  "name": "aam-backend",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/aam-backend/src",
+  "tags": ["type:app", "scope:backend", "lang:python"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-backend",
+        "commands": [
+          "python -m pip install build",
+          "python -m build"
+        ]
+      },
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-backend",
+        "command": "uvicorn aam_backend.main:app --reload --host 0.0.0.0 --port 8000"
+      }
+    },
+    "serve-prod": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-backend",
+        "command": "uvicorn aam_backend.main:app --host 0.0.0.0 --port 8000 --workers 4"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-backend",
+        "command": "pytest tests/ -v"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-backend",
+        "commands": [
+          "ruff check src/ tests/",
+          "mypy src/"
+        ]
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-backend",
+        "command": "ruff format src/ tests/"
+      }
+    },
+    "install": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-backend",
+        "command": "pip install -e '.[dev]'"
+      }
+    },
+    "migrate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-backend",
+        "command": "alembic upgrade head"
+      }
+    },
+    "migrate-create": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-backend",
+        "command": "alembic revision --autogenerate -m"
+      }
+    }
+  }
+}

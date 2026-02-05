@@ -88,9 +88,11 @@ A **package** is a distributable unit that bundles one or more artifacts togethe
 
 A **registry** is a storage backend where packages are published and discovered. AAM supports:
 
-- **Git registry** (default) — a Git repository with a defined directory structure
+- **Git registry** — a Git repository with a defined directory structure (simple, no server needed)
 - **Local registry** — a local directory for offline/private use
-- **HTTP registry** (future) — a REST API-based registry
+- **HTTP registry** — a REST API-based registry (see [HTTP_REGISTRY_SPEC.md](./HTTP_REGISTRY_SPEC.md))
+
+The default registry (`aam-central`) uses the git backend. Organizations can run their own HTTP registry (`aam-central` or custom) for advanced features like user authentication, package signing verification, and download statistics.
 
 ### 2.4 Platform
 
@@ -181,7 +183,8 @@ description: string     # max 256 chars
 # Optional metadata
 author: string
 license: string         # SPDX identifier
-repository: string      # URL
+repository: string      # URL (source code)
+homepage: string        # URL (project homepage, docs, etc.)
 keywords: list[string]
 
 # Artifact declarations (at least one artifact required)
@@ -247,6 +250,12 @@ asvc-auditor-1.0.0.aam
 
 The archive contains the full package directory. This mirrors the `.skill` format from Codex but is generalized for all artifact types.
 
+**Archive constraints:**
+- Maximum size: **50 MB** (enforced by `aam pack` and registry upload)
+- Must contain `aam.yaml` at root
+- No symlinks outside package directory
+- No absolute paths
+
 ---
 
 ## 4. Artifact Definitions
@@ -260,8 +269,9 @@ Skills follow the established SKILL.md convention used by Cursor and Codex.
 skills/<skill-name>/
 ├── SKILL.md            # Required — frontmatter + instructions
 ├── scripts/            # Optional — executable scripts
+├── templates/          # Optional — output templates (Jinja2 .j2 files)
 ├── references/         # Optional — documentation loaded on demand
-└── assets/             # Optional — files used in output
+└── assets/             # Optional — files used in output (images, CSS, etc.)
 ```
 
 **SKILL.md format (unchanged from existing conventions):**
@@ -358,9 +368,11 @@ variables:
     description: "Finding severity level"
     required: true
     enum: [critical, high, medium, low]
+    default: medium           # Optional default value
   - name: evidence
     description: "Evidence supporting the finding"
     required: false
+    default: "No evidence provided"
 ---
 
 # Audit Finding: {{control_id}}
@@ -388,11 +400,17 @@ An **instruction** defines rules, conventions, or guidelines. These get translat
 
 **File format:** Markdown with YAML frontmatter.
 
+**Frontmatter fields:**
+- `name` (required): Instruction identifier
+- `description` (required): What this instruction does
+- `scope` (optional): `project` (default) or `global` — determines deployment location
+- `globs` (optional): File patterns this instruction applies to (e.g., `**/*.py`)
+
 ```markdown
 ---
 name: asvc-coding-standards
 description: "Coding standards for ASVC-compliant projects"
-scope: project          # "project" or "global"
+scope: project          # "project" (deploy to .cursor/rules/) or "global" (~/.cursor/rules/)
 globs: "**/*.py"        # Optional file pattern (used by Cursor rules)
 ---
 
@@ -440,10 +458,23 @@ Registry:
   registry list                  List configured registries
   registry remove <name>         Remove a registry source
 
+Authentication (HTTP registry):
+  register                       Create a new registry account
+  login                          Authenticate and save API token
+  logout                         Revoke saved API token
+
+Package Lifecycle:
+  yank <package>@<version>       Mark a version as yanked (unpublish)
+
 Configuration:
-  config set <key> <value>       Set configuration value
+  config set <key> <value>       Set configuration value (dot-notation for nested keys)
   config get <key>               Get configuration value
   config list                    List all configuration
+
+# Config key examples:
+#   aam config set default_platform cursor
+#   aam config set security.require_signature true
+#   aam config set registries.aam-central.url https://registry.aam.dev
 
 Utilities:
   doctor                         Check environment and diagnose issues
@@ -515,12 +546,17 @@ Deploying to cursor...
 Installed 3 packages (2 skills, 1 agent, 2 prompts, 1 instruction)
 ```
 
-#### `aam init`
+#### `aam init [name]`
 
-Interactive package scaffolding.
+Interactive package scaffolding. Optionally provide a package name as argument.
 
 ```bash
+# Interactive mode (prompts for name)
 $ aam init
+Package name: asvc-auditor
+
+# Or provide name directly
+$ aam init asvc-auditor
 Package name: asvc-auditor
 Version (1.0.0):
 Description: ASVC audit agent with reporting capabilities
@@ -635,7 +671,7 @@ aam-registry/
 
 **registry.yaml:**
 ```yaml
-name: aam-community
+name: aam-central
 description: "Community registry for AAM packages"
 url: https://github.com/aam-packages/registry
 api_version: 1
@@ -720,13 +756,27 @@ $ aam pack
 ✓ Built asvc-auditor-1.0.0.aam (12.4 KB)
 
 $ aam publish
-Publishing asvc-auditor@1.0.0 to aam-community...
+Publishing asvc-auditor@1.0.0 to aam-central...
 ✓ Published successfully
   https://github.com/aam-packages/registry/packages/asvc-auditor/
+
+# Publish with signature (HTTP registry)
+$ aam publish --sign
+Publishing asvc-auditor@1.0.0 to aam-central...
+  Signing with Sigstore (OIDC identity)...
+✓ Published with signature
+  Signature: sigstore bundle attached
+
+# Publish with GPG signature
+$ aam publish --sign --sign-type gpg
+Publishing asvc-auditor@1.0.0 to aam-central...
+  Signing with GPG key: ABC123DEF...
+✓ Published with GPG signature
 ```
 
 Under the hood, `aam publish` either:
 - Creates a PR to the git registry (for community registry), or
+- Uploads via HTTP API with optional signature (for HTTP registry), or
 - Copies the `.aam` file to the local/private registry
 
 ---
@@ -772,6 +822,7 @@ RESOLVE(root_package):
 | `^1.0.0` | Compatible release | >=1.0.0, <2.0.0 |
 | `~1.0.0` | Approximate | >=1.0.0, <1.1.0 |
 | `*` | Any version | Latest available |
+| `>=1.0.0,<2.0.0` | Range constraint | Explicit range with multiple conditions |
 
 ### 7.3 Lock File: `aam-lock.yaml`
 
@@ -785,7 +836,7 @@ resolved_at: "2026-02-05T14:30:00Z"
 packages:
   asvc-auditor:
     version: 1.0.0
-    source: aam-community
+    source: aam-central
     checksum: sha256:abc123...
     dependencies:
       generic-auditor: 1.2.3
@@ -793,13 +844,13 @@ packages:
 
   generic-auditor:
     version: 1.2.3
-    source: aam-community
+    source: aam-central
     checksum: sha256:def456...
     dependencies: {}
 
   report-templates:
     version: 2.1.0
-    source: aam-community
+    source: aam-central
     checksum: sha256:789ghi...
     dependencies: {}
 ```
@@ -829,22 +880,99 @@ Suggestions:
 
 Unlike npm, AAM does **not** support multiple versions of the same dependency (no node_modules-style nesting). Agent artifacts must converge on a single version to avoid conflicting instructions.
 
+### 7.5 Package Signing & Verification
+
+AAM supports multiple levels of package integrity and authenticity verification.
+
+#### Signing Methods
+
+| Method | Description | When to Use |
+|--------|-------------|-------------|
+| **Checksum** | SHA-256 hash of archive | Always (automatic) |
+| **Sigstore** | Keyless, identity-based via OIDC | Recommended for public packages |
+| **GPG** | Traditional key-based signing | For teams with existing GPG infrastructure |
+| **Registry Attestation** | Server-side signatures | Automated trust for registry-verified packages |
+
+#### Signing Flow
+
+```
+Author                          Registry                         User
+   │                               │                               │
+   │  aam publish --sign           │                               │
+   ├──────────────────────────────►│                               │
+   │  1. Calculate SHA-256         │                               │
+   │  2. Sign with Sigstore/GPG    │                               │
+   │  3. Upload archive+signature  │                               │
+   │                               │  Verify signature             │
+   │                               │  Store attestation            │
+   │                               │                               │
+   │                               │         aam install pkg       │
+   │                               │◄──────────────────────────────┤
+   │                               │  1. Download archive          │
+   │                               │  2. Download signature        │
+   │                               ├──────────────────────────────►│
+   │                               │                               │
+   │                               │  3. Verify checksum           │
+   │                               │  4. Verify signature          │
+   │                               │  5. Check trust policy        │
+   │                               │  6. Install if valid          │
+```
+
+#### Verification Policy
+
+Users configure their trust requirements in `~/.aam/config.yaml`:
+
+```yaml
+security:
+  require_checksum: true      # Always enforced
+  require_signature: false    # Optional by default
+  trusted_identities:         # For Sigstore verification
+    - "*@example.org"         # Trust all from domain
+    - "user@specific.com"     # Trust specific user
+  trusted_keys:               # For GPG verification
+    - "ABCD1234..."           # GPG key fingerprint
+  on_signature_failure: warn  # warn, error, or ignore
+```
+
+#### CLI Integration
+
+```bash
+# Verify package signature before install
+$ aam install asvc-auditor --verify
+✓ Checksum verified: sha256:abc123...
+✓ Sigstore signature valid
+  Identity: author@example.org
+  Transparency log: https://rekor.sigstore.dev/...
+
+# Show signature info
+$ aam info asvc-auditor --signatures
+asvc-auditor@1.0.0
+  Checksum: sha256:abc123def456...
+  Signatures:
+    - Type: sigstore
+      Identity: author@example.org
+      Timestamp: 2026-02-05T14:30:00Z
+```
+
+For full signing implementation details, see [HTTP_REGISTRY_SPEC.md](./HTTP_REGISTRY_SPEC.md) section 5.
+
 ---
 
 ## 8. Platform Adapters
 
-Each platform adapter implements a common interface:
+Each platform adapter implements the `PlatformAdapter` protocol (see [section 11.4](#114-key-interfaces) for the full interface definition):
 
 ```python
-class PlatformAdapter:
+class PlatformAdapter(Protocol):
     """Deploys abstract artifacts to a specific AI platform."""
+    name: str
 
-    def deploy_skill(self, skill: Skill, config: PlatformConfig) -> DeployResult
-    def deploy_agent(self, agent: Agent, config: PlatformConfig) -> DeployResult
-    def deploy_prompt(self, prompt: Prompt, config: PlatformConfig) -> DeployResult
-    def deploy_instruction(self, instruction: Instruction, config: PlatformConfig) -> DeployResult
-    def undeploy(self, artifact_name: str) -> UndeployResult
-    def list_deployed(self) -> list[DeployedArtifact]
+    def deploy_skill(self, skill_path: Path, skill_ref: ArtifactRef, config: dict) -> Path
+    def deploy_agent(self, agent_path: Path, agent_ref: ArtifactRef, config: dict) -> Path
+    def deploy_prompt(self, prompt_path: Path, prompt_ref: ArtifactRef, config: dict) -> Path
+    def deploy_instruction(self, instr_path: Path, instr_ref: ArtifactRef, config: dict) -> Path
+    def undeploy(self, artifact_name: str, artifact_type: str) -> None
+    def list_deployed(self) -> list[tuple[str, str, Path]]  # (name, type, path)
 ```
 
 ### 8.1 Cursor Adapter
@@ -959,25 +1087,25 @@ Same marker-based merging as Copilot, but targeting `CLAUDE.md`:
 
 ### 8.5 Adapter Summary
 
-```
-                    ┌─────────────────┐
-                    │   AAM Package    │
-                    │   (abstract)     │
-                    └────────┬────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              │              │              │
-     ┌────────▼───┐  ┌──────▼─────┐ ┌─────▼──────┐
-     │   Cursor   │  │  Copilot   │ │   Claude   │  ...
-     │  Adapter   │  │  Adapter   │ │  Adapter   │
-     └────────┬───┘  └──────┬─────┘ └─────┬──────┘
-              │              │              │
-     ┌────────▼───┐  ┌──────▼─────┐ ┌─────▼──────┐
-     │.cursor/    │  │.github/    │ │CLAUDE.md   │
-     │  rules/    │  │  copilot-  │ │.claude/    │
-     │  skills/   │  │  instruc.. │ │  skills/   │
-     │  prompts/  │  │  prompts/  │ │  prompts/  │
-     └────────────┘  └────────────┘ └────────────┘
+```mermaid
+flowchart TB
+    Package["AAM Package<br/>(abstract artifacts)"]
+    
+    Package --> CursorAdapter["Cursor Adapter"]
+    Package --> CopilotAdapter["Copilot Adapter"]
+    Package --> ClaudeAdapter["Claude Adapter"]
+    Package --> CodexAdapter["Codex Adapter"]
+    
+    CursorAdapter --> CursorFiles[".cursor/<br/>rules/, skills/, prompts/"]
+    CopilotAdapter --> CopilotFiles[".github/<br/>copilot-instructions.md<br/>prompts/"]
+    ClaudeAdapter --> ClaudeFiles["CLAUDE.md<br/>.claude/skills/, prompts/"]
+    CodexAdapter --> CodexFiles["AGENTS.md<br/>~/.codex/skills/"]
+    
+    style Package fill:#e1f5fe
+    style CursorAdapter fill:#fff3e0
+    style CopilotAdapter fill:#fff3e0
+    style ClaudeAdapter fill:#fff3e0
+    style CodexAdapter fill:#fff3e0
 ```
 
 ---
@@ -999,7 +1127,7 @@ active_platforms:
 
 # Registry sources (searched in order)
 registries:
-  - name: aam-community
+  - name: aam-central
     url: https://github.com/aam-packages/registry
     type: git
   - name: local
@@ -1010,6 +1138,16 @@ registries:
 cache:
   directory: ~/.aam/cache
   max_size_mb: 500
+
+# Security and verification policy
+security:
+  require_checksum: true      # Always enforced (non-configurable)
+  require_signature: false    # Require signed packages
+  trusted_identities:         # Sigstore OIDC identities to trust
+    - "*@myorg.com"
+  trusted_keys:               # GPG key fingerprints to trust
+    - "ABCD1234..."
+  on_signature_failure: warn  # warn, error, or ignore
 
 # Author defaults (used by aam init)
 author:
@@ -1046,12 +1184,24 @@ Project (.aam/config.yaml)  >  Global (~/.aam/config.yaml)  >  Defaults
 ```
 ~/.aam/
 ├── config.yaml             # Global configuration
+├── credentials.yaml        # API tokens (chmod 600, never commit)
 ├── cache/                  # Downloaded package cache
 │   ├── asvc-auditor-1.0.0.aam
 │   └── generic-auditor-1.2.3.aam
 └── registries/             # Cached registry indexes
-    └── aam-community/
+    └── aam-central/
         └── index.yaml
+```
+
+**`credentials.yaml` format (sensitive — chmod 600):**
+```yaml
+# ~/.aam/credentials.yaml — DO NOT COMMIT
+registries:
+  aam-central:
+    token: "aam_tok_abc123..."
+    expires: "2026-08-05T14:30:00Z"
+  private-registry:
+    token: "aam_tok_xyz789..."
 ```
 
 ### 10.2 Project-Level: `.aam/`
@@ -1120,7 +1270,10 @@ aam/
 │   ├── deploy.py           # aam deploy command
 │   ├── publish.py          # aam publish command
 │   ├── search.py           # aam search command
-│   └── config.py           # aam config command
+│   ├── config.py           # aam config command
+│   ├── register.py         # aam register command (HTTP registry)
+│   ├── login.py            # aam login / logout commands
+│   └── yank.py             # aam yank command
 ├── core/
 │   ├── __init__.py
 │   ├── manifest.py         # aam.yaml parsing and validation
@@ -1128,11 +1281,18 @@ aam/
 │   ├── artifact.py         # Artifact models (Skill, Agent, Prompt, Instruction)
 │   ├── resolver.py         # Dependency resolution
 │   ├── installer.py        # Download + extract + deploy orchestration
-│   └── version.py          # Semver parsing and constraint matching
+│   ├── version.py          # Semver parsing and constraint matching
+│   └── auth.py             # Token management and credentials
+├── signing/
+│   ├── __init__.py
+│   ├── checksum.py         # SHA-256 calculation and verification
+│   ├── sigstore.py         # Sigstore signing/verification
+│   └── gpg.py              # GPG signing/verification
 ├── registry/
 │   ├── __init__.py
 │   ├── base.py             # Registry interface
 │   ├── git.py              # Git-based registry
+│   ├── http.py             # HTTP registry client
 │   └── local.py            # Local filesystem registry
 ├── adapters/
 │   ├── __init__.py
@@ -1144,7 +1304,6 @@ aam/
 └── utils/
     ├── __init__.py
     ├── archive.py          # .aam archive creation/extraction
-    ├── checksum.py         # SHA256 verification
     ├── yaml_utils.py       # YAML helpers
     └── paths.py            # Path resolution utilities
 ```
@@ -1161,52 +1320,35 @@ aam/
 | Git operations | subprocess (git CLI) | No heavy dependencies, git is ubiquitous |
 | HTTP | httpx | Modern async HTTP for registry downloads |
 | Rich output | rich | Beautiful terminal output, progress bars, trees |
+| Signing | sigstore | Keyless signing via OIDC (Sigstore ecosystem) |
+| GPG | python-gnupg | GPG key-based signing for traditional workflows |
 
 ### 11.3 Data Flow: Install
 
-```
-User: aam install asvc-auditor
-         │
-         ▼
-┌──────────────────┐
-│   CLI (install)  │ Parse args, load config
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│    Registry      │ Search registries for package
-│    (resolve)     │ Download metadata.yaml
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│    Resolver      │ Build dependency graph
-│  (dependencies)  │ Resolve version constraints
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│   Installer      │ Download .aam archives
-│   (download)     │ Verify checksums
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│   Installer      │ Extract to .aam/packages/
-│   (extract)      │ Write lock file
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│    Adapter       │ For each active platform:
-│   (deploy)       │   Transform & copy artifacts
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│    Summary       │ Print installed packages
-│   (report)       │ Show deployed locations
-└──────────────────┘
+```mermaid
+flowchart TD
+    User["User: aam install asvc-auditor"]
+    
+    CLI["CLI (install)<br/>Parse args, load config"]
+    Registry["Registry (resolve)<br/>Search registries for package<br/>Download metadata.yaml"]
+    Resolver["Resolver (dependencies)<br/>Build dependency graph<br/>Resolve version constraints"]
+    Download["Installer (download)<br/>Download .aam archives<br/>Download signatures"]
+    Verify["Signing (verify)<br/>Verify SHA-256 checksum<br/>Verify signatures per policy"]
+    Extract["Installer (extract)<br/>Extract to .aam/packages/<br/>Write lock file"]
+    Deploy["Adapter (deploy)<br/>For each active platform:<br/>Transform & copy artifacts"]
+    Summary["Summary (report)<br/>Print installed packages<br/>Show deployed locations"]
+    
+    User --> CLI
+    CLI --> Registry
+    Registry --> Resolver
+    Resolver --> Download
+    Download --> Verify
+    Verify --> Extract
+    Extract --> Deploy
+    Deploy --> Summary
+    
+    style User fill:#e8f5e9
+    style Summary fill:#e8f5e9
 ```
 
 ### 11.4 Key Interfaces
@@ -1415,8 +1557,13 @@ Now the user opens Cursor, and the ASVC auditor agent is fully configured with i
 ### Phase 2 — Registry + More Platforms (v0.2.0)
 
 - [ ] Git-based registry (read-only: search, download)
+- [ ] HTTP registry client (`aam/registry/http.py`)
+- [ ] `aam register` — create registry account
+- [ ] `aam login` / `aam logout` — authentication
 - [ ] `aam publish` — publish to registry
+- [ ] `aam publish --sign` — publish with Sigstore/GPG signature
 - [ ] `aam search` — search registry index
+- [ ] Package signing and verification (checksum always, Sigstore/GPG optional)
 - [ ] Claude adapter
 - [ ] GitHub Copilot adapter
 - [ ] Lock file generation
@@ -1434,7 +1581,8 @@ Now the user opens Cursor, and the ASVC auditor agent is fully configured with i
 ### Phase 4 — Advanced (v1.0.0)
 
 - [ ] Namespace/scope support (`@org/package-name`)
-- [ ] HTTP registry backend
+- [ ] `aam yank` — mark version as yanked (HTTP registry only)
+- [ ] Registry attestations (automated trust)
 - [ ] `aam-lock.yaml` integrity verification
 - [ ] Plugin system for community-contributed adapters
 - [ ] Multi-version dependency support (if needed)

@@ -1,0 +1,44 @@
+version: "3.9"
+
+# Development overrides - use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend.dev
+    volumes:
+      - ../apps/aam-backend:/app
+    environment:
+      APP_ENV: development
+      DEBUG: "true"
+    command: uvicorn aam_backend.main:app --reload --host 0.0.0.0 --port 8000
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web.dev
+    volumes:
+      - ../apps/aam-web:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+    command: npm run dev -- --host 0.0.0.0
+
+  # Remove nginx in development
+  nginx:
+    profiles:
+      - production

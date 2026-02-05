@@ -1,0 +1,65 @@
+{
+  "name": "aam-cli",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/aam-cli/src",
+  "tags": ["type:app", "scope:cli", "lang:python"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-cli",
+        "commands": [
+          "python -m pip install build",
+          "python -m build"
+        ]
+      },
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "run": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-cli",
+        "command": "python -m aam_cli.main"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-cli",
+        "command": "python -m aam_cli.main"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-cli",
+        "command": "pytest tests/ -v"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-cli",
+        "commands": [
+          "ruff check src/ tests/",
+          "mypy src/"
+        ]
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-cli",
+        "command": "ruff format src/ tests/"
+      }
+    },
+    "install": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-cli",
+        "command": "pip install -e '.[dev]'"
+      }
+    }
+  }
+}

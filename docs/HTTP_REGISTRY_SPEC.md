@@ -52,32 +52,35 @@ This document specifies the HTTP Registry Service for AAM (Agent Artifact Manage
 
 ### 2.1 System Components
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         AAM Registry Service                      │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
-│  │   API Layer  │    │  Auth Layer  │    │ Signing Layer│       │
-│  │   (FastAPI)  │◄──►│  (JWT/Token) │◄──►│  (Sigstore)  │       │
-│  └──────┬───────┘    └──────────────┘    └──────────────┘       │
-│         │                                                         │
-│         ▼                                                         │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
-│  │   Database   │    │   Storage    │    │    Cache     │       │
-│  │ (PostgreSQL) │    │  (S3/MinIO)  │    │   (Redis)    │       │
-│  └──────────────┘    └──────────────┘    └──────────────┘       │
-│                                                                   │
-└─────────────────────────────────────────────────────────────────┘
-                              ▲
-                              │ HTTPS
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                          AAM CLI Client                          │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
-│  │ aam publish  │    │ aam install  │    │  aam search  │       │
-│  └──────────────┘    └──────────────┘    └──────────────┘       │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Client["AAM CLI Client"]
+        publish["aam publish"]
+        install["aam install"]
+        search["aam search"]
+    end
+
+    subgraph Registry["AAM Registry Service"]
+        subgraph Services["Service Layer"]
+            API["API Layer<br/>(FastAPI)"]
+            Auth["Auth Layer<br/>(JWT/Token)"]
+            Signing["Signing Layer<br/>(Sigstore)"]
+        end
+        
+        subgraph Data["Data Layer"]
+            DB[(PostgreSQL)]
+            Storage[(S3/MinIO)]
+            Cache[(Redis)]
+        end
+        
+        API <--> Auth
+        Auth <--> Signing
+        API --> DB
+        API --> Storage
+        API --> Cache
+    end
+
+    Client <-->|HTTPS| API
 ```
 
 ### 2.2 Technology Stack
@@ -363,49 +366,94 @@ Authorization: Bearer <token>
 
 ### 4.1 Entity Relationship Diagram
 
-```
-┌─────────────┐       ┌──────────────────┐       ┌─────────────────┐
-│   users     │       │     packages     │       │ package_versions│
-├─────────────┤       ├──────────────────┤       ├─────────────────┤
-│ id (PK)     │──┐    │ id (PK)          │──┐    │ id (PK)         │
-│ username    │  │    │ name             │  │    │ package_id (FK) │
-│ email       │  │    │ description      │  │    │ version         │
-│ password_h  │  │    │ author           │  │    │ checksum_sha256 │
-│ created_at  │  │    │ license          │  │    │ archive_size    │
-└─────────────┘  │    │ repository       │  │    │ archive_path    │
-       │         │    │ latest_version   │  │    │ published_at    │
-       │         │    │ created_at       │  │    │ yanked          │
-       │         │    │ updated_at       │  │    │ yanked_at       │
-       │         │    └──────────────────┘  │    │ signature_type  │
-       │         │             │            │    │ signature_data  │
-       │         │             │            │    │ signer_identity │
-       │         │             ▼            │    └─────────────────┘
-       │         │    ┌──────────────────┐  │            │
-       │         │    │ package_keywords │  │            │
-       │         │    ├──────────────────┤  │            ▼
-       │         │    │ package_id (FK)  │  │    ┌─────────────────┐
-       │         │    │ keyword          │  │    │  dependencies   │
-       │         │    └──────────────────┘  │    ├─────────────────┤
-       │         │                          │    │ version_id (FK) │
-       │         ▼                          │    │ dep_name        │
-       │  ┌──────────────────┐              │    │ version_constr  │
-       │  │ package_owners   │              │    └─────────────────┘
-       │  ├──────────────────┤              │
-       └─►│ user_id (FK)     │              │            │
-          │ package_id (FK)  │◄─────────────┘            ▼
-          └──────────────────┘                   ┌─────────────────┐
-                                                 │    artifacts    │
-       ┌─────────────────┐                       ├─────────────────┤
-       │   api_tokens    │                       │ version_id (FK) │
-       ├─────────────────┤                       │ artifact_type   │
-       │ id (PK)         │                       │ name            │
-       │ user_id (FK)    │                       │ description     │
-       │ token_hash      │                       └─────────────────┘
-       │ name            │
-       │ created_at      │
-       │ last_used_at    │
-       │ revoked_at      │
-       └─────────────────┘
+```mermaid
+erDiagram
+    users ||--o{ api_tokens : has
+    users ||--o{ package_owners : owns
+    packages ||--o{ package_owners : owned_by
+    packages ||--o{ package_keywords : has
+    packages ||--o{ package_versions : contains
+    package_versions ||--o{ dependencies : requires
+    package_versions ||--o{ artifacts : declares
+
+    users {
+        uuid id PK
+        varchar username UK
+        varchar email UK
+        varchar password_hash
+        boolean email_verified
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    api_tokens {
+        uuid id PK
+        uuid user_id FK
+        varchar token_hash
+        varchar name
+        varchar[] scopes
+        timestamp created_at
+        timestamp last_used_at
+        timestamp expires_at
+        timestamp revoked_at
+    }
+
+    packages {
+        uuid id PK
+        varchar name UK
+        text description
+        varchar author
+        varchar license
+        varchar repository
+        varchar latest_version
+        bigint downloads_total
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    package_owners {
+        uuid package_id PK,FK
+        uuid user_id PK,FK
+        varchar role
+        timestamp added_at
+    }
+
+    package_keywords {
+        uuid package_id PK,FK
+        varchar keyword PK
+    }
+
+    package_versions {
+        uuid id PK
+        uuid package_id FK
+        varchar version
+        varchar checksum_sha256
+        bigint archive_size
+        varchar archive_path
+        jsonb manifest_json
+        timestamp published_at
+        uuid published_by FK
+        boolean yanked
+        timestamp yanked_at
+        varchar signature_type
+        jsonb signature_data
+        varchar signer_identity
+    }
+
+    dependencies {
+        uuid id PK
+        uuid version_id FK
+        varchar dependency_name
+        varchar version_constraint
+    }
+
+    artifacts {
+        uuid id PK
+        uuid version_id FK
+        varchar artifact_type
+        varchar name
+        text description
+    }
 ```
 
 ### 4.2 Table Definitions
@@ -618,38 +666,28 @@ Sigstore provides keyless signing using OIDC identity providers (GitHub, Google,
 
 #### 5.3.1 Signing Flow
 
-```
-┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│  Author  │     │   OIDC   │     │ Fulcio   │     │  Rekor   │
-│   CLI    │     │ Provider │     │   CA     │     │   Log    │
-└────┬─────┘     └────┬─────┘     └────┬─────┘     └────┬─────┘
-     │                │                │                │
-     │ 1. Initiate    │                │                │
-     │    signing     │                │                │
-     │───────────────►│                │                │
-     │                │                │                │
-     │ 2. OIDC login  │                │                │
-     │◄──────────────►│                │                │
-     │                │                │                │
-     │ 3. ID token    │                │                │
-     │◄───────────────│                │                │
-     │                │                │                │
-     │ 4. Request certificate          │                │
-     │─────────────────────────────────►│                │
-     │                                  │                │
-     │ 5. Short-lived certificate       │                │
-     │◄─────────────────────────────────│                │
-     │                                                   │
-     │ 6. Sign package with cert                         │
-     │                                                   │
-     │ 7. Record in transparency log                     │
-     │──────────────────────────────────────────────────►│
-     │                                                   │
-     │ 8. Log entry receipt                              │
-     │◄──────────────────────────────────────────────────│
-     │
-     │ 9. Upload package + signature bundle to registry
-     │
+```mermaid
+sequenceDiagram
+    participant CLI as Author CLI
+    participant OIDC as OIDC Provider<br/>(GitHub/Google)
+    participant Fulcio as Fulcio CA
+    participant Rekor as Rekor Log
+    participant Registry as AAM Registry
+
+    CLI->>OIDC: 1. Initiate signing (open browser)
+    CLI->>OIDC: 2. OIDC login
+    OIDC-->>CLI: 3. ID token
+    
+    CLI->>Fulcio: 4. Request certificate (with ID token)
+    Fulcio-->>CLI: 5. Short-lived certificate
+    
+    Note over CLI: 6. Sign package with certificate
+    
+    CLI->>Rekor: 7. Record in transparency log
+    Rekor-->>CLI: 8. Log entry receipt
+    
+    CLI->>Registry: 9. Upload package + signature bundle
+    Registry-->>CLI: 10. Published successfully
 ```
 
 #### 5.3.2 Signature Bundle Format
@@ -1403,32 +1441,38 @@ volumes:
 
 ### 10.2 Production Architecture
 
-```
-                         ┌─────────────┐
-                         │   CDN       │
-                         │ (CloudFront)│
-                         └──────┬──────┘
-                                │
-                         ┌──────▼──────┐
-                         │   Load      │
-                         │  Balancer   │
-                         └──────┬──────┘
-                                │
-              ┌─────────────────┼─────────────────┐
-              │                 │                 │
-       ┌──────▼──────┐   ┌──────▼──────┐   ┌──────▼──────┐
-       │   API       │   │   API       │   │   API       │
-       │  Server 1   │   │  Server 2   │   │  Server 3   │
-       └──────┬──────┘   └──────┬──────┘   └──────┬──────┘
-              │                 │                 │
-              └─────────────────┼─────────────────┘
-                                │
-              ┌─────────────────┼─────────────────┐
-              │                 │                 │
-       ┌──────▼──────┐   ┌──────▼──────┐   ┌──────▼──────┐
-       │  PostgreSQL │   │    Redis    │   │     S3      │
-       │   (RDS)     │   │ (ElastiCache)│   │   Bucket    │
-       └─────────────┘   └─────────────┘   └─────────────┘
+```mermaid
+flowchart TB
+    subgraph Internet
+        Users[Users / CLI]
+    end
+
+    subgraph AWS["AWS / Cloud"]
+        CDN[CDN<br/>CloudFront]
+        LB[Load Balancer<br/>ALB]
+        
+        subgraph Compute["Compute (Auto-scaling)"]
+            API1[API Server 1]
+            API2[API Server 2]
+            API3[API Server 3]
+        end
+        
+        subgraph Data["Data Stores"]
+            DB[(PostgreSQL<br/>RDS)]
+            Cache[(Redis<br/>ElastiCache)]
+            S3[(S3 Bucket<br/>Package Storage)]
+        end
+    end
+
+    Users --> CDN
+    CDN --> LB
+    LB --> API1
+    LB --> API2
+    LB --> API3
+    
+    API1 & API2 & API3 --> DB
+    API1 & API2 & API3 --> Cache
+    API1 & API2 & API3 --> S3
 ```
 
 ### 10.3 Environment Variables

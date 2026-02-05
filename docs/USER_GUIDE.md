@@ -10,11 +10,12 @@ This guide walks you through creating, publishing, and installing AAM packages w
 ## Table of Contents
 
 1. [Quick Start](#1-quick-start)
-2. [Creating a Package](#2-creating-a-package)
-3. [Publishing a Package](#3-publishing-a-package)
-4. [Installing a Package](#4-installing-a-package)
-5. [Adding Dependencies](#5-adding-dependencies)
-6. [Complete Example: Building a Code Review Package](#6-complete-example-building-a-code-review-package)
+2. [Creating a Package from an Existing Project](#2-creating-a-package-from-an-existing-project)
+3. [Creating a Package from Scratch](#3-creating-a-package-from-scratch)
+4. [Publishing a Package](#4-publishing-a-package)
+5. [Installing a Package](#5-installing-a-package)
+6. [Adding Dependencies](#6-adding-dependencies)
+7. [Complete Example: Building a Code Review Package](#7-complete-example-building-a-code-review-package)
 
 ---
 
@@ -23,8 +24,17 @@ This guide walks you through creating, publishing, and installing AAM packages w
 ```mermaid
 flowchart LR
     subgraph Author["Package Author"]
-        Init["aam init"]
-        Create["Create Artifacts<br/>skills/, agents/,<br/>prompts/, instructions/"]
+        direction TB
+        
+        subgraph NewPkg["From Scratch"]
+            Init["aam init"]
+            CreateNew["Create Artifacts<br/>skills/, agents/,<br/>prompts/, instructions/"]
+        end
+        
+        subgraph ExistingPkg["From Existing Project"]
+            CreatePkg["aam create-package<br/><i>autodetect + select</i>"]
+        end
+        
         Validate["aam validate"]
         Pack["aam pack"]
         Publish["aam publish --sign"]
@@ -40,8 +50,9 @@ flowchart LR
         Deploy["Auto-deploy to<br/>target platforms"]
     end
     
-    Init --> Create
-    Create --> Validate
+    Init --> CreateNew
+    CreateNew --> Validate
+    CreatePkg --> Validate
     Validate --> Pack
     Pack --> Publish
     Publish --> Store
@@ -51,6 +62,7 @@ flowchart LR
     Install --> Deploy
     
     style Init fill:#e3f2fd
+    style CreatePkg fill:#e3f2fd
     style Publish fill:#fff3e0
     style Store fill:#f3e5f5
     style Install fill:#e8f5e9
@@ -77,7 +89,10 @@ aam config set default_platform cursor
 ### TL;DR Commands
 
 ```bash
-# Create a new package
+# Create a package from an existing project (autodetect skills/agents/etc.)
+aam create-package
+
+# Or create a new package from scratch
 aam init my-package
 
 # Validate before publishing
@@ -93,9 +108,286 @@ aam install my-package
 
 ---
 
-## 2. Creating a Package
+## 2. Creating a Package from an Existing Project
 
-### 2.1 Initialize a New Package
+You have been working on a project and organically created skills, agents, or instructions — perhaps directly in `.cursor/skills/`, `.cursor/rules/`, or other platform-specific locations. Now you want to bundle them into an AAM package so they can be shared, versioned, and installed elsewhere.
+
+The `aam create-package` command handles this workflow.
+
+### 2.1 The Problem
+
+Imagine your project looks like this:
+
+```
+my-project/
+├── .cursor/
+│   ├── skills/
+│   │   ├── code-reviewer/
+│   │   │   ├── SKILL.md
+│   │   │   └── scripts/
+│   │   │       └── analyze.py
+│   │   └── deploy-helper/
+│   │       └── SKILL.md
+│   ├── rules/
+│   │   ├── agent-security-auditor.mdc
+│   │   └── python-standards.mdc
+│   └── prompts/
+│       └── refactor-template.md
+├── CLAUDE.md
+├── src/
+│   └── ... (your application code)
+└── ... (other project files)
+```
+
+These skills and agents are useful, but they're trapped in your local project. There's no `aam.yaml`, no package structure — just files you created while working.
+
+### 2.2 Basic Usage
+
+Run `aam create-package` from your project root:
+
+```bash
+$ cd my-project/
+$ aam create-package
+
+Scanning for artifacts not managed by AAM...
+
+Found 5 artifacts:
+
+  Skills (2):
+    [x] 1. code-reviewer       .cursor/skills/code-reviewer/SKILL.md
+    [x] 2. deploy-helper       .cursor/skills/deploy-helper/SKILL.md
+
+  Agents (1):
+    [x] 3. security-auditor    .cursor/rules/agent-security-auditor.mdc
+
+  Instructions (1):
+    [x] 4. python-standards    .cursor/rules/python-standards.mdc
+
+  Prompts (1):
+    [x] 5. refactor-template   .cursor/prompts/refactor-template.md
+
+Toggle selection with [space], confirm with [enter].
+Select/deselect all: [a]  |  Invert selection: [i]
+```
+
+Select the artifacts you want to include (or deselect ones that are work-in-progress), then fill in the package metadata:
+
+```bash
+Selected 5 artifacts. Continue? [Y/n] y
+
+Package name [my-project]: my-toolkit
+Version [1.0.0]:
+Description: Code review and deployment toolkit
+Author [spazy]:
+License [MIT]:
+
+How should files be organized?
+  (c) Copy into AAM package structure
+  (r) Reference in-place (keep files where they are)
+  [default: c]
+
+Creating package...
+  ✓ Created aam.yaml
+  ✓ Copied .cursor/skills/code-reviewer/ → skills/code-reviewer/
+  ✓ Copied .cursor/skills/deploy-helper/ → skills/deploy-helper/
+  ✓ Converted .cursor/rules/agent-security-auditor.mdc → agents/security-auditor/
+  ✓ Converted .cursor/rules/python-standards.mdc → instructions/python-standards.md
+  ✓ Copied .cursor/prompts/refactor-template.md → prompts/refactor-template.md
+
+✓ Package created: my-toolkit@1.0.0
+  5 artifacts (2 skills, 1 agent, 1 instruction, 1 prompt)
+
+Next steps:
+  aam validate    — verify the package is well-formed
+  aam pack        — build distributable .aam archive
+  aam publish     — publish to registry
+```
+
+### 2.3 What Gets Autodetected
+
+AAM scans for known artifact patterns across all supported platforms:
+
+| Artifact Type | Detection Patterns |
+|---------------|-------------------|
+| **Skills** | `**/SKILL.md` (parent directory = skill), `.cursor/skills/*/`, `.codex/skills/*/`, `skills/*/` |
+| **Agents** | `**/agent.yaml`, `agents/*/`, `.cursor/rules/agent-*.mdc` |
+| **Prompts** | `prompts/*.md`, `.cursor/prompts/*.md`, `.github/prompts/*.md` |
+| **Instructions** | `instructions/*.md`, `.cursor/rules/*.mdc` (non-agent), `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md` |
+
+The following directories are **always excluded** from scanning:
+- `.aam/packages/` (already-installed AAM packages)
+- `node_modules/`, `.venv/`, `__pycache__/`, `.git/`
+
+Files already declared in an existing `aam.yaml` are also excluded.
+
+### 2.4 File Organization Modes
+
+When creating the package, you choose how files are organized:
+
+#### Copy Mode (Default)
+
+Copies detected artifacts into the standard AAM directory structure. Your original files remain untouched.
+
+```bash
+$ aam create-package --organize copy
+```
+
+Result:
+```
+my-project/
+├── aam.yaml                          # NEW: package manifest
+├── skills/                           # NEW: copied from .cursor/skills/
+│   ├── code-reviewer/
+│   │   ├── SKILL.md
+│   │   └── scripts/
+│   │       └── analyze.py
+│   └── deploy-helper/
+│       └── SKILL.md
+├── agents/                           # NEW: converted from .cursor/rules/
+│   └── security-auditor/
+│       ├── agent.yaml
+│       └── system-prompt.md
+├── instructions/                     # NEW: converted from .cursor/rules/
+│   └── python-standards.md
+├── prompts/                          # NEW: copied from .cursor/prompts/
+│   └── refactor-template.md
+├── .cursor/                          # UNTOUCHED: original files remain
+│   └── ...
+└── src/
+    └── ...
+```
+
+#### Reference Mode
+
+Does not copy files. The `aam.yaml` points to artifacts at their current locations. Best for local-only packages or when you want to keep using platform-specific paths.
+
+```bash
+$ aam create-package --organize reference
+```
+
+Result (only `aam.yaml` is created):
+```yaml
+# aam.yaml (reference mode)
+artifacts:
+  skills:
+    - name: code-reviewer
+      path: .cursor/skills/code-reviewer/
+      description: "..."
+    - name: deploy-helper
+      path: .cursor/skills/deploy-helper/
+      description: "..."
+```
+
+#### Move Mode
+
+Moves files into AAM structure and removes originals. **Use with caution** — this changes your project layout.
+
+```bash
+$ aam create-package --organize move
+```
+
+### 2.5 Platform-Specific Conversions
+
+Artifacts found in platform-specific formats are automatically converted to AAM-native format:
+
+**Cursor `.mdc` Rules → Instructions:**
+
+A `.cursor/rules/python-standards.mdc` file like:
+
+```markdown
+---
+description: "Python coding standards"
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Python Standards
+...
+```
+
+Gets converted to `instructions/python-standards.md`:
+
+```markdown
+---
+name: python-standards
+description: "Python coding standards"
+scope: project
+globs: "**/*.py"
+---
+
+# Python Standards
+...
+```
+
+**Cursor Agent Rules → Agent Definitions:**
+
+A `.cursor/rules/agent-security-auditor.mdc` file is converted into:
+
+```
+agents/security-auditor/
+├── agent.yaml        # Generated agent definition
+└── system-prompt.md  # Extracted from the .mdc rule body
+```
+
+### 2.6 Manual Include
+
+If autodetection misses files, include them manually:
+
+```bash
+# Include a specific file as an instruction
+$ aam create-package --include docs/coding-guide.md --include-as instruction
+
+# Include a directory as a skill
+$ aam create-package --include ./tools/linter/ --include-as skill
+```
+
+### 2.7 Non-Interactive Mode
+
+For CI/CD or scripting, use flags to skip prompts:
+
+```bash
+$ aam create-package \
+    --all \
+    --name my-toolkit \
+    --version 1.0.0 \
+    --description "My toolkit" \
+    --author spazy \
+    --organize copy \
+    --yes
+```
+
+### 2.8 Dry Run (Preview)
+
+See what would be detected and created without writing any files:
+
+```bash
+$ aam create-package --dry-run
+
+Scanning for artifacts not managed by AAM...
+
+Found 5 artifacts:
+  skill:       code-reviewer       .cursor/skills/code-reviewer/SKILL.md
+  skill:       deploy-helper       .cursor/skills/deploy-helper/SKILL.md
+  agent:       security-auditor    .cursor/rules/agent-security-auditor.mdc
+  instruction: python-standards    .cursor/rules/python-standards.mdc
+  prompt:      refactor-template   .cursor/prompts/refactor-template.md
+
+Would create:
+  aam.yaml
+  skills/code-reviewer/  (copy from .cursor/skills/code-reviewer/)
+  skills/deploy-helper/  (copy from .cursor/skills/deploy-helper/)
+  agents/security-auditor/  (convert from .cursor/rules/agent-security-auditor.mdc)
+  instructions/python-standards.md  (convert from .cursor/rules/python-standards.mdc)
+  prompts/refactor-template.md  (copy from .cursor/prompts/refactor-template.md)
+
+[Dry run — no files written]
+```
+
+---
+
+## 3. Creating a Package from Scratch
+
+### 3.1 Initialize a New Package
 
 Use `aam init` to create a new package interactively:
 

@@ -443,6 +443,7 @@ Package Management:
   info <package>                 Show package details
 
 Package Authoring:
+  create-package [path]          Create package from existing project (autodetect + interactive)
   init                           Initialize a new package (interactive)
   validate                       Validate current package manifest and artifacts
   pack                           Build distributable .aam archive
@@ -544,6 +545,178 @@ Deploying to cursor...
   → instruction: asvc-standards → .cursor/rules/asvc-standards.mdc
 
 Installed 3 packages (2 skills, 1 agent, 2 prompts, 1 instruction)
+```
+
+#### `aam create-package [path]`
+
+Creates a new AAM package from an existing working project that already contains skills, agents, prompts, or instructions that are **not** yet managed by AAM. This is the reverse of `aam init` — instead of scaffolding an empty package, it discovers existing artifacts in a project and packages them.
+
+**Use case:** You have been working in a project and created skills (e.g., `.cursor/skills/my-skill/SKILL.md`) or agents (e.g., `.cursor/rules/my-agent.mdc`) or instructions organically — outside of any AAM package. Now you want to bundle them into a distributable AAM package.
+
+```bash
+# Auto-detect artifacts in current directory
+$ aam create-package
+
+# Auto-detect artifacts in a specific directory
+$ aam create-package ./my-project/
+
+# Skip interactive selection — include everything detected
+$ aam create-package --all
+
+# Only detect specific artifact types
+$ aam create-package --type skills --type agents
+
+# Output manifest to stdout without creating files (preview mode)
+$ aam create-package --dry-run
+```
+
+**Autodetection flow:**
+
+The command scans the project directory for files that match known artifact patterns but are NOT already declared in any existing `aam.yaml` manifest.
+
+```
+Detection patterns:
+  Skills:
+    ─ **/SKILL.md                        (any SKILL.md file → parent dir is a skill)
+    ─ .cursor/skills/*/SKILL.md          (Cursor skill convention)
+    ─ .codex/skills/*/SKILL.md           (Codex skill convention)
+    ─ skills/*/SKILL.md                  (AAM convention)
+
+  Agents:
+    ─ **/agent.yaml                      (agent definition files)
+    ─ agents/*/agent.yaml                (AAM convention)
+    ─ .cursor/rules/agent-*.mdc          (Cursor agent rules)
+
+  Prompts:
+    ─ prompts/*.md                       (AAM convention)
+    ─ .cursor/prompts/*.md               (Cursor prompts)
+    ─ .github/prompts/*.md               (Copilot prompts)
+
+  Instructions:
+    ─ instructions/*.md                  (AAM convention)
+    ─ .cursor/rules/*.mdc                (Cursor rules, excluding agent-* rules)
+    ─ CLAUDE.md                          (Claude instructions)
+    ─ .github/copilot-instructions.md    (Copilot instructions)
+    ─ AGENTS.md                          (Codex instructions)
+```
+
+**Exclusion rules (NOT detected):**
+
+Files inside the following directories are ignored:
+- `.aam/packages/` — already-installed AAM packages
+- `node_modules/`, `.venv/`, `__pycache__/` — dependency/build directories
+- `.git/` — version control
+
+Files already declared in an existing `aam.yaml` are excluded from detection results.
+
+**Interactive selection flow:**
+
+```bash
+$ aam create-package
+
+Scanning for artifacts not managed by AAM...
+
+Found 6 artifacts:
+
+  Skills:
+    [x] 1. my-reviewer       .cursor/skills/my-reviewer/SKILL.md
+    [x] 2. deploy-helper     .cursor/skills/deploy-helper/SKILL.md
+    [ ] 3. experiment-wip    .cursor/skills/experiment-wip/SKILL.md
+
+  Agents:
+    [x] 4. code-auditor      agents/code-auditor/agent.yaml
+    [ ] 5. chat-assistant     .cursor/rules/agent-chat-assistant.mdc
+
+  Instructions:
+    [x] 6. python-rules      .cursor/rules/python-rules.mdc
+
+Toggle selection with space, confirm with enter.
+Select/deselect all: [a]
+Invert selection: [i]
+
+───────────────────────────────────────
+
+Selected 4 artifacts. Continue? [Y/n] y
+
+Package name [my-project]: my-toolkit
+Version [1.0.0]: 
+Description: Custom toolkit with code review and deployment skills
+Author [spazy]: 
+License [MIT]: 
+
+How should files be organized?
+  (c) Copy into AAM package structure (agents/, skills/, prompts/, instructions/)
+  (r) Reference in-place (keep files where they are, aam.yaml points to current paths)
+  [default: c]
+
+Creating package...
+  ✓ Created aam.yaml
+  ✓ Copied .cursor/skills/my-reviewer/ → skills/my-reviewer/
+  ✓ Copied .cursor/skills/deploy-helper/ → skills/deploy-helper/
+  ✓ Copied agents/code-auditor/ → agents/code-auditor/ (already in place)
+  ✓ Copied .cursor/rules/python-rules.mdc → instructions/python-rules.md
+
+✓ Package created: my-toolkit@1.0.0
+  4 artifacts (2 skills, 1 agent, 1 instruction)
+
+Next steps:
+  aam validate    — check that everything is correct
+  aam pack        — build distributable archive
+  aam publish     — publish to registry
+```
+
+**File organization modes:**
+
+| Mode | Flag | Behavior |
+|------|------|----------|
+| **Copy** (default) | `--organize copy` | Copies files into standard AAM directory structure (`skills/`, `agents/`, etc.). Original files are left untouched. |
+| **Reference** | `--organize reference` | Does NOT copy files. The `aam.yaml` manifest points to files at their current locations (e.g., `.cursor/skills/my-reviewer/`). Useful for packages that will only be used locally or published from the same project layout. |
+| **Move** | `--organize move` | Moves files into AAM structure and removes originals. Use with caution. |
+
+**Platform-specific artifact conversion:**
+
+When artifacts are found in platform-specific locations, they may need conversion:
+
+| Source Format | Target Format | Conversion |
+|---------------|--------------|------------|
+| `.cursor/rules/*.mdc` (instruction) | `instructions/*.md` | Strip `.mdc` frontmatter, convert to instruction markdown with YAML frontmatter |
+| `.cursor/rules/agent-*.mdc` (agent) | `agents/*/` | Extract system prompt from rule body, generate `agent.yaml` |
+| `CLAUDE.md` sections | `instructions/*.md` | Split `CLAUDE.md` into individual instruction files |
+| `.github/copilot-instructions.md` sections | `instructions/*.md` | Split into individual instruction files |
+
+**Manual include:**
+
+In addition to autodetection, you can manually specify files to include:
+
+```bash
+# Include specific files that autodetection missed
+$ aam create-package --include docs/my-guide.md --include-as instruction
+
+# Include a directory as a skill
+$ aam create-package --include ./my-tools/analyzer/ --include-as skill
+```
+
+**Command options:**
+
+```
+aam create-package [PATH]
+
+Arguments:
+  PATH                       Project directory to scan (default: current directory)
+
+Options:
+  --all                      Include all detected artifacts without interactive selection
+  --type TYPE                Filter detection to specific types (repeatable: skills, agents, prompts, instructions)
+  --organize MODE            File organization: copy (default), reference, move
+  --include PATH             Manually include a file/directory (repeatable)
+  --include-as TYPE          Artifact type for --include (skill, agent, prompt, instruction)
+  --name NAME                Package name (skip interactive prompt)
+  --version VERSION          Package version (skip interactive prompt)
+  --description DESC         Package description (skip interactive prompt)
+  --author AUTHOR            Package author (skip interactive prompt)
+  --dry-run                  Show what would be created without writing files
+  --output-dir DIR           Output directory for package (default: current directory)
+  -y, --yes                  Skip confirmation prompts
 ```
 
 #### `aam init [name]`
@@ -1265,6 +1438,7 @@ aam/
 ├── cli/
 │   ├── __init__.py
 │   ├── main.py             # Click/Typer CLI app
+│   ├── create_package.py   # aam create-package command (autodetect + interactive)
 │   ├── install.py          # aam install command
 │   ├── init.py             # aam init command
 │   ├── deploy.py           # aam deploy command
@@ -1547,6 +1721,7 @@ Now the user opens Cursor, and the ASVC auditor agent is fully configured with i
 ### Phase 1 — MVP (v0.1.0)
 
 - [ ] Core manifest parsing (`aam.yaml` with pydantic validation)
+- [ ] `aam create-package` — create package from existing project (autodetect + interactive selection)
 - [ ] `aam init` — interactive package scaffolding
 - [ ] `aam validate` — manifest and artifact validation
 - [ ] `aam pack` — build `.aam` archive

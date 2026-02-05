@@ -18,6 +18,46 @@ This guide walks you through creating, publishing, and installing AAM packages w
 
 ---
 
+## Workflow Overview
+
+```mermaid
+flowchart LR
+    subgraph Author["Package Author"]
+        Init["aam init"]
+        Create["Create Artifacts<br/>skills/, agents/,<br/>prompts/, instructions/"]
+        Validate["aam validate"]
+        Pack["aam pack"]
+        Publish["aam publish --sign"]
+    end
+    
+    subgraph Registry["Registry"]
+        Store[(Package<br/>Storage)]
+    end
+    
+    subgraph Consumer["Package Consumer"]
+        Search["aam search"]
+        Install["aam install"]
+        Deploy["Auto-deploy to<br/>target platforms"]
+    end
+    
+    Init --> Create
+    Create --> Validate
+    Validate --> Pack
+    Pack --> Publish
+    Publish --> Store
+    
+    Store --> Search
+    Search --> Install
+    Install --> Deploy
+    
+    style Init fill:#e3f2fd
+    style Publish fill:#fff3e0
+    style Store fill:#f3e5f5
+    style Install fill:#e8f5e9
+```
+
+---
+
 ## 1. Quick Start
 
 ### Prerequisites
@@ -139,11 +179,77 @@ platforms:
 
 #### Add a Skill
 
-Create `skills/python-reviewer/SKILL.md`:
+A skill is more than just a `SKILL.md` file — it can include **scripts**, **templates**, **references**, and **assets** that the AI agent can use.
+
+```mermaid
+flowchart TB
+    subgraph Skill["📁 skills/python-reviewer/"]
+        SKILL["📄 SKILL.md<br/><i>Required: Instructions & metadata</i>"]
+        
+        subgraph Scripts["📁 scripts/"]
+            S1["analyze.py"]
+            S2["complexity.py"]
+        end
+        
+        subgraph Templates["📁 templates/"]
+            T1["report.md.j2"]
+            T2["summary.j2"]
+        end
+        
+        subgraph References["📁 references/"]
+            R1["style-guide.md"]
+            R2["best-practices.md"]
+        end
+        
+        subgraph Assets["📁 assets/"]
+            A1["logo.png"]
+            A2["config.json"]
+        end
+    end
+    
+    Agent["🤖 AI Agent"]
+    
+    Agent -->|"reads instructions"| SKILL
+    Agent -->|"executes"| Scripts
+    Agent -->|"formats output"| Templates
+    Agent -->|"loads on demand"| References
+    Agent -->|"uses in output"| Assets
+    
+    style SKILL fill:#e8f5e9,stroke:#2e7d32
+    style Scripts fill:#fff3e0,stroke:#ef6c00
+    style Templates fill:#e3f2fd,stroke:#1565c0
+    style References fill:#fce4ec,stroke:#c2185b
+    style Assets fill:#f3e5f5,stroke:#7b1fa2
+```
+
+**Complete Skill Directory Structure:**
+
+```
+skills/<skill-name>/
+├── SKILL.md              # Required — frontmatter + instructions
+├── scripts/              # Optional — executable scripts
+│   ├── analyze.py
+│   └── generate_report.sh
+├── templates/            # Optional — output templates
+│   ├── report.md.j2
+│   └── summary.html.j2
+├── references/           # Optional — documentation loaded on demand
+│   ├── style-guide.md
+│   └── best-practices.md
+└── assets/               # Optional — files used in output
+    ├── logo.png
+    └── styles.css
+```
+
+**Create a complete skill with all components:**
 
 ```bash
-mkdir -p skills/python-reviewer
+mkdir -p skills/python-reviewer/{scripts,templates,references,assets}
 ```
+
+**1. SKILL.md — Main skill definition:**
+
+`skills/python-reviewer/SKILL.md`:
 
 ```markdown
 ---
@@ -157,6 +263,33 @@ description: Review Python code for best practices, PEP 8 compliance, and common
 - User asks to review Python code
 - User asks about Python best practices
 - User wants to improve code quality
+
+## Available Scripts
+
+This skill includes executable scripts:
+
+- `scripts/analyze.py` — Static analysis script that checks for common issues
+- `scripts/complexity.py` — Calculate cyclomatic complexity metrics
+
+Run scripts when deeper analysis is needed:
+```bash
+python skills/python-reviewer/scripts/analyze.py <file.py>
+```
+
+## Templates
+
+Use these templates for consistent output:
+
+- `templates/review-report.md.j2` — Full review report template
+- `templates/quick-summary.md.j2` — Brief summary template
+
+## References
+
+Load these for detailed guidance:
+
+- [Style Guide](references/pep8-summary.md) — PEP 8 quick reference
+- [Best Practices](references/best-practices.md) — Python idioms and patterns
+- [Type Hints Guide](references/type-hints.md) — Typing best practices
 
 ## Review Checklist
 
@@ -187,7 +320,7 @@ description: Review Python code for best practices, PEP 8 compliance, and common
 
 ## Output Format
 
-When reviewing code, structure feedback as:
+Use the `templates/review-report.md.j2` template, or structure feedback as:
 
 ```markdown
 ## Code Review: [filename]
@@ -208,7 +341,372 @@ When reviewing code, structure feedback as:
 ```
 ```
 
-Update `aam.yaml` to include the skill:
+**2. Scripts — Executable tools:**
+
+`skills/python-reviewer/scripts/analyze.py`:
+
+```python
+#!/usr/bin/env python3
+"""
+Static analysis script for Python code review.
+Usage: python analyze.py <file.py> [--format json|text]
+"""
+import ast
+import sys
+import json
+from pathlib import Path
+from dataclasses import dataclass, asdict
+
+@dataclass
+class Issue:
+    line: int
+    column: int
+    severity: str  # critical, high, medium, low
+    category: str
+    message: str
+    suggestion: str | None = None
+
+def analyze_file(filepath: Path) -> list[Issue]:
+    """Analyze a Python file for common issues."""
+    issues = []
+    content = filepath.read_text()
+    
+    # Check line lengths
+    for i, line in enumerate(content.splitlines(), 1):
+        if len(line) > 88:
+            issues.append(Issue(
+                line=i,
+                column=89,
+                severity="low",
+                category="formatting",
+                message=f"Line exceeds 88 characters ({len(line)} chars)",
+                suggestion="Break line or use Black formatter"
+            ))
+    
+    # Parse AST for deeper analysis
+    tree = ast.parse(content)
+    
+    for node in ast.walk(tree):
+        # Check for bare except
+        if isinstance(node, ast.ExceptHandler) and node.type is None:
+            issues.append(Issue(
+                line=node.lineno,
+                column=node.col_offset,
+                severity="high",
+                category="error-handling",
+                message="Bare 'except:' clause catches all exceptions",
+                suggestion="Specify exception type: except Exception:"
+            ))
+        
+        # Check for missing docstrings
+        if isinstance(node, ast.FunctionDef):
+            if not ast.get_docstring(node):
+                issues.append(Issue(
+                    line=node.lineno,
+                    column=node.col_offset,
+                    severity="medium",
+                    category="documentation",
+                    message=f"Function '{node.name}' missing docstring",
+                    suggestion="Add docstring describing purpose and parameters"
+                ))
+    
+    return issues
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python analyze.py <file.py> [--format json|text]")
+        sys.exit(1)
+    
+    filepath = Path(sys.argv[1])
+    output_format = "text"
+    if "--format" in sys.argv:
+        idx = sys.argv.index("--format")
+        output_format = sys.argv[idx + 1]
+    
+    issues = analyze_file(filepath)
+    
+    if output_format == "json":
+        print(json.dumps([asdict(i) for i in issues], indent=2))
+    else:
+        for issue in issues:
+            print(f"{filepath}:{issue.line}:{issue.column} [{issue.severity}] {issue.message}")
+
+if __name__ == "__main__":
+    main()
+```
+
+`skills/python-reviewer/scripts/complexity.py`:
+
+```python
+#!/usr/bin/env python3
+"""
+Calculate cyclomatic complexity for Python functions.
+Usage: python complexity.py <file.py>
+"""
+import ast
+import sys
+from pathlib import Path
+
+class ComplexityVisitor(ast.NodeVisitor):
+    """Calculate cyclomatic complexity of functions."""
+    
+    def __init__(self):
+        self.results = []
+    
+    def visit_FunctionDef(self, node):
+        complexity = self._calculate_complexity(node)
+        self.results.append({
+            "name": node.name,
+            "line": node.lineno,
+            "complexity": complexity,
+            "rating": self._rate_complexity(complexity)
+        })
+        self.generic_visit(node)
+    
+    def _calculate_complexity(self, node) -> int:
+        """Count decision points."""
+        complexity = 1  # Base complexity
+        
+        for child in ast.walk(node):
+            if isinstance(child, (ast.If, ast.While, ast.For, ast.ExceptHandler)):
+                complexity += 1
+            elif isinstance(child, ast.BoolOp):
+                complexity += len(child.values) - 1
+            elif isinstance(child, ast.comprehension):
+                complexity += 1
+        
+        return complexity
+    
+    def _rate_complexity(self, complexity: int) -> str:
+        if complexity <= 5:
+            return "low (good)"
+        elif complexity <= 10:
+            return "moderate"
+        elif complexity <= 20:
+            return "high (consider refactoring)"
+        else:
+            return "very high (refactor recommended)"
+
+def main():
+    filepath = Path(sys.argv[1])
+    tree = ast.parse(filepath.read_text())
+    
+    visitor = ComplexityVisitor()
+    visitor.visit(tree)
+    
+    print(f"Complexity Analysis: {filepath}\n")
+    print(f"{'Function':<30} {'Line':<6} {'Complexity':<12} {'Rating'}")
+    print("-" * 70)
+    
+    for result in visitor.results:
+        print(f"{result['name']:<30} {result['line']:<6} {result['complexity']:<12} {result['rating']}")
+
+if __name__ == "__main__":
+    main()
+```
+
+**3. Templates — Output formatting:**
+
+`skills/python-reviewer/templates/review-report.md.j2`:
+
+```jinja2
+# Code Review Report
+
+**File:** {{ filename }}  
+**Reviewed:** {{ timestamp }}  
+**Reviewer:** AI Code Reviewer
+
+---
+
+## Summary
+
+{{ summary }}
+
+**Overall Score:** {{ score }}/10
+
+---
+
+## Issues Found
+
+{% if critical_issues %}
+### Critical ({{ critical_issues | length }})
+
+{% for issue in critical_issues %}
+- **Line {{ issue.line }}**: {{ issue.message }}
+  - Suggestion: {{ issue.suggestion }}
+{% endfor %}
+{% endif %}
+
+{% if high_issues %}
+### High Priority ({{ high_issues | length }})
+
+{% for issue in high_issues %}
+- **Line {{ issue.line }}**: {{ issue.message }}
+  - Suggestion: {{ issue.suggestion }}
+{% endfor %}
+{% endif %}
+
+{% if medium_issues %}
+### Medium Priority ({{ medium_issues | length }})
+
+{% for issue in medium_issues %}
+- **Line {{ issue.line }}**: {{ issue.message }}
+{% endfor %}
+{% endif %}
+
+---
+
+## Metrics
+
+| Metric | Value |
+|--------|-------|
+| Lines of Code | {{ loc }} |
+| Functions | {{ function_count }} |
+| Average Complexity | {{ avg_complexity }} |
+| Test Coverage | {{ coverage }}% |
+
+---
+
+## Recommendations
+
+{% for rec in recommendations %}
+{{ loop.index }}. {{ rec }}
+{% endfor %}
+
+---
+
+*Generated by python-reviewer skill*
+```
+
+`skills/python-reviewer/templates/quick-summary.md.j2`:
+
+```jinja2
+## Quick Review: {{ filename }}
+
+**Score:** {{ score }}/10 | **Issues:** {{ issue_count }} ({{ critical_count }} critical)
+
+{% if critical_issues %}
+**Critical:** {% for issue in critical_issues %}Line {{ issue.line }}: {{ issue.message }}. {% endfor %}
+{% endif %}
+
+**Top recommendations:** {{ recommendations[:3] | join(", ") }}
+```
+
+**4. References — Documentation for the agent:**
+
+`skills/python-reviewer/references/pep8-summary.md`:
+
+```markdown
+# PEP 8 Quick Reference
+
+## Naming Conventions
+
+| Type | Convention | Example |
+|------|-----------|---------|
+| Module | lowercase_with_underscores | `my_module.py` |
+| Class | CapitalizedWords | `MyClass` |
+| Function | lowercase_with_underscores | `my_function()` |
+| Variable | lowercase_with_underscores | `my_variable` |
+| Constant | UPPERCASE_WITH_UNDERSCORES | `MAX_VALUE` |
+| Private | _single_leading_underscore | `_internal` |
+
+## Indentation
+
+- Use 4 spaces per indentation level
+- Never mix tabs and spaces
+- Continuation lines: align with opening delimiter or use hanging indent
+
+## Line Length
+
+- Maximum 79 characters (72 for docstrings)
+- Maximum 88 characters (Black formatter default)
+
+## Imports
+
+Order:
+1. Standard library imports
+2. Related third-party imports
+3. Local application imports
+
+Each group separated by a blank line.
+
+## Whitespace
+
+- No whitespace inside parentheses: `spam(ham[1], {eggs: 2})`
+- No whitespace before comma: `if x == 4: print(x, y)`
+- Surround operators with single space: `x = 1`
+```
+
+`skills/python-reviewer/references/best-practices.md`:
+
+```markdown
+# Python Best Practices
+
+## Use Context Managers
+
+```python
+# Bad
+f = open('file.txt')
+content = f.read()
+f.close()
+
+# Good
+with open('file.txt') as f:
+    content = f.read()
+```
+
+## Use List Comprehensions
+
+```python
+# Bad
+squares = []
+for x in range(10):
+    squares.append(x ** 2)
+
+# Good
+squares = [x ** 2 for x in range(10)]
+```
+
+## Use f-strings
+
+```python
+# Bad
+message = "Hello, " + name + "!"
+message = "Hello, {}!".format(name)
+
+# Good
+message = f"Hello, {name}!"
+```
+
+## Use Type Hints
+
+```python
+def greet(name: str, times: int = 1) -> str:
+    return f"Hello, {name}! " * times
+```
+
+## Use dataclasses
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class User:
+    name: str
+    email: str
+    age: int = 0
+```
+```
+
+**5. Assets — Static files:**
+
+`skills/python-reviewer/assets/` can contain:
+- Images for reports (logos, badges)
+- CSS stylesheets for HTML output
+- Configuration files
+- Sample data files
+
+**Update `aam.yaml` to include the skill:**
 
 ```yaml
 artifacts:
@@ -217,6 +715,8 @@ artifacts:
       path: skills/python-reviewer/
       description: "Review Python code for best practices and PEP 8 compliance"
 ```
+
+> **Note:** The entire skill directory is packaged and deployed. All scripts, templates, references, and assets are available to the AI agent at runtime.
 
 #### Add a Prompt
 
@@ -902,6 +1402,29 @@ Deploying to cursor...
 
 ### 5.5 View Dependency Tree
 
+```mermaid
+flowchart TD
+    PBP["python-best-practices@1.2.0"]
+    CA["code-analysis@1.0.0"]
+    CP["common-prompts@2.1.0"]
+    LR["linting-rules@1.3.0"]
+    FU["formatting-utils@1.0.2"]
+    UT["utilities@3.0.0"]
+    
+    PBP --> CA
+    PBP --> CP
+    PBP --> LR
+    PBP --> FU
+    LR --> UT
+    
+    style PBP fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style CA fill:#fff3e0
+    style CP fill:#fff3e0
+    style LR fill:#fff3e0
+    style FU fill:#fff3e0
+    style UT fill:#f3e5f5
+```
+
 ```bash
 $ aam list --tree
 
@@ -1009,13 +1532,35 @@ Fill in:
 ### Step 2: Create Directory Structure
 
 ```bash
-mkdir -p skills/security-scan skills/performance-check
+# Create complete skill directories with all components
+mkdir -p skills/security-scan/{scripts,templates,references}
+mkdir -p skills/performance-check/{scripts,templates,references}
 mkdir -p agents/security-reviewer
 mkdir -p prompts
 mkdir -p instructions
 ```
 
-### Step 3: Create Skill - Security Scan
+### Step 3: Create Skill - Security Scan (Complete Structure)
+
+This skill demonstrates a complete skill with scripts, templates, and references.
+
+**Directory structure:**
+
+```
+skills/security-scan/
+├── SKILL.md                    # Main skill definition
+├── scripts/
+│   ├── scan.py                 # Security scanning script
+│   └── check_secrets.sh        # Secret detection script
+├── templates/
+│   ├── security-report.md.j2   # Full report template
+│   └── finding.md.j2           # Single finding template
+└── references/
+    ├── owasp-top10.md          # OWASP Top 10 reference
+    └── cwe-patterns.md         # Common weakness patterns
+```
+
+**1. SKILL.md:**
 
 `skills/security-scan/SKILL.md`:
 
@@ -1026,6 +1571,32 @@ description: Scan code for common security vulnerabilities. Use when reviewing c
 ---
 
 # Security Scanner
+
+## Available Scripts
+
+Run these scripts for automated analysis:
+
+- `scripts/scan.py <file>` — Static security analysis
+- `scripts/check_secrets.sh <dir>` — Detect hardcoded secrets
+
+Example:
+```bash
+python skills/security-scan/scripts/scan.py src/auth.py --format json
+```
+
+## Templates
+
+Use for consistent output:
+
+- `templates/security-report.md.j2` — Full security assessment
+- `templates/finding.md.j2` — Individual finding format
+
+## References
+
+Load for detailed guidance:
+
+- [OWASP Top 10](references/owasp-top10.md) — Common web vulnerabilities
+- [CWE Patterns](references/cwe-patterns.md) — Weakness enumeration
 
 ## Checks Performed
 
@@ -1053,31 +1624,432 @@ description: Scan code for common security vulnerabilities. Use when reviewing c
 ## Usage
 
 When asked to review security:
-1. Identify the language/framework
-2. Apply relevant checks from above
+1. Run `scripts/scan.py` for automated detection
+2. Manually review for logic flaws
 3. Rate severity: Critical / High / Medium / Low
-4. Provide remediation guidance
+4. Generate report using template
+5. Provide remediation guidance with CWE references
+```
 
-## Output Format
+**2. Scripts:**
+
+`skills/security-scan/scripts/scan.py`:
+
+```python
+#!/usr/bin/env python3
+"""
+Security scanner for common vulnerabilities.
+Usage: python scan.py <file> [--format text|json] [--severity critical|high|medium|low|all]
+"""
+import re
+import sys
+import json
+from pathlib import Path
+from dataclasses import dataclass, asdict
+
+@dataclass
+class Finding:
+    id: str
+    severity: str
+    category: str
+    title: str
+    file: str
+    line: int
+    code: str
+    description: str
+    cwe: str
+    remediation: str
+
+# Security patterns to detect
+PATTERNS = {
+    "sql_injection": {
+        "pattern": r'execute\s*\(\s*["\'].*%s.*["\']\s*%',
+        "severity": "critical",
+        "cwe": "CWE-89",
+        "title": "SQL Injection",
+        "description": "User input directly concatenated into SQL query",
+        "remediation": "Use parameterized queries or prepared statements"
+    },
+    "hardcoded_password": {
+        "pattern": r'(?i)(password|passwd|pwd)\s*=\s*["\'][^"\']+["\']',
+        "severity": "high",
+        "cwe": "CWE-798",
+        "title": "Hardcoded Credentials",
+        "description": "Password appears to be hardcoded in source",
+        "remediation": "Use environment variables or secure vault"
+    },
+    "eval_usage": {
+        "pattern": r'\beval\s*\(',
+        "severity": "high",
+        "cwe": "CWE-95",
+        "title": "Code Injection via eval()",
+        "description": "eval() can execute arbitrary code",
+        "remediation": "Use ast.literal_eval() or avoid dynamic evaluation"
+    },
+    "shell_injection": {
+        "pattern": r'os\.system\s*\(|subprocess\.call\s*\([^,]+shell\s*=\s*True',
+        "severity": "critical",
+        "cwe": "CWE-78",
+        "title": "Shell Injection",
+        "description": "Command executed with shell=True or os.system",
+        "remediation": "Use subprocess with shell=False and argument list"
+    }
+}
+
+def scan_file(filepath: Path) -> list[Finding]:
+    findings = []
+    content = filepath.read_text()
+    lines = content.splitlines()
+    
+    for vuln_id, config in PATTERNS.items():
+        for i, line in enumerate(lines, 1):
+            if re.search(config["pattern"], line):
+                findings.append(Finding(
+                    id=f"SEC-{len(findings)+1:03d}",
+                    severity=config["severity"],
+                    category="security",
+                    title=config["title"],
+                    file=str(filepath),
+                    line=i,
+                    code=line.strip(),
+                    description=config["description"],
+                    cwe=config["cwe"],
+                    remediation=config["remediation"]
+                ))
+    
+    return findings
+
+def main():
+    filepath = Path(sys.argv[1])
+    output_format = "text"
+    if "--format" in sys.argv:
+        output_format = sys.argv[sys.argv.index("--format") + 1]
+    
+    findings = scan_file(filepath)
+    
+    if output_format == "json":
+        print(json.dumps([asdict(f) for f in findings], indent=2))
+    else:
+        for f in findings:
+            print(f"[{f.severity.upper()}] {f.id}: {f.title}")
+            print(f"  File: {f.file}:{f.line}")
+            print(f"  Code: {f.code}")
+            print(f"  CWE: {f.cwe}")
+            print(f"  Fix: {f.remediation}")
+            print()
+
+if __name__ == "__main__":
+    main()
+```
+
+`skills/security-scan/scripts/check_secrets.sh`:
+
+```bash
+#!/bin/bash
+# Detect hardcoded secrets in source files
+# Usage: ./check_secrets.sh <directory>
+
+DIR="${1:-.}"
+
+echo "Scanning for secrets in: $DIR"
+echo "================================"
+
+# Patterns to detect
+patterns=(
+    "api[_-]?key\s*[:=]"
+    "secret[_-]?key\s*[:=]"
+    "password\s*[:=]"
+    "private[_-]?key"
+    "AWS_SECRET"
+    "BEGIN RSA PRIVATE KEY"
+    "BEGIN OPENSSH PRIVATE KEY"
+)
+
+found=0
+
+for pattern in "${patterns[@]}"; do
+    results=$(grep -rn -E "$pattern" "$DIR" --include="*.py" --include="*.js" --include="*.yaml" --include="*.yml" --include="*.json" 2>/dev/null)
+    if [ -n "$results" ]; then
+        echo "Pattern: $pattern"
+        echo "$results"
+        echo ""
+        ((found++))
+    fi
+done
+
+if [ $found -eq 0 ]; then
+    echo "No secrets detected."
+else
+    echo "================================"
+    echo "Found $found potential secret patterns!"
+fi
+```
+
+**3. Templates:**
+
+`skills/security-scan/templates/security-report.md.j2`:
+
+```jinja2
+# Security Assessment Report
+
+**Target:** {{ target }}  
+**Date:** {{ date }}  
+**Scanner:** security-scan skill v1.0
+
+---
+
+## Executive Summary
+
+| Severity | Count |
+|----------|-------|
+| Critical | {{ findings | selectattr('severity', 'eq', 'critical') | list | length }} |
+| High     | {{ findings | selectattr('severity', 'eq', 'high') | list | length }} |
+| Medium   | {{ findings | selectattr('severity', 'eq', 'medium') | list | length }} |
+| Low      | {{ findings | selectattr('severity', 'eq', 'low') | list | length }} |
+
+**Risk Level:** {{ risk_level }}
+
+---
+
+## Findings
+
+{% for finding in findings %}
+### {{ finding.id }}: {{ finding.title }}
+
+| Field | Value |
+|-------|-------|
+| Severity | **{{ finding.severity | upper }}** |
+| Location | `{{ finding.file }}:{{ finding.line }}` |
+| CWE | [{{ finding.cwe }}](https://cwe.mitre.org/data/definitions/{{ finding.cwe | replace('CWE-', '') }}.html) |
+
+**Description:** {{ finding.description }}
+
+**Vulnerable Code:**
+```
+{{ finding.code }}
+```
+
+**Remediation:** {{ finding.remediation }}
+
+---
+
+{% endfor %}
+
+## Recommendations
+
+1. Address all Critical findings immediately
+2. Schedule High findings for next sprint
+3. Track Medium/Low in backlog
+4. Implement security linting in CI/CD
+
+---
+
+*Generated by security-scan skill*
+```
+
+`skills/security-scan/templates/finding.md.j2`:
+
+```jinja2
+## {{ finding.id }}: {{ finding.title }}
+
+**Severity:** {{ finding.severity | upper }}  
+**Location:** `{{ finding.file }}:{{ finding.line }}`  
+**CWE:** {{ finding.cwe }}
+
+{{ finding.description }}
+
+```{{ language }}
+{{ finding.code }}
+```
+
+**Remediation:** {{ finding.remediation }}
+```
+
+**4. References:**
+
+`skills/security-scan/references/owasp-top10.md`:
 
 ```markdown
-## Security Review: [file/component]
+# OWASP Top 10 (2021)
 
-### Critical Issues
-- [issue]: [location] - [remediation]
+## A01: Broken Access Control
 
-### High Priority
-- [issue]: [location] - [remediation]
+Access control enforces policy such that users cannot act outside their intended permissions.
 
-### Medium Priority
-- [issue]: [location] - [remediation]
+**What to look for:**
+- Missing authorization checks
+- IDOR (Insecure Direct Object References)
+- CORS misconfiguration
+- Path traversal
 
-### Recommendations
-- [general security improvements]
+## A02: Cryptographic Failures
+
+Failures related to cryptography which often lead to sensitive data exposure.
+
+**What to look for:**
+- Weak algorithms (MD5, SHA1 for passwords)
+- Hardcoded keys
+- Missing encryption for sensitive data
+- Improper certificate validation
+
+## A03: Injection
+
+User-supplied data is not validated, filtered, or sanitized.
+
+**What to look for:**
+- SQL injection
+- Command injection
+- LDAP injection
+- XSS (Cross-site scripting)
+
+## A04: Insecure Design
+
+Missing or ineffective security controls.
+
+**What to look for:**
+- Missing rate limiting
+- No defense in depth
+- Missing input validation at trust boundaries
+
+## A05: Security Misconfiguration
+
+Missing appropriate security hardening.
+
+**What to look for:**
+- Default credentials
+- Unnecessary features enabled
+- Verbose error messages
+- Missing security headers
+
+## A06: Vulnerable Components
+
+Using components with known vulnerabilities.
+
+**What to look for:**
+- Outdated dependencies
+- Unpatched systems
+- Unsupported software
+
+## A07: Authentication Failures
+
+Confirmation of identity, authentication, and session management.
+
+**What to look for:**
+- Weak passwords allowed
+- Missing MFA
+- Session fixation
+- Credential stuffing vulnerabilities
+
+## A08: Software and Data Integrity Failures
+
+Code and infrastructure that does not protect against integrity violations.
+
+**What to look for:**
+- Unsigned updates
+- Insecure deserialization
+- CI/CD pipeline vulnerabilities
+
+## A09: Security Logging Failures
+
+Without logging and monitoring, breaches cannot be detected.
+
+**What to look for:**
+- Missing audit logs
+- Logs not monitored
+- Sensitive data in logs
+
+## A10: Server-Side Request Forgery (SSRF)
+
+Fetching a remote resource without validating user-supplied URL.
+
+**What to look for:**
+- URL parameters to external services
+- Unvalidated redirects
+- Internal service access
+```
+
+`skills/security-scan/references/cwe-patterns.md`:
+
+```markdown
+# Common CWE Patterns
+
+## CWE-89: SQL Injection
+
+**Pattern:**
+```python
+# Vulnerable
+query = "SELECT * FROM users WHERE id = " + user_id
+cursor.execute(query)
+
+# Safe
+cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+```
+
+## CWE-78: OS Command Injection
+
+**Pattern:**
+```python
+# Vulnerable
+os.system(f"ping {host}")
+
+# Safe
+subprocess.run(["ping", host], shell=False)
+```
+
+## CWE-79: Cross-site Scripting (XSS)
+
+**Pattern:**
+```javascript
+// Vulnerable
+element.innerHTML = userInput;
+
+// Safe
+element.textContent = userInput;
+```
+
+## CWE-798: Hardcoded Credentials
+
+**Pattern:**
+```python
+# Vulnerable
+password = "secret123"
+
+# Safe
+password = os.environ.get("DB_PASSWORD")
+```
+
+## CWE-502: Deserialization of Untrusted Data
+
+**Pattern:**
+```python
+# Vulnerable
+data = pickle.loads(user_input)
+
+# Safe
+data = json.loads(user_input)
 ```
 ```
 
-### Step 4: Create Skill - Performance Check
+### Step 4: Create Skill - Performance Check (Complete Structure)
+
+Another complete skill with scripts and references.
+
+**Directory structure:**
+
+```
+skills/performance-check/
+├── SKILL.md
+├── scripts/
+│   ├── complexity.py           # Cyclomatic complexity analyzer
+│   └── profile_wrapper.py      # Performance profiling wrapper
+├── templates/
+│   └── perf-report.md.j2       # Performance report template
+└── references/
+    ├── big-o-cheatsheet.md     # Algorithm complexity reference
+    └── optimization-patterns.md # Common optimization patterns
+```
+
+**1. SKILL.md:**
 
 `skills/performance-check/SKILL.md`:
 
@@ -1088,6 +2060,25 @@ description: Analyze code for performance issues and optimization opportunities.
 ---
 
 # Performance Analyzer
+
+## Available Scripts
+
+- `scripts/complexity.py <file>` — Calculate cyclomatic and cognitive complexity
+- `scripts/profile_wrapper.py <script>` — Profile execution time and memory
+
+Example:
+```bash
+python skills/performance-check/scripts/complexity.py src/main.py
+```
+
+## Templates
+
+- `templates/perf-report.md.j2` — Full performance analysis report
+
+## References
+
+- [Big-O Cheatsheet](references/big-o-cheatsheet.md) — Complexity reference
+- [Optimization Patterns](references/optimization-patterns.md) — Common fixes
 
 ## Analysis Areas
 
@@ -1111,22 +2102,231 @@ description: Analyze code for performance issues and optimization opportunities.
 - JavaScript: DOM manipulation, event handlers
 - SQL: Missing indexes, inefficient joins
 
-## Output Format
+## Workflow
+
+1. Run `scripts/complexity.py` for static analysis
+2. Use `scripts/profile_wrapper.py` for runtime profiling (if applicable)
+3. Review findings against Big-O cheatsheet
+4. Apply optimization patterns from references
+5. Generate report using template
+```
+
+**2. Scripts:**
+
+`skills/performance-check/scripts/complexity.py`:
+
+```python
+#!/usr/bin/env python3
+"""
+Analyze code complexity metrics.
+Usage: python complexity.py <file.py> [--format text|json]
+"""
+import ast
+import sys
+import json
+from pathlib import Path
+from dataclasses import dataclass, asdict
+
+@dataclass
+class FunctionMetrics:
+    name: str
+    line: int
+    cyclomatic_complexity: int
+    cognitive_complexity: int
+    lines_of_code: int
+    parameters: int
+    rating: str
+
+class ComplexityAnalyzer(ast.NodeVisitor):
+    def __init__(self):
+        self.metrics = []
+        self._cognitive_nesting = 0
+    
+    def visit_FunctionDef(self, node):
+        cc = self._cyclomatic_complexity(node)
+        cog = self._cognitive_complexity(node)
+        loc = node.end_lineno - node.lineno + 1
+        params = len(node.args.args)
+        
+        self.metrics.append(FunctionMetrics(
+            name=node.name,
+            line=node.lineno,
+            cyclomatic_complexity=cc,
+            cognitive_complexity=cog,
+            lines_of_code=loc,
+            parameters=params,
+            rating=self._rate(cc, cog)
+        ))
+        self.generic_visit(node)
+    
+    def _cyclomatic_complexity(self, node) -> int:
+        complexity = 1
+        for child in ast.walk(node):
+            if isinstance(child, (ast.If, ast.While, ast.For, 
+                                  ast.ExceptHandler, ast.With,
+                                  ast.Assert, ast.comprehension)):
+                complexity += 1
+            elif isinstance(child, ast.BoolOp):
+                complexity += len(child.values) - 1
+        return complexity
+    
+    def _cognitive_complexity(self, node) -> int:
+        complexity = 0
+        nesting = 0
+        
+        for child in ast.walk(node):
+            if isinstance(child, (ast.If, ast.While, ast.For)):
+                complexity += 1 + nesting
+                nesting += 1
+            elif isinstance(child, ast.BoolOp):
+                complexity += len(child.values) - 1
+        
+        return complexity
+    
+    def _rate(self, cc: int, cog: int) -> str:
+        score = max(cc, cog)
+        if score <= 5:
+            return "A (excellent)"
+        elif score <= 10:
+            return "B (good)"
+        elif score <= 20:
+            return "C (moderate - consider refactoring)"
+        elif score <= 30:
+            return "D (complex - refactor recommended)"
+        else:
+            return "F (very complex - must refactor)"
+
+def analyze(filepath: Path) -> list[FunctionMetrics]:
+    tree = ast.parse(filepath.read_text())
+    analyzer = ComplexityAnalyzer()
+    analyzer.visit(tree)
+    return analyzer.metrics
+
+def main():
+    filepath = Path(sys.argv[1])
+    output_format = "text"
+    if "--format" in sys.argv:
+        output_format = sys.argv[sys.argv.index("--format") + 1]
+    
+    metrics = analyze(filepath)
+    
+    if output_format == "json":
+        print(json.dumps([asdict(m) for m in metrics], indent=2))
+    else:
+        print(f"Complexity Analysis: {filepath}\n")
+        print(f"{'Function':<25} {'Line':<6} {'CC':<4} {'Cog':<4} {'LOC':<5} {'Rating'}")
+        print("-" * 70)
+        for m in metrics:
+            print(f"{m.name:<25} {m.line:<6} {m.cyclomatic_complexity:<4} "
+                  f"{m.cognitive_complexity:<4} {m.lines_of_code:<5} {m.rating}")
+
+if __name__ == "__main__":
+    main()
+```
+
+**3. References:**
+
+`skills/performance-check/references/big-o-cheatsheet.md`:
 
 ```markdown
-## Performance Review: [file/component]
+# Big-O Complexity Cheatsheet
 
-### Issues Found
-| Location | Issue | Impact | Suggestion |
-|----------|-------|--------|------------|
-| line X   | ...   | High   | ...        |
+## Common Time Complexities
 
-### Optimization Opportunities
-- [opportunity with expected improvement]
+| Notation | Name | Example |
+|----------|------|---------|
+| O(1) | Constant | Hash table lookup |
+| O(log n) | Logarithmic | Binary search |
+| O(n) | Linear | Single loop |
+| O(n log n) | Linearithmic | Merge sort |
+| O(n²) | Quadratic | Nested loops |
+| O(2ⁿ) | Exponential | Recursive fibonacci |
+| O(n!) | Factorial | Permutations |
 
-### Metrics
-- Estimated complexity: O(...)
-- Potential improvement: X%
+## Data Structure Operations
+
+| Structure | Access | Search | Insert | Delete |
+|-----------|--------|--------|--------|--------|
+| Array | O(1) | O(n) | O(n) | O(n) |
+| Linked List | O(n) | O(n) | O(1) | O(1) |
+| Hash Table | N/A | O(1)* | O(1)* | O(1)* |
+| BST | O(log n)* | O(log n)* | O(log n)* | O(log n)* |
+| Heap | N/A | O(n) | O(log n) | O(log n) |
+
+*Average case, worst case may differ
+
+## Python-Specific
+
+| Operation | Time |
+|-----------|------|
+| `list.append()` | O(1) |
+| `list.insert(0, x)` | O(n) |
+| `x in list` | O(n) |
+| `x in set` | O(1) |
+| `dict[key]` | O(1) |
+| `list.sort()` | O(n log n) |
+```
+
+`skills/performance-check/references/optimization-patterns.md`:
+
+```markdown
+# Common Optimization Patterns
+
+## Use Set for Membership Testing
+
+```python
+# Slow O(n)
+if item in large_list:
+    pass
+
+# Fast O(1)
+large_set = set(large_list)
+if item in large_set:
+    pass
+```
+
+## Use Generators for Large Data
+
+```python
+# Memory heavy - loads all into memory
+squares = [x**2 for x in range(1000000)]
+
+# Memory efficient - generates on demand
+squares = (x**2 for x in range(1000000))
+```
+
+## Avoid String Concatenation in Loops
+
+```python
+# Slow O(n²)
+result = ""
+for s in strings:
+    result += s
+
+# Fast O(n)
+result = "".join(strings)
+```
+
+## Cache Expensive Computations
+
+```python
+from functools import lru_cache
+
+@lru_cache(maxsize=128)
+def expensive_function(n):
+    # ... complex calculation
+    return result
+```
+
+## Batch Database Operations
+
+```python
+# Slow - N+1 queries
+for user_id in user_ids:
+    user = db.query(User).get(user_id)
+
+# Fast - single query
+users = db.query(User).filter(User.id.in_(user_ids)).all()
 ```
 ```
 

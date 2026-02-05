@@ -1,0 +1,21 @@
+# Build outputs
+dist/
+build/
+coverage/
+
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+# Nx
+.nx/
+
+# Python compiled
+__pycache__/
+*.py[cod]
+
+# Misc
+*.md
+*.json
+*.lock

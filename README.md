@@ -62,7 +62,24 @@ aam install python-best-practices
 # ✓ Installed 1 package
 ```
 
-### Create Your Own Package
+### Package Existing Skills & Agents
+
+Already have skills or agents in your project? Package them up:
+
+```bash
+cd my-project/
+aam create-package
+
+# Scanning for artifacts not managed by AAM...
+# Found 3 artifacts:
+#   [x] 1. code-reviewer     .cursor/skills/code-reviewer/SKILL.md
+#   [x] 2. security-auditor  .cursor/rules/agent-security-auditor.mdc
+#   [x] 3. python-rules      .cursor/rules/python-rules.mdc
+#
+# ✓ Package created: my-project@1.0.0
+```
+
+### Create a New Package from Scratch
 
 ```bash
 mkdir my-awesome-skill && cd my-awesome-skill
@@ -99,7 +116,8 @@ aam publish     # Upload to registry
 
 | Command | Description |
 |---------|-------------|
-| `aam init` | Create a new package interactively |
+| `aam create-package` | Create package from existing project (autodetect + interactive) |
+| `aam init` | Create a new package from scratch (interactive) |
 | `aam install <pkg>` | Install a package and dependencies |
 | `aam uninstall <pkg>` | Remove an installed package |
 | `aam update` | Update packages to latest compatible versions |

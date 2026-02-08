@@ -8,7 +8,7 @@ license = { text = "MIT" }
 authors = [
     { name = "AAM Team" }
 ]
-keywords = ["cli", "agent", "package-manager", "ai"]
+keywords = ["cli", "agent", "package-manager", "ai","skills-manager"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -30,6 +30,7 @@ dependencies = [
     "tomli>=2.0.0;python_version<'3.11'",
     "tomli-w>=1.0.0",
     "packaging>=24.0",
+    "pyyaml>=6.0.0",
 ]
 
 [project.optional-dependencies]
@@ -46,9 +47,9 @@ dev = [
 aam = "aam_cli.main:cli"
 
 [project.urls]
-Homepage = "https://github.com/aam/agent-package-manager"
-Documentation = "https://github.com/aam/agent-package-manager/docs"
-Repository = "https://github.com/aam/agent-package-manager"
+Homepage = "https://github.com/spazyCZ/agent-package-manager"
+Documentation = "https://github.com/spazyCZ/agent-package-manager/docs"
+Repository = "https://github.com/spazyCZ/agent-package-manager"
 
 [build-system]
 requires = ["hatchling"]

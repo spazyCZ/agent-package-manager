@@ -245,8 +245,13 @@ class TestInstallCommand:
 
     def test_unit_install_no_registries(self) -> None:
         """Test install shows error when no registries are configured."""
-        with self.runner.isolated_filesystem():
-            result = self.runner.invoke(cli, ["install", "my-agent"])
+        with self.runner.isolated_filesystem() as tmpdir:
+            # Isolate HOME so global ~/.aam/config.yaml is not read
+            result = self.runner.invoke(
+                cli,
+                ["install", "my-agent"],
+                env={"HOME": tmpdir},
+            )
             assert result.exit_code != 0
             assert "No registries configured" in result.output
 
@@ -283,8 +288,13 @@ class TestSearchCommand:
 
     def test_unit_search_no_registries(self) -> None:
         """Test search shows error when no registries configured."""
-        with self.runner.isolated_filesystem():
-            result = self.runner.invoke(cli, ["search", "chatbot"])
+        with self.runner.isolated_filesystem() as tmpdir:
+            # Isolate HOME so global ~/.aam/config.yaml is not read
+            result = self.runner.invoke(
+                cli,
+                ["search", "chatbot"],
+                env={"HOME": tmpdir},
+            )
             assert result.exit_code != 0
             assert "No registries configured" in result.output
 
@@ -332,10 +342,12 @@ class TestConfigCommand:
 
     def test_unit_config_set_default_platform(self) -> None:
         """Test config set for a valid key."""
-        with self.runner.isolated_filesystem():
+        with self.runner.isolated_filesystem() as tmpdir:
+            # Isolate HOME so config writes go to temp directory
             result = self.runner.invoke(
                 cli,
                 ["config", "set", "default_platform", "cursor"],
+                env={"HOME": tmpdir},
             )
             assert result.exit_code == 0
             assert "Set default_platform" in result.output

@@ -1,14 +1,49 @@
-"""Search command for AAM CLI."""
+"""Search command for AAM CLI.
+
+Searches configured registries for packages matching a query.
+Uses case-insensitive substring matching per R-004.
+"""
+
+################################################################################
+#                                                                              #
+# IMPORTS & DEPENDENCIES                                                       #
+#                                                                              #
+################################################################################
+
+import json
+import logging
 
 import click
 from rich.console import Console
-from rich.table import Table
+
+from aam_cli.core.config import load_config
+from aam_cli.registry.factory import create_registry
+
+################################################################################
+#                                                                              #
+# LOGGING                                                                      #
+#                                                                              #
+################################################################################
+
+# Initialize logger for this module
+logger = logging.getLogger(__name__)
+
+################################################################################
+#                                                                              #
+# COMMAND                                                                      #
+#                                                                              #
+################################################################################
 
 
 @click.command()
 @click.argument("query")
 @click.option("--limit", "-l", default=10, help="Maximum number of results")
-@click.option("--type", "-t", "package_type", help="Filter by package type (agent, skill, tool)")
+@click.option(
+    "--type",
+    "-t",
+    "package_type",
+    help="Filter by artifact type",
+)
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
 @click.pass_context
 def search(
@@ -18,36 +53,78 @@ def search(
     package_type: str | None,
     output_json: bool,
 ) -> None:
-    """Search for packages in the registry.
-    
-    Examples:
+    """Search configured registries for packages.
+
+    Uses case-insensitive substring matching on name, description,
+    and keywords.
+
+    Examples::
+
         aam search chatbot
-        aam search "code assistant" --type agent
-        aam search summarizer --limit 5
+        aam search "code review" --type skill
+        aam search audit --limit 5
+        aam search audit --json
     """
     console: Console = ctx.obj["console"]
-    
-    console.print(f"[dim]Searching for '{query}'...[/dim]\n")
-    
-    # TODO: Implement actual search logic
-    # Mock results for now
-    results = [
-        {"name": f"{query}-agent", "version": "1.0.0", "description": f"An agent for {query}"},
-        {"name": f"{query}-skill", "version": "0.5.0", "description": f"A skill related to {query}"},
-    ]
-    
+
+    logger.info(f"Searching packages: query='{query}', limit={limit}")
+
+    config = load_config()
+
+    if not config.registries:
+        console.print(
+            "[red]Error:[/red] No registries configured. Run 'aam registry init' to create one."
+        )
+        ctx.exit(1)
+        return
+
+    # -----
+    # Search all configured registries
+    # -----
+    all_results: list[dict] = []
+
+    for reg_source in config.registries:
+        reg = create_registry(reg_source)
+        entries = reg.search(query)
+
+        for entry in entries:
+            # Filter by artifact type if specified
+            if package_type and package_type not in entry.artifact_types:
+                continue
+
+            all_results.append(
+                {
+                    "name": entry.name,
+                    "version": entry.latest,
+                    "description": entry.description,
+                    "keywords": entry.keywords,
+                    "artifact_types": entry.artifact_types,
+                    "registry": reg_source.name,
+                }
+            )
+
+    # -----
+    # Limit results
+    # -----
+    results = all_results[:limit]
+
+    # -----
+    # Output
+    # -----
     if output_json:
-        import json
         console.print(json.dumps(results, indent=2))
         return
-    
-    table = Table(title=f"Search Results for '{query}'")
-    table.add_column("Package", style="cyan", no_wrap=True)
-    table.add_column("Version", style="green")
-    table.add_column("Description")
-    
-    for result in results[:limit]:
-        table.add_row(result["name"], result["version"], result["description"])
-    
-    console.print(table)
-    console.print(f"\n[dim]Found {len(results)} packages[/dim]")
+
+    if not results:
+        console.print(f'No packages found matching "{query}".')
+        return
+
+    console.print(f'Search results for "{query}" ({len(results)} packages):\n')
+
+    for result in results:
+        types_str = ", ".join(result["artifact_types"]) if result["artifact_types"] else ""
+        console.print(f"  [cyan]{result['name']}[/cyan]  {result['version']}")
+        console.print(f"    {result['description']}")
+        if types_str:
+            console.print(f"    [{types_str}]")
+        console.print()

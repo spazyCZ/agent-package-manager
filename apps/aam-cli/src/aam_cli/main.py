@@ -1,10 +1,50 @@
-"""Main entry point for AAM CLI."""
+"""Main entry point for AAM CLI.
+
+Registers all CLI commands and configures the root Click group.
+"""
+
+################################################################################
+#                                                                              #
+# IMPORTS & DEPENDENCIES                                                       #
+#                                                                              #
+################################################################################
+
+import logging
 
 import click
 from rich.console import Console
 
 from aam_cli import __version__
-from aam_cli.commands import create_package, install, search, publish, config, registry
+from aam_cli.commands import (
+    build,
+    config,
+    create_package,
+    install,
+    publish,
+    registry,
+    search,
+)
+from aam_cli.commands.init_package import init_package
+from aam_cli.commands.list_packages import list_packages
+from aam_cli.commands.pack import pack
+from aam_cli.commands.show_package import show_package
+from aam_cli.commands.uninstall import uninstall
+from aam_cli.commands.validate import validate
+
+################################################################################
+#                                                                              #
+# LOGGING                                                                      #
+#                                                                              #
+################################################################################
+
+# Initialize logger for this module
+logger = logging.getLogger(__name__)
+
+################################################################################
+#                                                                              #
+# CLI GROUP                                                                    #
+#                                                                              #
+################################################################################
 
 console = Console()
 
@@ -15,54 +55,54 @@ console = Console()
 @click.pass_context
 def cli(ctx: click.Context, verbose: bool) -> None:
     """AAM - Agent Package Manager.
-    
+
     A package manager for AI agents, skills, and tools.
     """
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
     ctx.obj["console"] = console
 
+    # -----
+    # Configure logging level based on verbose flag
+    # -----
+    if verbose:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+    else:
+        logging.basicConfig(
+            level=logging.WARNING,
+            format="%(levelname)s: %(message)s",
+        )
 
-# Register command groups
+
+################################################################################
+#                                                                              #
+# COMMAND REGISTRATION                                                         #
+#                                                                              #
+################################################################################
+
+# -----
+# Existing commands
+# -----
+cli.add_command(build.build)
 cli.add_command(create_package.create_package)
 cli.add_command(install.install)
+cli.add_command(registry.registry)
 cli.add_command(search.search)
 cli.add_command(publish.publish)
 cli.add_command(config.config)
-cli.add_command(registry.registry)
 
-
-@cli.command()
-@click.pass_context
-def info(ctx: click.Context) -> None:
-    """Display AAM information and configuration."""
-    console = ctx.obj["console"]
-    console.print(f"[bold blue]AAM CLI[/bold blue] v{__version__}")
-    console.print("\n[bold]Configuration:[/bold]")
-    console.print("  Registry: https://registry.aam.dev")
-    console.print("  Cache: ~/.aam/cache")
-
-
-@cli.command()
-@click.argument("package_name")
-@click.option("--version", "-V", help="Specific version to show")
-@click.pass_context
-def show(ctx: click.Context, package_name: str, version: str | None) -> None:
-    """Show detailed information about a package."""
-    console = ctx.obj["console"]
-    console.print(f"[bold]Package:[/bold] {package_name}")
-    if version:
-        console.print(f"[bold]Version:[/bold] {version}")
-    console.print("\n[dim]Fetching package details...[/dim]")
-
-
-@cli.command()
-@click.pass_context
-def list(ctx: click.Context) -> None:
-    """List installed packages."""
-    console = ctx.obj["console"]
-    console.print("[bold]Installed Packages:[/bold]")
-    console.print("[dim]No packages installed yet.[/dim]")
+# -----
+# New commands for local-repository feature
+# -----
+cli.add_command(init_package)
+cli.add_command(validate)
+cli.add_command(pack)
+cli.add_command(list_packages)
+cli.add_command(show_package)
+cli.add_command(uninstall)
 
 
 if __name__ == "__main__":

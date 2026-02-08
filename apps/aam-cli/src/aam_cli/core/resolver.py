@@ -17,7 +17,7 @@ import logging
 from collections import deque
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from aam_cli.core.manifest import PackageManifest
 from aam_cli.core.version import find_best_match, parse_version
@@ -49,10 +49,7 @@ class ResolvedPackage(BaseModel):
     archive_path: Path | None = None
     manifest: PackageManifest | None = None
 
-    class Config:
-        """Allow arbitrary types for Path."""
-
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 ################################################################################

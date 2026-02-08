@@ -15,7 +15,7 @@ Detection patterns from R-009 in research.md and DESIGN.md Section 5.2.
 import logging
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 ################################################################################
 #                                                                              #
@@ -66,10 +66,7 @@ class DetectedArtifact(BaseModel):
     platform: str | None = None  # cursor, codex, copilot, claude, or None
     description: str = ""
 
-    class Config:
-        """Pydantic config to allow arbitrary Path types."""
-
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 ################################################################################

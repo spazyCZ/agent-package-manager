@@ -1,20 +1,18 @@
-# Web Dockerfile - Development
+# =============================================================================
+# Web Dockerfile — Development (Vite dev server with HMR)
+# =============================================================================
+
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
 COPY package.json package-lock.json* ./
 COPY apps/aam-web/package.json ./apps/aam-web/
 
-# Install dependencies
 RUN npm ci --legacy-peer-deps
 
-# Copy source code
 COPY apps/aam-web .
 
-# Expose port
 EXPOSE 3000
 
-# Run development server
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

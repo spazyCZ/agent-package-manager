@@ -1,0 +1,57 @@
+# =============================================================================
+# AAM Infrastructure — TEST Stack Configuration
+# =============================================================================
+# Purpose : QA, staging, pre-release validation
+# Trigger : develop branch / release candidates
+# GCP Project : aamregistry
+# =============================================================================
+
+config:
+  aam-infra:environment: test
+  aam-infra:gcp_project: aamregistry
+  aam-infra:gcp_region: us-central1
+
+  # ---------------------------------------------------------------------------
+  # Cloud Run — Backend
+  # ---------------------------------------------------------------------------
+  aam-infra:backend_image: us-central1-docker.pkg.dev/aamregistry/aam/backend:test
+  aam-infra:backend_cpu: "1"
+  aam-infra:backend_memory: 1Gi
+  aam-infra:backend_min_instances: 1
+  aam-infra:backend_max_instances: 4
+  aam-infra:backend_concurrency: 80
+
+  # ---------------------------------------------------------------------------
+  # Cloud Run — Web
+  # ---------------------------------------------------------------------------
+  aam-infra:web_image: us-central1-docker.pkg.dev/aamregistry/aam/web:test
+  aam-infra:web_cpu: "1"
+  aam-infra:web_memory: 256Mi
+  aam-infra:web_min_instances: 1
+  aam-infra:web_max_instances: 3
+
+  # ---------------------------------------------------------------------------
+  # Cloud SQL — PostgreSQL
+  # ---------------------------------------------------------------------------
+  aam-infra:db_tier: db-custom-1-3840
+  aam-infra:db_disk_size_gb: 20
+  aam-infra:db_high_availability: false
+  aam-infra:db_backup_enabled: true
+
+  # ---------------------------------------------------------------------------
+  # Memorystore — Redis
+  # ---------------------------------------------------------------------------
+  aam-infra:redis_tier: BASIC
+  aam-infra:redis_memory_size_gb: 1
+
+  # ---------------------------------------------------------------------------
+  # GCS — Package Storage
+  # ---------------------------------------------------------------------------
+  aam-infra:storage_location: US-CENTRAL1
+  aam-infra:storage_class: STANDARD
+
+  # ---------------------------------------------------------------------------
+  # Domain / Networking
+  # ---------------------------------------------------------------------------
+  aam-infra:domain: test.aam.example.com
+  aam-infra:enable_cdn: false

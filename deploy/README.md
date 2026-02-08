@@ -1,180 +1,100 @@
 # AAM Deployment
 
-Docker Compose deployment for the Agent Package Manager.
+This directory contains everything needed to deploy AAM locally (Docker Compose) and to Google Cloud Platform (Pulumi IaC).
 
-## Quick Start
+## Directory Structure
 
-### Development
+```
+deploy/
+├── local/                    # Local Docker Compose deployment
+│   ├── docker-compose.yml    # Base compose (all services)
+│   ├── docker-compose.dev.yml# Dev overrides (hot reload, debug)
+│   ├── .env.example          # Environment variable template
+│   ├── init-db.sql           # PostgreSQL initialization script
+│   ├── nginx/                # Nginx configuration files
+│   │   ├── nginx.conf        # Reverse proxy config
+│   │   └── nginx-web.conf    # Web SPA serving config
+│   ├── ssl/                  # SSL certificates (local testing)
+│   └── README.md             # Local deployment guide
+│
+├── docker/                   # Dockerfiles (shared by local & cloud)
+│   ├── backend/
+│   │   ├── Dockerfile        # Production (multi-stage)
+│   │   └── Dockerfile.dev    # Development (hot reload)
+│   └── web/
+│       ├── Dockerfile        # Production (multi-stage → Nginx)
+│       └── Dockerfile.dev    # Development (Vite HMR)
+│
+├── pulumi/                   # Pulumi IaC for Google Cloud
+│   ├── Pulumi.yaml           # Pulumi project config
+│   ├── Pulumi.dev.yaml       # Dev stack config
+│   ├── Pulumi.test.yaml      # Test stack config
+│   ├── Pulumi.prod.yaml      # Prod stack config
+│   ├── __main__.py           # Entry point — provisions all resources
+│   ├── config.py             # Typed stack configuration loader
+│   ├── requirements.txt      # Python dependencies (pulumi, pulumi-gcp)
+│   ├── components/           # Reusable ComponentResource modules
+│   │   ├── network.py        # VPC, subnets, VPC connector
+│   │   ├── database.py       # Cloud SQL (PostgreSQL 16)
+│   │   ├── cache.py          # Memorystore (Redis 7)
+│   │   ├── storage.py        # GCS bucket (package archives)
+│   │   ├── registry.py       # Artifact Registry (Docker images)
+│   │   ├── secrets.py        # Secret Manager
+│   │   ├── backend_service.py# Cloud Run (FastAPI backend)
+│   │   ├── web_service.py    # Cloud Run (React web frontend)
+│   │   ├── load_balancer.py  # Global HTTPS Load Balancer
+│   │   └── monitoring.py     # Uptime checks & alerting
+│   └── README.md             # Pulumi deployment guide
+│
+└── README.md                 # This file
+```
+
+## Deployment Targets
+
+### Local Development
+
+Run the full stack locally using Docker Compose.
 
 ```bash
-# Copy environment file
-cp .env.example .env
-
-# Start all services in development mode
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
+# Quick start (dev mode with hot reload)
+cp deploy/local/.env.example deploy/local/.env
+docker compose -f deploy/local/docker-compose.yml \
+  -f deploy/local/docker-compose.dev.yml up -d
 ```
 
-### Production
+See [local/README.md](local/README.md) for full instructions.
+
+### Google Cloud Platform
+
+Deploy to GCP using Pulumi across three environments:
+
+| Environment | Stack Config         | Trigger                        |
+|-------------|----------------------|--------------------------------|
+| **dev**     | `Pulumi.dev.yaml`    | Feature branches               |
+| **test**    | `Pulumi.test.yaml`   | `develop` / release candidates |
+| **prod**    | `Pulumi.prod.yaml`   | `main` / tagged releases       |
 
 ```bash
-# Copy and configure environment file
-cp .env.example .env
-# Edit .env with secure passwords and your domain
+cd deploy/pulumi
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
 
-# Build and start services
-docker-compose up -d --build
-
-# Run database migrations
-docker-compose exec backend alembic upgrade head
-
-# View logs
-docker-compose logs -f
+pulumi stack select dev
+pulumi up
 ```
 
-## Services
+See [pulumi/README.md](pulumi/README.md) for full instructions.
 
-| Service | Port | Description |
-|---------|------|-------------|
-| nginx | 80, 443 | Reverse proxy |
-| web | 3000 | React frontend |
-| backend | 8000 | FastAPI backend |
-| postgres | 5432 | PostgreSQL database |
-| redis | 6379 | Redis cache |
-| minio | 9000, 9001 | S3-compatible storage |
+## GCP Resources Overview
 
-## Architecture
-
-```
-                    ┌─────────────┐
-                    │   Nginx     │ :80/:443
-                    └──────┬──────┘
-                           │
-            ┌──────────────┼──────────────┐
-            │              │              │
-            ▼              ▼              ▼
-      ┌─────────┐   ┌───────────┐   ┌─────────┐
-      │   Web   │   │  Backend  │   │  MinIO  │
-      │ :3000   │   │   :8000   │   │  :9000  │
-      └─────────┘   └─────┬─────┘   └─────────┘
-                          │
-                ┌─────────┴─────────┐
-                │                   │
-                ▼                   ▼
-          ┌──────────┐       ┌───────────┐
-          │ Postgres │       │   Redis   │
-          │  :5432   │       │   :6379   │
-          └──────────┘       └───────────┘
-```
-
-## Configuration
-
-### Environment Variables
-
-See `.env.example` for all available configuration options.
-
-Key variables:
-
-- `SECRET_KEY`: JWT signing key (must be secure in production)
-- `POSTGRES_PASSWORD`: Database password
-- `REDIS_PASSWORD`: Redis password
-- `MINIO_ROOT_PASSWORD`: MinIO admin password
-
-### SSL/TLS
-
-For HTTPS support:
-
-1. Place SSL certificates in the `ssl/` directory:
-   - `ssl/cert.pem`
-   - `ssl/key.pem`
-
-2. Uncomment the HTTPS server block in `nginx.conf`
-
-3. Update the HTTP server to redirect to HTTPS
-
-### Scaling
-
-For high availability, consider:
-
-- Running multiple backend instances behind a load balancer
-- Using managed PostgreSQL (RDS, Cloud SQL, etc.)
-- Using managed Redis (ElastiCache, etc.)
-- Using S3 instead of MinIO
-
-## Maintenance
-
-### Database Migrations
-
-```bash
-# Run migrations
-docker-compose exec backend alembic upgrade head
-
-# Create a new migration
-docker-compose exec backend alembic revision --autogenerate -m "description"
-
-# Rollback
-docker-compose exec backend alembic downgrade -1
-```
-
-### Backups
-
-```bash
-# Backup PostgreSQL
-docker-compose exec postgres pg_dump -U aam aam > backup.sql
-
-# Restore PostgreSQL
-docker-compose exec -T postgres psql -U aam aam < backup.sql
-```
-
-### Logs
-
-```bash
-# All services
-docker-compose logs -f
-
-# Specific service
-docker-compose logs -f backend
-
-# Last 100 lines
-docker-compose logs --tail 100 backend
-```
-
-## Troubleshooting
-
-### Services not starting
-
-```bash
-# Check service status
-docker-compose ps
-
-# Check logs for errors
-docker-compose logs backend
-
-# Restart a service
-docker-compose restart backend
-```
-
-### Database connection issues
-
-```bash
-# Check if PostgreSQL is healthy
-docker-compose exec postgres pg_isready -U aam
-
-# Connect to database
-docker-compose exec postgres psql -U aam aam
-```
-
-### Clear all data and restart
-
-```bash
-# Stop and remove containers, volumes
-docker-compose down -v
-
-# Rebuild and start
-docker-compose up -d --build
-```
+| Resource              | GCP Service            | Purpose                       |
+|-----------------------|------------------------|-------------------------------|
+| API / Backend         | Cloud Run              | FastAPI container hosting     |
+| Web Frontend          | Cloud Run              | React SPA via Nginx container |
+| Database              | Cloud SQL (PG 16)      | Persistent storage            |
+| Cache                 | Memorystore (Redis 7)  | Session / query caching       |
+| Package Storage       | Cloud Storage (GCS)    | Package archive storage       |
+| Container Registry    | Artifact Registry      | Docker image storage          |
+| Load Balancer         | Global HTTPS LB        | SSL termination, routing      |
+| Secrets               | Secret Manager         | Credentials, signing keys     |
+| Monitoring            | Cloud Monitoring       | Uptime checks, alerting       |

@@ -1,0 +1,62 @@
+################################################################################
+#                                                                              #
+#  AAM Local Development — Dev Overrides                                       #
+#  Hot reload, debug ports, source mounting                                    #
+#                                                                              #
+#  Usage:                                                                      #
+#    docker compose -f deploy/local/docker-compose.yml \                       #
+#      -f deploy/local/docker-compose.dev.yml up                               #
+#                                                                              #
+################################################################################
+
+services:
+  # ---------------------------------------------------------------------------
+  # Expose infra ports directly for local tooling
+  # ---------------------------------------------------------------------------
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  # ---------------------------------------------------------------------------
+  # Backend — hot reload with source volume mount
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/backend/Dockerfile.dev
+    volumes:
+      - ../../apps/aam-backend:/app
+    environment:
+      APP_ENV: development
+      DEBUG: "true"
+    command: uvicorn aam_backend.main:app --reload --host 0.0.0.0 --port 8000
+
+  # ---------------------------------------------------------------------------
+  # Web — Vite dev server with HMR
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/web/Dockerfile.dev
+    volumes:
+      - ../../apps/aam-web:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+    command: npm run dev -- --host 0.0.0.0
+
+  # ---------------------------------------------------------------------------
+  # Nginx — disabled in dev (direct port access)
+  # ---------------------------------------------------------------------------
+  nginx:
+    profiles:
+      - production

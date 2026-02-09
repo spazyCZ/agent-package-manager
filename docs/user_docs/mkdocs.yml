@@ -1,0 +1,190 @@
+site_name: AAM - Agent Artifact Manager
+site_url: https://aam.dev/docs
+site_description: >-
+  The package manager for AI agent artifacts.
+  Package, share, and deploy skills, agents, prompts, and instructions
+  across Cursor, Claude, GitHub Copilot, and Codex.
+site_author: AAM Team
+repo_url: https://github.com/spazyCZ/agent-package-manager
+repo_name: agent-package-manager
+edit_uri: edit/main/docs/user_docs/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+  icon:
+    logo: material/package-variant-closed
+    repo: fontawesome/brands/github
+
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+  - minify:
+      minify_html: true
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      permalink_title: Anchor link to this section
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/spazyCZ/agent-package-manager
+  generator: false
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - getting-started/index.md
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Your First Package: getting-started/first-package.md
+  - Tutorials:
+    - tutorials/index.md
+    - Package Existing Skills: tutorials/package-existing-skills.md
+    - Build a Code Review Package: tutorials/build-code-review-package.md
+    - Share Packages with Your Team: tutorials/share-with-team.md
+    - Multi-Platform Deployment: tutorials/multi-platform-deployment.md
+    - Working with Dependencies: tutorials/working-with-dependencies.md
+  - Concepts:
+    - concepts/index.md
+    - Packages & Manifests: concepts/packages.md
+    - Artifact Types: concepts/artifacts.md
+    - Git Sources: concepts/git-sources.md
+    - Registries: concepts/registries.md
+    - Dependency Resolution: concepts/dependencies.md
+    - Platform Adapters: concepts/platform-adapters.md
+    - Security & Signing: concepts/security.md
+    - Workspaces & Lock Files: concepts/workspaces.md
+  - CLI Reference:
+    - cli/index.md
+    - Package Management:
+      - aam install: cli/install.md
+      - aam uninstall: cli/uninstall.md
+      - aam list: cli/list.md
+      - aam info: cli/info.md
+      - aam search: cli/search.md
+    - Package Authoring:
+      - aam init: cli/init.md
+      - aam create-package: cli/create-package.md
+      - aam validate: cli/validate.md
+      - aam pack: cli/pack.md
+      - aam publish: cli/publish.md
+      - aam build: cli/build.md
+    - Source Management:
+      - aam source add: cli/source-add.md
+      - aam source scan: cli/source-scan.md
+      - aam source update: cli/source-update.md
+      - aam source list: cli/source-list.md
+      - aam source remove: cli/source-remove.md
+      - aam source candidates: cli/source-candidates.md
+    - Package Integrity:
+      - aam verify: cli/verify.md
+      - aam diff: cli/diff.md
+    - Registry Management:
+      - aam registry init: cli/registry-init.md
+      - aam registry add: cli/registry-add.md
+      - aam registry list: cli/registry-list.md
+      - aam registry remove: cli/registry-remove.md
+    - Configuration:
+      - aam config set: cli/config-set.md
+      - aam config get: cli/config-get.md
+      - aam config list: cli/config-list.md
+    - Global Options: cli/global-options.md
+  - Configuration:
+    - configuration/index.md
+    - Global Config: configuration/global.md
+    - Project Config: configuration/project.md
+    - aam.yaml Manifest: configuration/manifest.md
+    - Lock Files: configuration/lock-files.md
+    - Security Policy: configuration/security.md
+  - Platform Guides:
+    - platforms/index.md
+    - Cursor: platforms/cursor.md
+    - Claude: platforms/claude.md
+    - GitHub Copilot: platforms/copilot.md
+    - Codex: platforms/codex.md
+  - Advanced:
+    - advanced/index.md
+    - HTTP Registry: advanced/http-registry.md
+    - Package Signing: advanced/signing.md
+    - Dist-Tags: advanced/dist-tags.md
+    - Scoped Packages: advanced/scoped-packages.md
+    - Quality & Evals: advanced/quality-evals.md
+    - Hosting a Registry: advanced/hosting-registry.md
+  - Troubleshooting:
+    - troubleshooting/index.md
+    - Common Issues: troubleshooting/common-issues.md
+    - FAQ: troubleshooting/faq.md
+    - Migration Guide: troubleshooting/migration.md

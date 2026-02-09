@@ -24,12 +24,17 @@ from aam_cli.commands import (
     registry,
     search,
 )
+from aam_cli.commands.diff import diff_cmd
+from aam_cli.commands.doctor import doctor
 from aam_cli.commands.init_package import init_package
 from aam_cli.commands.list_packages import list_packages
+from aam_cli.commands.mcp_serve import mcp
 from aam_cli.commands.pack import pack
 from aam_cli.commands.show_package import show_package
+from aam_cli.commands.source import source
 from aam_cli.commands.uninstall import uninstall
 from aam_cli.commands.validate import validate
+from aam_cli.commands.verify import verify
 
 ################################################################################
 #                                                                              #
@@ -103,6 +108,19 @@ cli.add_command(pack)
 cli.add_command(list_packages)
 cli.add_command(show_package)
 cli.add_command(uninstall)
+
+# -----
+# Source management commands (spec 003)
+# -----
+cli.add_command(source)
+cli.add_command(verify)
+cli.add_command(diff_cmd)
+
+# -----
+# MCP server and diagnostic commands
+# -----
+cli.add_command(mcp)
+cli.add_command(doctor)
 
 
 if __name__ == "__main__":

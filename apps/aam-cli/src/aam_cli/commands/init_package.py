@@ -146,7 +146,30 @@ def init_package(ctx: click.Context, name: str | None) -> None:
     dump_yaml(manifest_data, pkg_dir / "aam.yaml")
 
     # -----
-    # Step 6: Summary
+    # Step 6: Register default community sources
+    # -----
+    try:
+        from aam_cli.services.source_service import register_default_sources
+
+        defaults_result = register_default_sources()
+        if defaults_result["registered"]:
+            console.print(
+                f"\n[dim]Registered {len(defaults_result['registered'])} "
+                f"default source(s):[/dim]"
+            )
+            for src_name in defaults_result["registered"]:
+                console.print(f"  [dim]• {src_name}[/dim]")
+            console.print(
+                "[dim]Run 'aam source scan <name>' to browse available artifacts[/dim]"
+            )
+    except Exception as e:
+        # -----
+        # Default sources are nice-to-have — don't fail init
+        # -----
+        logger.warning(f"Failed to register default sources: {e}")
+
+    # -----
+    # Step 7: Summary
     # -----
     display_name = pkg_name.split("/")[-1] if "/" in pkg_name else pkg_name
 

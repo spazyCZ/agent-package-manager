@@ -1,0 +1,44 @@
+{
+  "name": "aam-docs",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "docs/user_docs/docs",
+  "tags": ["type:docs", "scope:docs"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "docs/user_docs",
+        "command": "source ../../.venv/bin/activate && mkdocs serve"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "docs/user_docs",
+        "command": "source ../../.venv/bin/activate && mkdocs build --strict"
+      },
+      "outputs": ["{projectRoot}/site"]
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["install"],
+      "options": {
+        "cwd": "docs/user_docs",
+        "command": "source ../../.venv/bin/activate && mkdocs gh-deploy --force --strict"
+      }
+    },
+    "deploy:gcp": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "./deploy/gcp/deploy_docs.sh"
+      }
+    },
+    "install": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "source .venv/bin/activate && pip install -r docs/user_docs/requirements-docs.txt"
+      }
+    }
+  }
+}

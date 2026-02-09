@@ -17,6 +17,7 @@ max lengths, and non-empty checks from data-model.md.
 import logging
 import re
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, field_validator, model_validator
 
@@ -125,6 +126,28 @@ class QualityConfig(BaseModel):
 
 ################################################################################
 #                                                                              #
+# PROVENANCE                                                                   #
+#                                                                              #
+################################################################################
+
+
+class Provenance(BaseModel):
+    """Tracks where a package's artifacts originated.
+
+    Added to ``aam.yaml`` when a package is created from a remote
+    source via ``aam create-package --from-source``.
+    """
+
+    source_type: Literal["git", "local"] = "local"
+    source_url: str | None = None  # Clone URL
+    source_ref: str | None = None  # Branch/tag/commit
+    source_path: str | None = None  # Scan scope
+    source_commit: str | None = None  # Commit SHA at time of creation
+    fetched_at: str | None = None  # ISO 8601 timestamp
+
+
+################################################################################
+#                                                                              #
 # PLATFORM & ARTIFACTS DECLARATIONS                                            #
 #                                                                              #
 ################################################################################
@@ -174,6 +197,12 @@ class PackageManifest(BaseModel):
     dependencies: dict[str, str] = {}
     platforms: dict[str, PlatformConfig] = {}
     quality: QualityConfig | None = None
+
+    # -----
+    # Source provenance metadata (spec 003)
+    # Present when package was created from a remote source
+    # -----
+    provenance: Provenance | None = None
 
     # -----
     # Validators

@@ -37,7 +37,7 @@ This document specifies the HTTP Registry Service for AAM (Agent Artifact Manage
 | P1 | Package signing with Sigstore (identity-based) |
 | P1 | GPG signature support for advanced users |
 | P2 | Registry attestation (server-side signing) |
-| P2 | Namespace/scope support (`@org/package`) |
+| P0 | Namespace/scope support (`@author/package`) |
 
 ### 1.3 Non-Goals (v1)
 
@@ -109,17 +109,41 @@ https://registry.aam.dev/api/v1
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | `GET` | `/packages` | No | Search/list packages |
-| `GET` | `/packages/{name}` | No | Get package metadata |
-| `GET` | `/packages/{name}/versions` | No | List all versions |
-| `GET` | `/packages/{name}/{version}` | No | Get version metadata |
-| `GET` | `/packages/{name}/{version}/download` | No | Download archive |
+| `GET` | `/packages/@{scope}/{name}` | No | Get scoped package metadata |
+| `GET` | `/packages/@{scope}/{name}/versions` | No | List scoped package versions |
+| `GET` | `/packages/@{scope}/{name}/{version}` | No | Get scoped version metadata |
+| `GET` | `/packages/@{scope}/{name}/{version}/download` | No | Download scoped archive |
+| `GET` | `/packages/{name}` | No | Get unscoped package metadata |
+| `GET` | `/packages/{name}/versions` | No | List unscoped package versions |
+| `GET` | `/packages/{name}/{version}` | No | Get unscoped version metadata |
+| `GET` | `/packages/{name}/{version}/download` | No | Download unscoped archive |
 | `POST` | `/packages` | Yes | Publish new package/version |
-| `DELETE` | `/packages/{name}/{version}` | Yes | Yank a version |
+| `DELETE` | `/packages/@{scope}/{name}/{version}` | Yes | Yank a scoped version |
+| `DELETE` | `/packages/{name}/{version}` | Yes | Yank an unscoped version |
+| `GET` | `/packages/@{scope}/{name}/tags` | No | List dist-tags for scoped package |
+| `PUT` | `/packages/@{scope}/{name}/tags/{tag}` | Yes | Set dist-tag for scoped package (owner) |
+| `DELETE` | `/packages/@{scope}/{name}/tags/{tag}` | Yes | Remove dist-tag from scoped package (owner) |
+| `GET` | `/packages/{name}/tags` | No | List dist-tags for unscoped package |
+| `PUT` | `/packages/{name}/tags/{tag}` | Yes | Set dist-tag for unscoped package (owner) |
+| `DELETE` | `/packages/{name}/tags/{tag}` | Yes | Remove dist-tag from unscoped package (owner) |
+| `POST` | `/packages/@{scope}/{name}/{version}/approve` | Yes | Approve a scoped version (approver) |
+| `GET` | `/packages/@{scope}/{name}/{version}/approvals` | No | List approvals for a scoped version |
+| `POST` | `/packages/{name}/{version}/approve` | Yes | Approve an unscoped version (approver) |
+| `GET` | `/packages/{name}/{version}/approvals` | No | List approvals for an unscoped version |
+| `POST` | `/packages/@{scope}/{name}/{version}/eval-results` | Yes | Upload eval results for scoped version (owner) |
+| `GET` | `/packages/@{scope}/{name}/{version}/eval-results` | No | Get eval results for scoped version |
+| `POST` | `/packages/{name}/{version}/eval-results` | Yes | Upload eval results for unscoped version (owner) |
+| `GET` | `/packages/{name}/{version}/eval-results` | No | Get eval results for unscoped version |
+| `GET` | `/audit-log` | Yes | Query audit log (admin, supports filters) |
+| `GET` | `/packages/@{scope}/{name}/audit-log` | Yes | Scoped package audit log (owner/admin) |
+| `GET` | `/packages/{name}/audit-log` | Yes | Unscoped package audit log (owner/admin) |
 | `POST` | `/users/register` | No | Register new user |
 | `POST` | `/users/login` | No | Get access token |
 | `GET` | `/users/me` | Yes | Get current user info |
 | `POST` | `/users/tokens` | Yes | Create API token |
 | `DELETE` | `/users/tokens/{id}` | Yes | Revoke API token |
+
+> **Route ordering:** Scoped routes (`@{scope}/{name}`) must be defined before unscoped routes (`{name}`) in the server implementation to prevent `@scope/name` from being misinterpreted as `{name}/{version}`.
 
 ### 3.3 Endpoint Details
 
@@ -144,9 +168,10 @@ GET /api/v1/packages?q={query}&type={artifact_type}&page={page}&limit={limit}
 {
   "packages": [
     {
-      "name": "asvc-auditor",
+      "name": "@author/asvc-auditor",
+      "scope": "author",
       "description": "ASVC audit agent with reporting capabilities",
-      "author": "spazy",
+      "author": "author",
       "latest_version": "1.1.0",
       "keywords": ["audit", "asvc", "compliance"],
       "artifact_types": ["agent", "skill", "prompt"],
@@ -163,6 +188,7 @@ GET /api/v1/packages?q={query}&type={artifact_type}&page={page}&limit={limit}
 #### 3.3.2 Get Package Metadata
 
 ```http
+GET /api/v1/packages/@{scope}/{name}
 GET /api/v1/packages/{name}
 ```
 
@@ -170,17 +196,18 @@ GET /api/v1/packages/{name}
 
 ```json
 {
-  "name": "asvc-auditor",
+  "name": "@author/asvc-auditor",
+  "scope": "author",
   "description": "ASVC audit agent with reporting capabilities",
-  "author": "spazy",
+  "author": "author",
   "license": "MIT",
-  "repository": "https://github.com/spazy/asvc-auditor",
+  "repository": "https://github.com/author/asvc-auditor",
   "homepage": null,
   "keywords": ["audit", "asvc", "compliance"],
   "latest_version": "1.1.0",
   "created_at": "2026-02-05T10:00:00Z",
   "updated_at": "2026-02-10T14:30:00Z",
-  "owners": ["spazy"],
+  "owners": ["author"],
   "versions": [
     {
       "version": "1.1.0",
@@ -208,6 +235,7 @@ GET /api/v1/packages/{name}
 #### 3.3.3 Get Version Metadata
 
 ```http
+GET /api/v1/packages/@{scope}/{name}/{version}
 GET /api/v1/packages/{name}/{version}
 ```
 
@@ -215,12 +243,13 @@ GET /api/v1/packages/{name}/{version}
 
 ```json
 {
-  "name": "asvc-auditor",
+  "name": "@author/asvc-auditor",
+  "scope": "author",
   "version": "1.1.0",
   "description": "ASVC audit agent with reporting capabilities",
-  "author": "spazy",
+  "author": "author",
   "license": "MIT",
-  "repository": "https://github.com/spazy/asvc-auditor",
+  "repository": "https://github.com/author/asvc-auditor",
   "published_at": "2026-02-10T14:30:00Z",
   "yanked": false,
   "checksum": {
@@ -228,13 +257,13 @@ GET /api/v1/packages/{name}/{version}
   },
   "signature": {
     "type": "sigstore",
-    "identity": "spazy@github",
+    "identity": "author@github",
     "issuer": "https://github.com/login/oauth",
     "transparency_log": "https://rekor.sigstore.dev/api/v1/log/entries/...",
     "verified": true
   },
   "dependencies": {
-    "generic-auditor": ">=1.0.0",
+    "@author/generic-auditor": ">=1.0.0",
     "report-templates": "^2.0.0"
   },
   "artifacts": {
@@ -262,8 +291,18 @@ GET /api/v1/packages/{name}/{version}
     ],
     "instructions": []
   },
-  "download_url": "/api/v1/packages/asvc-auditor/1.1.0/download",
-  "archive_size": 12847
+  "download_url": "/api/v1/packages/@author/asvc-auditor/1.1.0/download",
+  "archive_size": 12847,
+  "approval_status": "approved",
+  "dist_tags": ["latest", "stable"],
+  "eval_results": [
+    {
+      "eval_name": "accuracy-eval",
+      "status": "passed",
+      "metrics": {"accuracy": 94.2, "latency_p95": 1200},
+      "run_at": "2026-02-07T10:00:00Z"
+    }
+  ]
 }
 ```
 
@@ -359,6 +398,242 @@ Authorization: Bearer <token>
   "yanked_at": "2026-02-15T10:00:00Z"
 }
 ```
+
+#### 3.3.7 Dist-Tag Management
+
+**List dist-tags:**
+
+```http
+GET /api/v1/packages/@{scope}/{name}/tags
+GET /api/v1/packages/{name}/tags
+```
+
+**Response: 200 OK**
+
+```json
+{
+  "package": "@author/asvc-auditor",
+  "tags": {
+    "latest": "1.1.0",
+    "stable": "1.0.0",
+    "bank-approved": "1.0.0"
+  }
+}
+```
+
+**Set dist-tag:**
+
+```http
+PUT /api/v1/packages/@{scope}/{name}/tags/{tag}
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Request Body:**
+
+```json
+{
+  "version": "1.2.0"
+}
+```
+
+**Response: 200 OK**
+
+```json
+{
+  "package": "@author/asvc-auditor",
+  "tag": "stable",
+  "version": "1.2.0"
+}
+```
+
+**Remove dist-tag:**
+
+```http
+DELETE /api/v1/packages/@{scope}/{name}/tags/{tag}
+Authorization: Bearer <token>
+```
+
+**Response: 204 No Content**
+
+#### 3.3.8 Version Approvals
+
+**Approve a version:**
+
+```http
+POST /api/v1/packages/@{scope}/{name}/{version}/approve
+POST /api/v1/packages/{name}/{version}/approve
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Request Body:**
+
+```json
+{
+  "status": "approved",
+  "comment": "Reviewed and approved for production use"
+}
+```
+
+**Response: 201 Created**
+
+```json
+{
+  "version_id": "...",
+  "approver": "admin@myorg.com",
+  "status": "approved",
+  "comment": "Reviewed and approved for production use",
+  "created_at": "2026-02-07T15:00:00Z"
+}
+```
+
+**List approvals for a version:**
+
+```http
+GET /api/v1/packages/@{scope}/{name}/{version}/approvals
+GET /api/v1/packages/{name}/{version}/approvals
+```
+
+**Response: 200 OK**
+
+```json
+{
+  "package": "@author/asvc-auditor",
+  "version": "1.2.0",
+  "approval_status": "approved",
+  "approvals": [
+    {
+      "approver": "admin@myorg.com",
+      "status": "approved",
+      "comment": "Reviewed and approved for production use",
+      "created_at": "2026-02-07T15:00:00Z"
+    }
+  ]
+}
+```
+
+#### 3.3.9 Eval Results
+
+**Upload eval results:**
+
+```http
+POST /api/v1/packages/@{scope}/{name}/{version}/eval-results
+POST /api/v1/packages/{name}/{version}/eval-results
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Request Body:**
+
+```json
+{
+  "eval_name": "accuracy-eval",
+  "status": "passed",
+  "metrics": {"accuracy": 94.2, "latency_p95": 1200},
+  "run_at": "2026-02-07T10:00:00Z",
+  "runner_identity": "ci@myorg.com",
+  "environment": {"model": "gpt-4", "runtime": "python-3.12"}
+}
+```
+
+**Response: 201 Created**
+
+```json
+{
+  "id": "...",
+  "eval_name": "accuracy-eval",
+  "status": "passed",
+  "metrics": {"accuracy": 94.2, "latency_p95": 1200},
+  "run_at": "2026-02-07T10:00:00Z"
+}
+```
+
+**Get eval results:**
+
+```http
+GET /api/v1/packages/@{scope}/{name}/{version}/eval-results
+GET /api/v1/packages/{name}/{version}/eval-results
+```
+
+**Response: 200 OK**
+
+```json
+{
+  "package": "@author/asvc-auditor",
+  "version": "1.2.0",
+  "eval_results": [
+    {
+      "eval_name": "accuracy-eval",
+      "status": "passed",
+      "metrics": {"accuracy": 94.2, "latency_p95": 1200},
+      "run_at": "2026-02-07T10:00:00Z",
+      "runner_identity": "ci@myorg.com"
+    }
+  ]
+}
+```
+
+#### 3.3.10 Audit Log
+
+**Query audit log (admin only):**
+
+```http
+GET /api/v1/audit-log?package={name}&event={event}&actor={actor}&from={date}&to={date}&page={page}&limit={limit}
+Authorization: Bearer <token>
+```
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `package` | string | No | Filter by package name |
+| `event` | string | No | Filter by event type (e.g., `package.publish`) |
+| `actor` | string | No | Filter by actor username |
+| `from` | datetime | No | Start of date range (ISO 8601) |
+| `to` | datetime | No | End of date range (ISO 8601) |
+| `page` | integer | No | Page number (default: 1) |
+| `limit` | integer | No | Results per page (default: 50, max: 200) |
+
+**Response: 200 OK**
+
+```json
+{
+  "entries": [
+    {
+      "id": "...",
+      "event": "package.publish",
+      "actor": "author",
+      "package": "@author/asvc-auditor",
+      "version": "1.2.0",
+      "timestamp": "2026-02-07T14:30:00Z",
+      "metadata": {"tag": "latest", "checksum": "sha256:abc..."}
+    },
+    {
+      "id": "...",
+      "event": "tag.set",
+      "actor": "author",
+      "package": "@author/asvc-auditor",
+      "version": "1.2.0",
+      "timestamp": "2026-02-07T14:31:00Z",
+      "metadata": {"tag": "stable"}
+    }
+  ],
+  "total": 42,
+  "page": 1,
+  "pages": 1
+}
+```
+
+**Package-specific audit log:**
+
+```http
+GET /api/v1/packages/@{scope}/{name}/audit-log
+GET /api/v1/packages/{name}/audit-log
+Authorization: Bearer <token>
+```
+
+Returns the same format, filtered to a specific package. Accessible by package owners and admins.
 
 ---
 
@@ -496,7 +771,8 @@ CREATE INDEX idx_api_tokens_hash ON api_tokens(token_hash);
 -- Packages table
 CREATE TABLE packages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(64) UNIQUE NOT NULL,
+    scope VARCHAR(64) NOT NULL DEFAULT '',      -- Empty string for unscoped packages
+    name VARCHAR(64) NOT NULL,
     description TEXT,
     author VARCHAR(255),
     license VARCHAR(32),
@@ -507,10 +783,27 @@ CREATE TABLE packages (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     
-    CONSTRAINT package_name_format CHECK (name ~ '^[a-z0-9][a-z0-9-]{0,63}$')
+    -- Name validation: lowercase, hyphens only
+    CONSTRAINT package_name_format CHECK (name ~ '^[a-z0-9][a-z0-9-]{0,63}$'),
+    -- Scope validation: empty string or lowercase with hyphens/underscores
+    CONSTRAINT package_scope_format CHECK (scope ~ '^$|^[a-z0-9][a-z0-9_-]{0,63}$'),
+    -- Unique package within scope (empty scope = unscoped)
+    UNIQUE (scope, name)
 );
 
-CREATE INDEX idx_packages_name ON packages(name);
+-- Scope ownership table
+CREATE TABLE scopes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(64) UNIQUE NOT NULL,
+    owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    CONSTRAINT scope_name_format CHECK (name ~ '^[a-z0-9][a-z0-9_-]{0,63}$')
+);
+
+CREATE INDEX idx_scopes_owner ON scopes(owner_id);
+
+CREATE INDEX idx_packages_scope_name ON packages(scope, name);
 CREATE INDEX idx_packages_updated ON packages(updated_at DESC);
 
 -- Full-text search index
@@ -589,7 +882,7 @@ CREATE INDEX idx_versions_published ON package_versions(published_at DESC);
 CREATE TABLE dependencies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     version_id UUID NOT NULL REFERENCES package_versions(id) ON DELETE CASCADE,
-    dependency_name VARCHAR(64) NOT NULL,
+    dependency_name VARCHAR(130) NOT NULL,     -- Supports scoped names: @scope/name (up to 130 chars)
     version_constraint VARCHAR(64) NOT NULL
 );
 
@@ -1142,7 +1435,16 @@ class S3Storage(StorageBackend):
         self.prefix = prefix
         self.session = aioboto3.Session()
     
-    def _key(self, package: str, version: str) -> str:
+    def _key(self, package: str, version: str, scope: str = "") -> str:
+        """Build the S3 key for a package archive.
+        
+        For scoped packages, includes the @scope prefix in the path:
+          packages/@author/asvc-auditor/asvc-auditor-1.0.0.aam
+        For unscoped packages:
+          packages/asvc-auditor/asvc-auditor-1.0.0.aam
+        """
+        if scope:
+            return f"{self.prefix}@{scope}/{package}/{package}-{version}.aam"
         return f"{self.prefix}{package}/{package}-{version}.aam"
     
     async def upload(self, package: str, version: str, data: bytes) -> str:
@@ -1260,21 +1562,51 @@ class HTTPRegistry(Registry):
             data = response.json()
             return [PackageMetadata(**p) for p in data["packages"]]
     
-    async def get_metadata(self, name: str) -> PackageMetadata:
+    def _package_url(self, scope: str, name: str) -> str:
+        """Build the API URL path for a package.
+        
+        Constructs URL with scope and name as separate path segments
+        to avoid issues with '/' in scoped names.
+        
+        Args:
+            scope: Package scope (empty string for unscoped packages).
+            name: Package name (without scope prefix).
+        
+        Returns:
+            URL path string like '/api/v1/packages/@author/my-pkg'
+            or '/api/v1/packages/my-pkg' for unscoped.
+        """
+        base = f"{self.base_url}/api/v1/packages"
+        if scope:
+            return f"{base}/@{scope}/{name}"
+        return f"{base}/{name}"
+    
+    async def get_metadata(self, name: str, scope: str = "") -> PackageMetadata:
+        """Get package metadata from the registry.
+        
+        Args:
+            name: Package name (without scope prefix).
+            scope: Package scope (empty string for unscoped packages).
+        """
+        url = self._package_url(scope, name)
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.get(
-                f"{self.base_url}/api/v1/packages/{name}",
-                headers=self._headers()
-            )
+            response = await client.get(url, headers=self._headers())
             response.raise_for_status()
             return PackageMetadata(**response.json())
     
-    async def get_version(self, name: str, version: str) -> VersionInfo:
+    async def get_version(
+        self, name: str, version: str, scope: str = ""
+    ) -> VersionInfo:
+        """Get version metadata from the registry.
+        
+        Args:
+            name: Package name (without scope prefix).
+            version: Semver version string.
+            scope: Package scope (empty string for unscoped packages).
+        """
+        url = f"{self._package_url(scope, name)}/{version}"
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.get(
-                f"{self.base_url}/api/v1/packages/{name}/{version}",
-                headers=self._headers()
-            )
+            response = await client.get(url, headers=self._headers())
             response.raise_for_status()
             return VersionInfo(**response.json())
     
@@ -1283,15 +1615,26 @@ class HTTPRegistry(Registry):
         name: str,
         version: str,
         dest: Path,
-        verify_checksum: bool = True
+        verify_checksum: bool = True,
+        scope: str = ""
     ) -> Path:
-        version_info = await self.get_version(name, version)
+        """Download a package archive from the registry.
+        
+        Args:
+            name: Package name (without scope prefix).
+            version: Semver version string.
+            dest: Destination directory for the archive.
+            verify_checksum: Whether to verify the SHA256 checksum.
+            scope: Package scope (empty string for unscoped packages).
+        """
+        version_info = await self.get_version(name, version, scope=scope)
         archive_path = dest / f"{name}-{version}.aam"
         
+        download_url = f"{self._package_url(scope, name)}/{version}/download"
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             async with client.stream(
                 "GET",
-                f"{self.base_url}/api/v1/packages/{name}/{version}/download",
+                download_url,
                 headers=self._headers()
             ) as response:
                 response.raise_for_status()
@@ -1366,7 +1709,9 @@ registries:
 
 | Field | Validation |
 |-------|------------|
-| Package name | `^[a-z0-9][a-z0-9-]{0,63}$` |
+| Package name (full) | `^(@[a-z0-9][a-z0-9_-]{0,63}/)?[a-z0-9][a-z0-9-]{0,63}$` |
+| Scope (if present) | `^[a-z0-9][a-z0-9_-]{0,63}$` |
+| Name part | `^[a-z0-9][a-z0-9-]{0,63}$` |
 | Version | Semver format |
 | Archive | Max 50MB, must be valid tar.gz |
 | Manifest | JSON schema validation |

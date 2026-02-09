@@ -60,6 +60,13 @@
         "cwd": "apps/aam-cli",
         "command": "pip install -e '.[dev]'"
       }
+    },
+    "mcp-serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/aam-cli",
+        "command": "python -m aam_cli.main mcp serve"
+      }
     }
   }
 }

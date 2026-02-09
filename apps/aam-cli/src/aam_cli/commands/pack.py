@@ -2,6 +2,9 @@
 
 Builds a distributable ``.aam`` archive from a valid package directory.
 Runs validation first, then creates the gzipped tar archive.
+
+Generates per-file SHA-256 checksums during packing and includes them
+in the archive metadata for post-install integrity verification.
 """
 
 ################################################################################
@@ -17,8 +20,10 @@ import click
 from rich.console import Console
 
 from aam_cli.core.manifest import load_manifest
+from aam_cli.services.checksum_service import compute_file_checksums
 from aam_cli.utils.archive import create_archive
 from aam_cli.utils.checksum import calculate_sha256
+from aam_cli.utils.yaml_utils import dump_yaml, load_yaml
 
 ################################################################################
 #                                                                              #
@@ -91,14 +96,40 @@ def pack(ctx: click.Context, path: str) -> None:
         return
 
     # -----
-    # Step 3: Log what's being added
+    # Step 3: Compute per-file SHA-256 checksums for integrity tracking
+    # -----
+    console.print("  Computing per-file checksums...")
+    file_checksums = compute_file_checksums(pkg_path)
+
+    if file_checksums:
+        # -----
+        # Write checksums into aam.yaml so they are included in the archive
+        # -----
+        manifest_yaml_path = pkg_path / "aam.yaml"
+        manifest_raw = load_yaml(manifest_yaml_path)
+        manifest_raw["file_checksums"] = {
+            "algorithm": "sha256",
+            "files": file_checksums,
+        }
+        dump_yaml(manifest_raw, manifest_yaml_path)
+
+        console.print(
+            f"  [dim]{len(file_checksums)} file checksum(s) computed[/dim]"
+        )
+        logger.info(
+            f"File checksums computed and written: "
+            f"count={len(file_checksums)}"
+        )
+
+    # -----
+    # Step 4: Log what's being added
     # -----
     console.print("  Adding aam.yaml")
     for _artifact_type, ref in manifest.all_artifacts:
         console.print(f"  Adding {ref.path}")
 
     # -----
-    # Step 4: Create the archive
+    # Step 5: Create the archive
     # -----
     archive_name = f"{manifest.base_name}-{manifest.version}.aam"
     if manifest.scope:
@@ -114,7 +145,7 @@ def pack(ctx: click.Context, path: str) -> None:
         return
 
     # -----
-    # Step 5: Report results
+    # Step 6: Report results
     # -----
     checksum = calculate_sha256(output_path)
     size_bytes = output_path.stat().st_size

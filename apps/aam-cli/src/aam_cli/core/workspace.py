@@ -40,6 +40,17 @@ logger = logging.getLogger(__name__)
 ################################################################################
 
 
+class FileChecksums(BaseModel):
+    """Per-file integrity checksums for an installed package.
+
+    Stored in the lock file to enable verification of installed
+    files against their original state.
+    """
+
+    algorithm: str = "sha256"  # Hash algorithm used
+    files: dict[str, str] = {}  # {relative_path: hex_digest}
+
+
 class LockedPackage(BaseModel):
     """A single resolved package in the lock file."""
 
@@ -47,6 +58,12 @@ class LockedPackage(BaseModel):
     source: str  # Registry name or "local"
     checksum: str  # "sha256:<hex>"
     dependencies: dict[str, str] = {}  # name -> resolved version
+
+    # -----
+    # Per-file integrity data (spec 003)
+    # Backward compatible: None for packages installed before this feature
+    # -----
+    file_checksums: FileChecksums | None = None
 
 
 class LockFile(BaseModel):

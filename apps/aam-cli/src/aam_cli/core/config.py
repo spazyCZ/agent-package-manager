@@ -17,7 +17,7 @@ Decision reference: plan.md Key Decision 6.
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -73,6 +73,24 @@ class PublishConfig(BaseModel):
     default_scope: str = ""
 
 
+class SourceEntry(BaseModel):
+    """A registered remote git artifact source.
+
+    Stores configuration for a single git repository that has been
+    added as an artifact source via ``aam source add``.
+    """
+
+    name: str
+    type: Literal["git"] = "git"
+    url: str  # Clone URL (HTTPS or SSH)
+    ref: str = "main"  # Git reference (branch, tag, commit)
+    path: str = ""  # Subdirectory scan scope
+    last_commit: str | None = None  # SHA of last fetched commit
+    last_fetched: str | None = None  # ISO 8601 timestamp
+    artifact_count: int | None = None  # Artifacts found in last scan
+    default: bool = False  # True if AAM-shipped default source
+
+
 class AamConfig(BaseModel):
     """Complete AAM configuration (merged global + project + CLI overrides).
 
@@ -86,6 +104,12 @@ class AamConfig(BaseModel):
     security: SecurityConfig = SecurityConfig()
     author: AuthorConfig = AuthorConfig()
     publish: PublishConfig = PublishConfig()
+
+    # -----
+    # Source management fields (spec 003)
+    # -----
+    sources: list[SourceEntry] = []  # Registered remote git sources
+    removed_defaults: list[str] = []  # Names of removed default sources
 
     # -----
     # Helper methods

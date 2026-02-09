@@ -1,0 +1,110 @@
+/* Custom styles for AAM documentation */
+
+/* Improve code block styling */
+.highlight {
+    border-radius: 6px;
+    margin: 1.5em 0;
+}
+
+/* Better table styling */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1.5em 0;
+}
+
+table thead {
+    background-color: var(--md-code-bg-color);
+}
+
+table th {
+    font-weight: 600;
+    padding: 0.8em;
+}
+
+table td {
+    padding: 0.6em 0.8em;
+}
+
+/* Admonition improvements */
+.admonition {
+    border-radius: 6px;
+    margin: 1.5em 0;
+}
+
+.admonition-title {
+    font-weight: 600;
+}
+
+/* Command examples */
+pre code {
+    display: block;
+    padding: 1em;
+}
+
+/* Inline code */
+code {
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+/* Navigation improvements */
+.md-nav__link--active {
+    font-weight: 600;
+}
+
+/* Better spacing for lists */
+.md-typeset ul li,
+.md-typeset ol li {
+    margin: 0.5em 0;
+}
+
+/* Headers with better spacing */
+.md-typeset h2 {
+    margin-top: 2em;
+    margin-bottom: 0.8em;
+}
+
+.md-typeset h3 {
+    margin-top: 1.5em;
+    margin-bottom: 0.6em;
+}
+
+/* Links */
+.md-typeset a {
+    text-decoration: none;
+}
+
+/* Custom blockquote styling */
+.md-typeset blockquote {
+    border-left: 4px solid var(--md-accent-fg-color);
+    padding-left: 1em;
+    margin: 1.5em 0;
+}
+
+/* Better mobile responsiveness */
+@media screen and (max-width: 76.1875em) {
+    .md-typeset table {
+        display: block;
+        overflow-x: auto;
+    }
+}
+
+/* Dark mode specific adjustments */
+[data-md-color-scheme="slate"] {
+    --md-code-bg-color: #1e293b;
+}
+
+[data-md-color-scheme="slate"] table thead {
+    background-color: #334155;
+}
+
+/* Light mode specific adjustments */
+[data-md-color-scheme="default"] {
+    --md-code-bg-color: #f8fafc;
+}
+
+[data-md-color-scheme="default"] table thead {
+    background-color: #f1f5f9;
+}

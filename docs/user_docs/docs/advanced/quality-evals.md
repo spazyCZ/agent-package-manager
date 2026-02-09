@@ -1,0 +1,509 @@
+# Quality & Evals
+
+## Overview
+
+Quality metrics help package consumers evaluate packages before installation. AAM supports two types of quality indicators:
+
+1. **Tests** - Standard automated tests (unit, integration, lint)
+2. **Evals** - AI-specific evaluations measuring accuracy, latency, quality
+
+Both are declared in `aam.yaml` and can be run with `aam test` and `aam eval`.
+
+## Why Quality Metrics Matter
+
+**For consumers:**
+
+- Choose high-quality packages with confidence
+- Compare packages based on objective metrics
+- Understand performance characteristics
+
+**For authors:**
+
+- Demonstrate package quality
+- Build trust with users
+- Track quality over time
+- Catch regressions
+
+## Tests
+
+Tests are standard automated checks using existing tools (pytest, ruff, mypy, etc.).
+
+### Declaring Tests
+
+```yaml
+# aam.yaml
+quality:
+  tests:
+    - name: "unit-tests"
+      command: "pytest tests/ -v"
+      description: "Unit tests for skills and agents"
+
+    - name: "lint-check"
+      command: "ruff check ."
+      description: "Code quality and style checks"
+
+    - name: "type-check"
+      command: "mypy src/"
+      description: "Static type checking"
+```
+
+### Running Tests
+
+```bash
+# Run all declared tests
+aam test
+
+# Run specific test
+aam test unit-tests
+
+# Run in CI/CD
+aam test --ci  # Fails if any test fails
+```
+
+**Output:**
+
+```
+Running tests for @author/my-agent@1.0.0...
+
+unit-tests: pytest tests/ -v
+✓ Passed (2.3s)
+
+lint-check: ruff check .
+✓ Passed (0.8s)
+
+type-check: mypy src/
+✓ Passed (1.5s)
+
+All tests passed (3/3)
+```
+
+### Test Requirements
+
+- `command` must be executable from package root
+- Exit code 0 = pass, non-zero = fail
+- Output is captured and displayed
+
+## Evals
+
+Evals are AI-specific evaluations that measure quality, accuracy, latency, and other metrics.
+
+### Declaring Evals
+
+```yaml
+# aam.yaml
+quality:
+  evals:
+    - name: "accuracy-eval"
+      path: "evals/accuracy.yaml"
+      description: "Accuracy on benchmark tasks"
+      metrics:
+        - name: "accuracy"
+          type: "percentage"
+          target: 90.0  # Target value
+
+        - name: "latency_p95"
+          type: "duration_ms"
+          target: 500
+```
+
+### Eval Definition Files
+
+Create eval definitions in `evals/` directory:
+
+```yaml
+# evals/accuracy.yaml
+name: accuracy-eval
+description: "Evaluate agent accuracy on benchmark dataset"
+
+dataset: evals/benchmark-dataset.jsonl
+model: gpt-4  # Model to evaluate
+judge: evals/judge-prompt.md  # LLM-as-judge prompt
+
+tasks:
+  - name: "code-review"
+    weight: 0.5
+    inputs:
+      - type: "code"
+        source: "dataset.code"
+    expected_output:
+      - type: "review"
+        source: "dataset.expected_review"
+
+metrics:
+  - name: "accuracy"
+    aggregation: "mean"
+    description: "Percentage of correct responses"
+
+  - name: "latency_p95"
+    aggregation: "percentile_95"
+    description: "95th percentile latency"
+```
+
+### Benchmark Dataset
+
+```jsonl
+{"code": "def add(a, b): return a + b", "expected_review": "Looks good"}
+{"code": "def divide(a, b): return a / b", "expected_review": "Missing zero check"}
+```
+
+### LLM-as-Judge Prompt
+
+```markdown
+<!-- evals/judge-prompt.md -->
+Compare the agent's review with the expected review.
+
+Agent review: {agent_output}
+Expected review: {expected_output}
+
+Score 1 if the reviews match in substance, 0 otherwise.
+```
+
+### Running Evals
+
+```bash
+# Run all declared evals
+aam eval
+
+# Run specific eval
+aam eval accuracy-eval
+
+# Run and publish results to registry
+aam eval --publish
+```
+
+**Output:**
+
+```
+Running evals for @author/my-agent@1.0.0...
+
+accuracy-eval: Accuracy on benchmark tasks
+  → Running 50 tasks...
+  ✓ accuracy: 94.2% (target: 90.0%)
+  ✓ latency_p95: 245ms (target: 500ms)
+
+Eval passed (2/2 metrics met targets)
+```
+
+## Publishing Results
+
+Publish eval results to the registry for consumers to see:
+
+```bash
+# Publish results
+aam eval --publish
+```
+
+Results are attached to the published version:
+
+```bash
+aam info @author/my-agent
+
+# Output includes:
+Quality Metrics:
+  accuracy-eval:
+    accuracy: 94.2% (✓ target: 90.0%)
+    latency_p95: 245ms (✓ target: 500ms)
+
+  Tests: 3/3 passed
+  Last evaluated: 2026-02-09T14:30:00Z
+```
+
+## Metric Types
+
+| Type | Description | Example | Target Format |
+|------|-------------|---------|---------------|
+| `percentage` | 0-100 scale | `94.2%` | `90.0` |
+| `score` | Arbitrary number | `8.5/10` | `8.0` |
+| `duration_ms` | Milliseconds | `245ms` | `500` |
+| `duration_s` | Seconds | `1.2s` | `2.0` |
+| `boolean` | Pass/fail | `true` | `true` |
+| `count` | Integer count | `42` | `50` |
+
+## Quality Badges
+
+Display quality badges in your package:
+
+```markdown
+# README.md
+
+![Tests](https://registry.aam.dev/badge/@author/my-agent/tests)
+![Accuracy](https://registry.aam.dev/badge/@author/my-agent/accuracy)
+```
+
+Badges are generated by the HTTP registry based on latest eval results.
+
+## CI/CD Integration
+
+### Run Tests in CI
+
+```yaml
+# .github/workflows/test.yml
+name: Test
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install AAM
+        run: pip install aam
+
+      - name: Run tests
+        run: aam test --ci
+```
+
+### Run Evals in CI
+
+```yaml
+# .github/workflows/eval.yml
+name: Eval
+on:
+  push:
+    branches: [main]
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install AAM
+        run: pip install aam
+
+      - name: Run evals
+        run: aam eval
+
+      - name: Publish results
+        if: success()
+        run: aam eval --publish
+        env:
+          AAM_TOKEN: ${{ secrets.AAM_TOKEN }}
+```
+
+### Publish with Quality Gate
+
+```yaml
+# .github/workflows/publish.yml
+name: Publish
+on:
+  release:
+    types: [created]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install AAM
+        run: pip install aam
+
+      - name: Run tests
+        run: aam test --ci
+
+      - name: Run evals
+        run: aam eval --ci  # Fail if targets not met
+
+      - name: Publish package
+        if: success()
+        run: aam publish --sign
+        env:
+          AAM_TOKEN: ${{ secrets.AAM_TOKEN }}
+```
+
+## Best Practices
+
+### For Tests
+
+1. **Include multiple test types:**
+   - Unit tests for code correctness
+   - Lint for code quality
+   - Type checking for safety
+
+2. **Make tests fast:**
+   - Tests run on every `aam test`
+   - Keep under 30 seconds total
+
+3. **Fail clearly:**
+   - Exit non-zero on failure
+   - Provide useful error messages
+
+### For Evals
+
+1. **Use representative datasets:**
+   - Cover common use cases
+   - Include edge cases
+   - Keep dataset version-controlled
+
+2. **Set realistic targets:**
+   - Based on actual performance
+   - Don't make targets too easy or hard
+   - Update targets as you improve
+
+3. **Publish regularly:**
+   - Publish results for each version
+   - Track quality over time
+   - Build trust with consumers
+
+### For Consumers
+
+1. **Check quality before installing:**
+   ```bash
+   aam info @author/my-agent
+   # Look for quality metrics
+   ```
+
+2. **Compare packages:**
+   ```bash
+   aam search "code-reviewer" --sort-by quality
+   ```
+
+3. **Verify recent evaluation:**
+   - Check "Last evaluated" timestamp
+   - Outdated evals may not reflect current quality
+
+## Examples
+
+### Simple Testing Setup
+
+```yaml
+# aam.yaml
+quality:
+  tests:
+    - name: "tests"
+      command: "pytest"
+      description: "All tests"
+```
+
+### Comprehensive Testing
+
+```yaml
+# aam.yaml
+quality:
+  tests:
+    - name: "unit-tests"
+      command: "pytest tests/unit/ -v"
+      description: "Unit tests"
+
+    - name: "integration-tests"
+      command: "pytest tests/integration/ -v"
+      description: "Integration tests"
+
+    - name: "lint"
+      command: "ruff check ."
+      description: "Linting"
+
+    - name: "format"
+      command: "black --check ."
+      description: "Code formatting"
+
+    - name: "types"
+      command: "mypy src/"
+      description: "Type checking"
+
+    - name: "security"
+      command: "bandit -r src/"
+      description: "Security checks"
+```
+
+### Agent Evaluation
+
+```yaml
+# aam.yaml
+quality:
+  evals:
+    - name: "accuracy"
+      path: "evals/accuracy.yaml"
+      description: "Accuracy on code review tasks"
+      metrics:
+        - name: "accuracy"
+          type: "percentage"
+          target: 90.0
+        - name: "false_positive_rate"
+          type: "percentage"
+          target: 5.0
+```
+
+## Troubleshooting
+
+### Tests Failing
+
+**Symptom:** `aam test` returns non-zero exit code.
+
+**Solution:**
+
+```bash
+# Run tests individually
+aam test unit-tests
+aam test lint-check
+
+# Check test command
+cat aam.yaml  # Verify test commands
+
+# Run command manually
+pytest tests/ -v
+```
+
+### Evals Not Running
+
+**Symptom:** `aam eval` says "No evals defined".
+
+**Solution:**
+
+Check `aam.yaml`:
+
+```yaml
+quality:
+  evals:
+    - name: "my-eval"
+      path: "evals/my-eval.yaml"  # File must exist
+      # ...
+```
+
+### Results Not Publishing
+
+**Symptom:** `aam eval --publish` fails.
+
+**Causes:**
+
+1. Not logged in
+2. Not package owner
+3. Network error
+
+**Solutions:**
+
+```bash
+# Login
+aam login
+
+# Verify ownership
+aam info @author/my-agent
+
+# Check network
+aam registry list
+```
+
+### Metric Target Not Met
+
+**Symptom:** Eval fails because metric doesn't meet target.
+
+**Solution:**
+
+Either improve the package or adjust targets:
+
+```yaml
+# Lower target temporarily
+metrics:
+  - name: "accuracy"
+    type: "percentage"
+    target: 85.0  # Was 90.0
+```
+
+## Next Steps
+
+- [HTTP Registry](http-registry.md) - Publish eval results
+- [Package Signing](signing.md) - Sign quality-assured packages
+- [Dist-Tags](dist-tags.md) - Tag high-quality versions
+- [Configuration Reference](../configuration/manifest.md) - Quality section details

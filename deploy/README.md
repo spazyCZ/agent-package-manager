@@ -1,6 +1,7 @@
 # AAM Deployment
 
-This directory contains everything needed to deploy AAM locally (Docker Compose) and to Google Cloud Platform (Pulumi IaC).
+This directory contains everything needed to deploy AAM locally (Docker Compose)
+and to Google Cloud Platform (Pulumi IaC, with optional `gcloud` helpers).
 
 ## Directory Structure
 
@@ -24,6 +25,12 @@ deploy/
 │   └── web/
 │       ├── Dockerfile        # Production (multi-stage → Nginx)
 │       └── Dockerfile.dev    # Development (Vite HMR)
+│
+├── gcp/                      # Optional `gcloud` helpers (GCP)
+│   ├── README.md             # gcloud-based build and deploy helpers
+│   ├── cloudbuild-web.yaml   # Cloud Build config for web image
+│   ├── deploy_web_dev.sh     # Build web image (optional Cloud Run deploy)
+│   └── deploy_docs.sh        # Build & deploy MkDocs to GCS bucket
 │
 ├── pulumi/                   # Pulumi IaC for Google Cloud
 │   ├── Pulumi.yaml           # Pulumi project config
@@ -83,7 +90,50 @@ pulumi stack select dev
 pulumi up
 ```
 
+Pulumi references container images in Artifact Registry. If you want to build
+and push the dev web image (`apps/aam-web`) with `gcloud`, run:
+
+```bash
+./deploy/gcp/deploy_web_dev.sh
+```
+
 See [pulumi/README.md](pulumi/README.md) for full instructions.
+
+### Documentation
+
+MkDocs documentation can be deployed to either GitHub Pages or GCP.
+
+#### Option A: GitHub Pages
+
+Automatic on pushes to `main` that touch `docs/user_docs/**` via the GitHub
+Actions workflow (`.github/workflows/deploy-docs.yml`).
+
+> **Prerequisite:** In the repository Settings → Pages → Build and deployment,
+> set **Source** to **GitHub Actions**.
+
+Manual deployment from your machine:
+
+```bash
+npm run docs:install   # one-time
+npm run docs:deploy    # pushes to gh-pages branch
+```
+
+#### Option B: Google Cloud Storage
+
+Deploy the static site to a GCS bucket with public access.
+
+```bash
+# Deploy to the dev docs bucket (aam-docs-dev)
+npm run docs:deploy:gcp
+
+# Or run the script directly with options
+./deploy/gcp/deploy_docs.sh --bucket=aam-docs-prod
+./deploy/gcp/deploy_docs.sh --dry-run
+./deploy/gcp/deploy_docs.sh --install  # install MkDocs deps first
+```
+
+The script creates the bucket on first run, configures static website serving,
+and syncs the built site. See [gcp/README.md](gcp/README.md) for full details.
 
 ## GCP Resources Overview
 
@@ -97,4 +147,5 @@ See [pulumi/README.md](pulumi/README.md) for full instructions.
 | Container Registry    | Artifact Registry      | Docker image storage          |
 | Load Balancer         | Global HTTPS LB        | SSL termination, routing      |
 | Secrets               | Secret Manager         | Credentials, signing keys     |
+| Documentation         | Cloud Storage (GCS)    | MkDocs static site hosting    |
 | Monitoring            | Cloud Monitoring       | Uptime checks, alerting       |

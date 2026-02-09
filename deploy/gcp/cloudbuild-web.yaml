@@ -1,0 +1,35 @@
+# =============================================================================
+# Cloud Build — AAM Web (React/Vite) container image
+# =============================================================================
+#
+# Builds the production web container defined at:
+#   deploy/docker/web/Dockerfile
+#
+# The Dockerfile expects the build context to be the MONOREPO ROOT ('.'),
+# because it runs `npm run web:build` via Nx and copies `apps/aam-web/**`.
+#
+# Usage:
+#   gcloud builds submit \
+#     --project="aamregistry" \
+#     --config="deploy/gcp/cloudbuild-web.yaml" \
+#     --substitutions="_IMAGE=us-central1-docker.pkg.dev/aamregistry/aam/web:dev" \
+#     .
+#
+# Required substitutions:
+#   _IMAGE: Full Artifact Registry image URI (repo/image:tag)
+#
+# =============================================================================
+
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-f"
+      - "deploy/docker/web/Dockerfile"
+      - "-t"
+      - "${_IMAGE}"
+      - "."
+
+images:
+  - "${_IMAGE}"
+

@@ -24,7 +24,12 @@
     "graph": "nx graph",
     "affected": "nx affected",
     "affected:build": "nx affected -t build",
-    "affected:test": "nx affected -t test"
+    "affected:test": "nx affected -t test",
+    "docs": "nx run aam-docs:serve",
+    "docs:build": "nx run aam-docs:build",
+    "docs:deploy": "nx run aam-docs:deploy",
+    "docs:deploy:gcp": "nx run aam-docs:deploy:gcp",
+    "docs:install": "nx run aam-docs:install"
   },
   "devDependencies": {
     "@nx/eslint": "^20.0.0",

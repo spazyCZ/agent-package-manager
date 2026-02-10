@@ -10,8 +10,12 @@ aam source list [OPTIONS]
 
 ## Description
 
-List all configured remote git sources with their status, URL, tracked
-ref, last commit, and artifact count.
+List all configured remote git sources with their status, publisher,
+URL, tracked ref, sub-path, artifact count, and last-fetched date.
+
+The **Publisher** column shows the GitHub organization or owner that
+maintains the source repository. It is extracted automatically from the
+source name (the segment before the first `/`).
 
 ## Options
 
@@ -29,16 +33,29 @@ aam source list
 
 **Output:**
 ```
-  Configured sources (3):
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━┓
+┃ Name                            ┃ Publisher      ┃ URL                       ┃ Ref  ┃ Path            ┃ Artifacts ┃ Last Fetched ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━┩
+│ google-gemini/gemini-cli:skills │ google-gemini  │ github.com/google-gemini… │ main │ .gemini/skills  │         4 │ 2026-02-09   │
+│ openai/skills:.curated          │ openai         │ github.com/openai/skills  │ main │ skills/.curated │        30 │ 2026-02-10   │
+└─────────────────────────────────┴────────────────┴───────────────────────────┴──────┴─────────────────┴───────────┴──────────────┘
 
-  Name                      URL                                    Ref    Artifacts
-  openai/skills (default)   github.com/openai/skills               main   12
-  github/awesome-copilot    github.com/github/awesome-copilot      main   8
-  myorg/internal-skills     github.com/myorg/internal-skills       v2     5
+  Total: 2 source(s)
 ```
 
-Sources marked `(default)` were automatically registered during
-`aam init`. You can remove them with `aam source remove`.
+The **Publisher** column (`google-gemini`, `openai`) lets you quickly
+identify who maintains each source. Sources marked `(default)` were
+automatically registered during `aam init`. You can remove them with
+`aam source remove`.
+
+### Example 2: JSON output
+
+```bash
+aam source list --json
+```
+
+The JSON output includes all fields shown in the table, plus `type`,
+`last_commit`, and `default` flags.
 
 ## See also
 

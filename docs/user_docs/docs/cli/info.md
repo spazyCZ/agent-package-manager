@@ -10,15 +10,25 @@ aam info PACKAGE
 
 ## Description
 
-Show detailed information about an installed package, including metadata, artifacts, dependencies, and source information. This command reads the package manifest from `.aam/packages/` and displays comprehensive details.
+Show detailed information about a package, including metadata,
+artifacts, dependencies, and source information. This command works
+for both **installed** and **uninstalled** packages:
 
-Use this to inspect what a package contains before using it, or to verify installation details.
+- **Installed packages** display the full manifest from
+  `.aam/packages/`, including artifacts, dependencies, and checksums.
+- **Uninstalled packages** are looked up in the source artifact index.
+  The output includes the artifact type, description, source origin,
+  and a direct GitHub link to the original artifact directory so you
+  can inspect the files in your browser.
+
+Each result clearly shows its install status so you know at a glance
+whether the package is already in your project.
 
 ## Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| PACKAGE | Yes | Name of the installed package |
+| PACKAGE | Yes | Name of the package (installed or from sources) |
 
 ## Options
 
@@ -26,15 +36,17 @@ This command has no command-specific options.
 
 ## Examples
 
-### Example 1: Show Package Information
+### Example 1: Installed package
 
 ```bash
 aam info my-package
 ```
 
 **Output:**
+
 ```
 my-package@1.0.0
+  Status:      Installed
   Description: A sample package with skills and agents
   Author:      John Doe
   License:     MIT
@@ -54,15 +66,93 @@ my-package@1.0.0
   Checksum: sha256:a1b2c3d4e5f6...
 ```
 
-### Example 2: Scoped Package
+### Example 2: Uninstalled source package
+
+When the package isn't installed but exists in a configured git
+source, you get a summary with a link to the original artifact on
+GitHub. If the artifact file contains YAML frontmatter (between
+`---` delimiters), the header metadata is displayed in a panel.
+
+```bash
+aam info openai-docs
+```
+
+**Output:**
+
+```
+openai-docs  source@4ab6e0f
+  Status:      Not installed
+  Type:        skill
+  Description: OpenAI documentation reference
+  Source:      openai/skills:.curated
+  Commit:      4ab6e0f3c8d1
+
+  ╭──── Artifact header ────╮
+  │ name: openai-docs       │
+  │ description: Use when   │
+  │ the user asks how to    │
+  │ build with OpenAI ...   │
+  ╰─────────────────────────╯
+
+  View on GitHub:
+  https://github.com/openai/skills/tree/4ab6e0f/.curated/openai-docs
+
+  To install, run:  aam install openai/skills:.curated/openai-docs
+```
+
+The **Artifact header** panel shows the YAML frontmatter exactly as
+it appears in the original SKILL.md file. This lets you read the
+full trigger description and other metadata without leaving the
+terminal.
+
+### Example 3: Uninstalled source package without frontmatter
+
+When the artifact file has no YAML frontmatter, the header panel is
+omitted and only the basic metadata and GitHub link are shown.
+
+```bash
+aam info docs-changelog
+```
+
+**Output:**
+
+```
+docs-changelog  source@da66c7c
+  Status:      Not installed
+  Type:        skill
+  Description: Generate changelog files from release information
+  Source:      google-gemini/gemini-cli:skills
+  Commit:      da66c7c4b1f2
+
+  View on GitHub:
+  https://github.com/google-gemini/gemini-cli/tree/da66c7c/.../docs-changelog
+
+  To install, run:  aam install google-gemini/gemini-cli:skills/docs-changelog
+```
+
+The GitHub link points at the exact commit that was indexed, so you
+see the same version of the artifact files that AAM discovered.
+
+### Example 4: Uninstalled source package (qualified name)
+
+You can use the fully qualified name to be explicit about which source
+the package comes from.
+
+```bash
+aam info google-gemini/gemini-cli:skills/docs-changelog
+```
+
+### Example 5: Scoped installed package
 
 ```bash
 aam info @author/advanced-agent
 ```
 
 **Output:**
+
 ```
 @author/advanced-agent@2.5.0
+  Status:      Installed
   Description: Advanced AI agent with multiple skills
   Author:      Author Name
   License:     Apache-2.0
@@ -80,124 +170,96 @@ aam info @author/advanced-agent
   Source: local
 ```
 
-### Example 3: Package Not Installed
+### Example 6: Package not found
 
 ```bash
 aam info non-existent-package
 ```
 
 **Output:**
+
 ```
-Error: 'non-existent-package' is not installed.
+Error: 'non-existent-package' is not installed and was not found in
+any configured source.
+
+  Try:  aam search non-existent-package
 ```
-
-### Example 4: Package with Many Dependencies
-
-```bash
-aam info complex-package
-```
-
-**Output:**
-```
-complex-package@3.0.0
-  Description: Complex package with multiple dependencies
-  Author:      Package Team
-  License:     MIT
-  Repository:  https://github.com/team/complex-package
-
-  Artifacts:
-    skill: main-skill         — Main functionality
-    agent: orchestrator       — Orchestrates multiple skills
-
-  Dependencies:
-    @author/skill-library  ^2.0.0 (installed: 2.3.1)
-    prompt-templates       ~1.5.0 (installed: 1.5.2)
-    utility-functions      >=1.0.0 (installed: 1.8.0)
-    shared-instructions    * (installed: 0.9.0)
-
-  Source: registry
-  Checksum: sha256:9f8e7d6c5b4a...
-```
-
-### Example 5: Local Package Installation
-
-```bash
-aam info my-local-package
-```
-
-**Output:**
-```
-my-local-package@0.1.0
-  Description: Package installed from local directory
-
-  Artifacts:
-    skill: test-skill         — Test skill for development
-
-  Dependencies:
-    None
-
-  Source: local
-  Checksum:
-```
-
-Note: Local installations don't have checksums.
 
 ## Exit Codes
 
 | Code | Meaning |
 |------|---------|
-| 0 | Success - package found and displayed |
-| 1 | Error - package not installed |
+| 0 | Success (package found, installed or from sources) |
+| 1 | Error (package not found anywhere) |
 
-## Information Displayed
+## Information displayed
 
-### Metadata
+### Installed packages
 
-- **Name and Version** - Package identifier and version
-- **Description** - What the package does
-- **Author** - Package author (if specified)
-- **License** - License identifier (SPDX format)
-- **Repository** - Source code repository URL
+For installed packages you see the full manifest:
 
-### Artifacts
+- **Name and version** — Package identifier and version
+- **Status** — "Installed" (green)
+- **Description** — What the package does
+- **Author** — Package author (if specified)
+- **License** — License identifier (SPDX format)
+- **Repository** — Source code repository URL
+- **Artifacts** — Each artifact's type, name, and description
+- **Dependencies** — Dependency names, version constraints, and
+  installed versions
+- **Source** — Where the package came from (`registry` or `local`)
+- **Checksum** — SHA-256 hash (registry installs only)
 
-For each artifact:
+### Uninstalled source packages
 
-- **Type** - skill, agent, prompt, or instruction
-- **Name** - Artifact identifier
-- **Description** - What the artifact does
+For packages discovered in git sources but not yet installed:
 
-### Dependencies
+- **Name and version** — Name with `source@<commit>` version
+- **Status** — "Not installed" (yellow)
+- **Type** — Artifact type (skill, agent, prompt, instruction)
+- **Description** — Extracted from the artifact metadata
+- **Source** — Which git source provides this artifact
+- **Commit** — Git commit SHA the artifact was indexed from
+- **Vendor agent** — Companion vendor agent file, if present
+- **Artifact header** — If the artifact file (for example,
+  SKILL.md) contains YAML frontmatter between `---` delimiters,
+  the full header is displayed in a bordered panel. This includes
+  fields like `name`, `description`, and any custom metadata the
+  artifact author defined.
+- **GitHub link** — Direct link to the artifact directory on
+  GitHub at the indexed commit
+- **Install command** — Ready-to-copy command to install
 
-For each dependency:
+## Related commands
 
-- **Name** - Dependency package name
-- **Constraint** - Version constraint from manifest
-- **Installed** - Actual installed version (if present)
-
-### Source Information
-
-- **Source** - Where the package came from:
-  - `registry` - Downloaded from a registry
-  - `local` - Installed from local directory or archive
-
-- **Checksum** - SHA-256 hash of the archive (registry installs only)
-
-## Related Commands
-
-- [`aam list`](list.md) - List all installed packages
-- [`aam install`](install.md) - Install a package
-- [`aam search`](search.md) - Search for packages in registries
+- [`aam list`](list.md) — List all installed packages
+- [`aam install`](install.md) — Install a package
+- [`aam search`](search.md) — Search for packages in registries
+  and sources
 
 ## Notes
 
-### Missing Metadata
+### GitHub links
 
-Optional fields (author, license, repository) may not be present. They will be omitted from the output if not specified in the package manifest.
+The GitHub link uses the exact commit SHA that was indexed, not a
+branch name. This means the link always points to the same version
+of the artifact files that AAM discovered during the last
+`aam source update`.
 
-### Dependency Installation Status
+For non-GitHub hosts (GitLab, Bitbucket), the URL format uses the
+same `tree/<commit>/<path>` pattern, which works on most major git
+hosting platforms.
 
-The command shows whether each dependency is actually installed. If a dependency is listed but not installed, it indicates a corrupted environment. Run:
+### Missing metadata
+
+Optional fields (author, license, repository) are omitted from the
+output if not specified in the package manifest.
+
+### Dependency installation status
+
+The command shows whether each dependency is actually installed. If
+a dependency is listed but not installed, it indicates a corrupted
+environment. Run:
 
 ```bash
 aam install package-name --force
@@ -205,19 +267,12 @@ aam install package-name --force
 
 to reinstall and resolve dependencies.
 
-### Checksum Verification
+### Checksum verification
 
-Checksums are only available for packages installed from archives. Packages installed from local directories do not have checksums.
+Checksums are only available for packages installed from archives.
+Packages installed from local directories don't have checksums.
 
-### Artifact Paths
-
-This command does not show artifact file paths. The paths are internal to the package structure. To explore package files directly:
-
-```bash
-ls -la .aam/packages/package-name/
-```
-
-### Querying Registry Packages
+### Querying registry packages
 
 To see information about packages in a registry (not installed), use:
 
@@ -225,4 +280,5 @@ To see information about packages in a registry (not installed), use:
 aam search package-name
 ```
 
-Registry search results show similar metadata but for all available versions.
+Registry search results show similar metadata but for all available
+versions.

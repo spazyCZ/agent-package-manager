@@ -26,6 +26,7 @@ from aam_cli.core.workspace import (
     write_lock_file,
 )
 from aam_cli.utils.naming import parse_package_name, to_filesystem_name
+from aam_cli.utils.paths import resolve_project_dir
 
 ################################################################################
 #                                                                              #
@@ -45,20 +46,34 @@ logger = logging.getLogger(__name__)
 
 @click.command()
 @click.argument("package")
+@click.option(
+    "--global", "-g", "is_global", is_flag=True,
+    help="Uninstall from global ~/.aam/ directory",
+)
 @click.pass_context
-def uninstall(ctx: click.Context, package: str) -> None:
+def uninstall(ctx: click.Context, package: str, is_global: bool) -> None:
     """Uninstall a package and remove deployed artifacts.
 
     Removes the package from ``.aam/packages/``, undeploys artifacts
     from the platform, and updates the lock file.
 
+    Use ``-g`` / ``--global`` to uninstall from the user-wide ``~/.aam/``
+    directory instead of the project-local ``.aam/`` workspace.
+
     Examples::
 
         aam uninstall my-package
         aam uninstall @author/my-package
+        aam uninstall my-package -g
     """
     console: Console = ctx.obj["console"]
-    project_dir = Path.cwd()
+    project_dir = resolve_project_dir(is_global)
+
+    # -----
+    # Visual indicator for global mode
+    # -----
+    if is_global:
+        console.print("[dim]Operating in global mode (~/.aam/)[/dim]\n")
 
     # -----
     # Step 1: Check if installed

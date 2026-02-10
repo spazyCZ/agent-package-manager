@@ -22,6 +22,7 @@ from aam_cli.commands.outdated import check_outdated
 from aam_cli.core.config import load_config
 from aam_cli.core.workspace import read_lock_file
 from aam_cli.services.upgrade_service import UpgradeResult
+from aam_cli.utils.paths import resolve_project_dir
 
 ################################################################################
 #                                                                              #
@@ -43,12 +44,17 @@ logger = logging.getLogger(__name__)
 @click.argument("package", required=False)
 @click.option("--dry-run", is_flag=True, help="Preview without making changes")
 @click.option("--force", "-f", is_flag=True, help="Skip modification warnings")
+@click.option(
+    "--global", "-g", "is_global", is_flag=True,
+    help="Upgrade packages in global ~/.aam/ directory",
+)
 @click.pass_context
 def upgrade(
     ctx: click.Context,
     package: str | None,
     dry_run: bool,
     force: bool,
+    is_global: bool,
 ) -> None:
     """Upgrade outdated source-installed packages.
 
@@ -58,15 +64,25 @@ def upgrade(
     Checks for local modifications before overwriting. Use ``--force``
     to skip modification warnings.
 
+    Use ``-g`` / ``--global`` to upgrade packages in the user-wide
+    ``~/.aam/`` directory instead of the project-local ``.aam/`` workspace.
+
     Examples::
 
         aam upgrade
         aam upgrade code-review
         aam upgrade --dry-run
         aam upgrade --force
+        aam upgrade -g
     """
     console: Console = ctx.obj["console"]
-    project_dir = Path.cwd()
+    project_dir = resolve_project_dir(is_global)
+
+    # -----
+    # Visual indicator for global mode
+    # -----
+    if is_global:
+        console.print("[dim]Operating in global mode (~/.aam/)[/dim]\n")
 
     logger.info(
         f"Upgrade invoked: package='{package}', dry_run={dry_run}, force={force}"

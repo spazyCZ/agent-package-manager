@@ -35,6 +35,7 @@ from aam_cli.registry.factory import create_registry
 from aam_cli.utils.archive import extract_archive
 from aam_cli.utils.checksum import calculate_sha256
 from aam_cli.utils.naming import parse_package_name, parse_package_spec, to_filesystem_name
+from aam_cli.utils.paths import resolve_project_dir
 from aam_cli.utils.yaml_utils import load_yaml_optional
 
 ################################################################################
@@ -243,6 +244,10 @@ def _read_file_checksums_from_package(
 @click.option("--no-deploy", is_flag=True, help="Download only, skip deployment")
 @click.option("--force", "-f", is_flag=True, help="Reinstall even if present")
 @click.option("--dry-run", is_flag=True, help="Preview without installing")
+@click.option(
+    "--global", "-g", "is_global", is_flag=True,
+    help="Install to global ~/.aam/ directory",
+)
 @click.pass_context
 def install(
     ctx: click.Context,
@@ -251,6 +256,7 @@ def install(
     no_deploy: bool,
     force: bool,
     dry_run: bool,
+    is_global: bool,
 ) -> None:
     """Install a package and deploy artifacts.
 
@@ -261,6 +267,9 @@ def install(
       - ``./path/`` — install from local directory
       - ``file.aam`` — install from archive file
 
+    Use ``-g`` / ``--global`` to install into the user-wide ``~/.aam/``
+    directory instead of the project-local ``.aam/`` workspace.
+
     Examples::
 
         aam install my-agent
@@ -270,9 +279,16 @@ def install(
         aam install my-package-1.0.0.aam
         aam install my-agent --no-deploy
         aam install my-agent --force
+        aam install my-agent -g
     """
     console: Console = ctx.obj["console"]
-    project_dir = Path.cwd()
+    project_dir = resolve_project_dir(is_global)
+
+    # -----
+    # Visual indicator for global mode
+    # -----
+    if is_global:
+        console.print("[dim]Operating in global mode (~/.aam/)[/dim]\n")
 
     if dry_run:
         console.print("[yellow]Dry run mode — no changes will be made[/yellow]\n")

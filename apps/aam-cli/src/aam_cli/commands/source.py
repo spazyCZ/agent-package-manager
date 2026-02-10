@@ -399,6 +399,7 @@ def list_cmd(ctx: click.Context, output_json: bool) -> None:
     # -----
     table = Table(show_header=True, header_style="bold")
     table.add_column("Name", style="cyan")
+    table.add_column("Publisher", style="magenta")
     table.add_column("URL")
     table.add_column("Ref")
     table.add_column("Path")
@@ -410,6 +411,12 @@ def list_cmd(ctx: click.Context, output_json: bool) -> None:
         if s["default"]:
             name_display += " [dim](default)[/dim]"
 
+        # -----
+        # Extract publisher (org/owner) from source name
+        # -----
+        # Source names follow "{owner}/{repo}:{path}" convention
+        publisher = s["name"].split("/")[0] if "/" in s["name"] else "—"
+
         fetched = s.get("last_fetched", "")
         if fetched:
             # Show just the date portion
@@ -417,6 +424,7 @@ def list_cmd(ctx: click.Context, output_json: bool) -> None:
 
         table.add_row(
             name_display,
+            publisher,
             s["url"],
             s["ref"],
             s["path"] or "—",

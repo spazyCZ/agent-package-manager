@@ -23,6 +23,7 @@ from rich.table import Table
 from aam_cli.core.config import load_config
 from aam_cli.core.workspace import read_lock_file
 from aam_cli.services.upgrade_service import OutdatedPackage, OutdatedResult
+from aam_cli.utils.paths import resolve_project_dir
 
 ################################################################################
 #                                                                              #
@@ -42,20 +43,34 @@ logger = logging.getLogger(__name__)
 
 @click.command()
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option(
+    "--global", "-g", "is_global", is_flag=True,
+    help="Check global ~/.aam/ packages for updates",
+)
 @click.pass_context
-def outdated(ctx: click.Context, output_json: bool) -> None:
+def outdated(ctx: click.Context, output_json: bool, is_global: bool) -> None:
     """Check for outdated source-installed packages.
 
     Compares installed package commit SHAs against the source HEAD.
     Packages not installed from sources are shown as "(no source)".
 
+    Use ``-g`` / ``--global`` to check packages in the user-wide
+    ``~/.aam/`` directory instead of the project-local ``.aam/`` workspace.
+
     Examples::
 
         aam outdated
         aam outdated --json
+        aam outdated -g
     """
     console: Console = ctx.obj["console"]
-    project_dir = Path.cwd()
+    project_dir = resolve_project_dir(is_global)
+
+    # -----
+    # Visual indicator for global mode
+    # -----
+    if is_global:
+        console.print("[dim]Operating in global mode (~/.aam/)[/dim]\n")
 
     logger.info("Checking for outdated packages")
 

@@ -20,6 +20,7 @@ from rich.tree import Tree
 from aam_cli.core.manifest import load_manifest
 from aam_cli.core.workspace import get_packages_dir, read_lock_file
 from aam_cli.utils.naming import parse_package_name, to_filesystem_name
+from aam_cli.utils.paths import resolve_project_dir
 
 ################################################################################
 #                                                                              #
@@ -44,22 +45,35 @@ logger = logging.getLogger(__name__)
     is_flag=True,
     help="Show available artifacts from configured sources",
 )
+@click.option(
+    "--global", "-g", "is_global", is_flag=True,
+    help="List packages from global ~/.aam/ directory",
+)
 @click.pass_context
-def list_packages(ctx: click.Context, tree: bool, available: bool) -> None:
+def list_packages(ctx: click.Context, tree: bool, available: bool, is_global: bool) -> None:
     """List installed packages or available source artifacts.
 
     Shows a table of installed packages with version and artifact counts.
     Use ``--tree`` to see the dependency tree.
     Use ``--available`` to list artifacts from configured git sources.
+    Use ``-g`` / ``--global`` to list packages from the user-wide
+    ``~/.aam/`` directory instead of the project-local ``.aam/`` workspace.
 
     Examples::
 
         aam list
         aam list --tree
         aam list --available
+        aam list -g
     """
     console: Console = ctx.obj["console"]
-    project_dir = Path.cwd()
+    project_dir = resolve_project_dir(is_global)
+
+    # -----
+    # Visual indicator for global mode
+    # -----
+    if is_global:
+        console.print("[dim]Operating in global mode (~/.aam/)[/dim]\n")
 
     # -----
     # Route to available artifacts view if requested

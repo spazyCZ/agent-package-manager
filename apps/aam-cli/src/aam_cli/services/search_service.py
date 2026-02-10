@@ -319,6 +319,12 @@ def search_packages(
                         description_lower=(entry.description or "").lower(),
                         keywords_lower=[k.lower() for k in entry.keywords],
                     )
+
+                    # -----
+                    # Always collect name for "Did you mean?" before filtering
+                    # -----
+                    all_names.append(entry.name)
+
                     if score == 0 and query_lower:
                         continue  # no match
 
@@ -335,7 +341,6 @@ def search_packages(
                             updated_at=getattr(entry, "updated_at", "") or "",
                         )
                     )
-                    all_names.append(entry.name)
 
             except (ValueError, OSError, KeyError) as exc:
                 warning_msg = (
@@ -364,6 +369,12 @@ def search_packages(
                     description_lower=(vp.description or "").lower(),
                     keywords_lower=[],  # sources have no keywords
                 )
+
+                # -----
+                # Always collect name for "Did you mean?" before filtering
+                # -----
+                all_names.append(vp.name)
+
                 if score == 0 and query_lower:
                     continue  # no match
 
@@ -380,7 +391,6 @@ def search_packages(
                         updated_at="",
                     )
                 )
-                all_names.append(vp.name)
 
         except (ValueError, OSError) as exc:
             warning_msg = f"Could not search sources: {exc}"

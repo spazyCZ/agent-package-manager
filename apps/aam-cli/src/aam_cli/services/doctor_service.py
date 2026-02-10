@@ -15,10 +15,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from aam_cli.core.config import load_config
+from pydantic import ValidationError
+
+from aam_cli.core.config import AamConfig, load_config
 from aam_cli.core.manifest import load_manifest
 from aam_cli.core.workspace import get_packages_dir, read_lock_file
 from aam_cli.utils.naming import parse_package_name, to_filesystem_name
+from aam_cli.utils.paths import get_global_config_path, get_project_config_path
+from aam_cli.utils.yaml_utils import load_yaml_optional
 
 ################################################################################
 #                                                                              #
@@ -51,10 +55,11 @@ def run_diagnostics(
 
     Performs the following checks:
       1. Python version >= 3.11
-      2. AAM configuration is valid and loadable
-      3. Configured registries are accessible
-      4. Installed packages have valid manifests and checksums
-      5. No incomplete installations (leftover staging directories)
+      2. Config file existence, paths, and YAML/schema validation
+      3. AAM configuration is valid and loadable (merged)
+      4. Configured registries are accessible
+      5. Installed packages have valid manifests and checksums
+      6. No incomplete installations (leftover staging directories)
 
     Args:
         project_dir: Project root directory. Defaults to cwd.
@@ -74,22 +79,27 @@ def run_diagnostics(
     checks.append(_check_python_version())
 
     # -----
-    # Check 2: Configuration validity
+    # Check 2: Config file paths and structure validation
+    # -----
+    checks.extend(_check_config_files(effective_dir))
+
+    # -----
+    # Check 3: Configuration validity (merged config loadable)
     # -----
     checks.append(_check_config_valid(effective_dir))
 
     # -----
-    # Check 3: Registry accessibility
+    # Check 4: Registry accessibility
     # -----
     checks.extend(_check_registries(effective_dir))
 
     # -----
-    # Check 4: Package integrity
+    # Check 5: Package integrity
     # -----
     checks.extend(_check_packages_integrity(effective_dir))
 
     # -----
-    # Check 5: Incomplete installations
+    # Check 6: Incomplete installations
     # -----
     checks.append(_check_incomplete_installs(effective_dir))
 
@@ -147,6 +157,114 @@ def _check_python_version() -> dict[str, Any]:
         "message": f"Python {version_str} (requires >= 3.11)",
         "suggestion": "Upgrade to Python 3.11 or later.",
     }
+
+
+def _check_config_files(project_dir: Path) -> list[dict[str, Any]]:
+    """Check existence, paths, and schema validity of each config file.
+
+    Reports the absolute path for both the global (``~/.aam/config.yaml``)
+    and project (``<cwd>/.aam/config.yaml``) config files, verifies that
+    each is parseable YAML, and validates against the ``AamConfig`` schema.
+
+    Args:
+        project_dir: Project root directory.
+
+    Returns:
+        List of DoctorCheck dicts (one per config file location).
+    """
+    checks: list[dict[str, Any]] = []
+
+    config_locations: list[tuple[str, Path]] = [
+        ("Global config", get_global_config_path()),
+        ("Project config", get_project_config_path(project_dir)),
+    ]
+
+    for label, config_path in config_locations:
+        check_name = label.lower().replace(" ", "_")
+
+        if not config_path.exists():
+            # -----
+            # File does not exist — perfectly fine, defaults will be used
+            # -----
+            logger.debug(f"{label} not found: path='{config_path}'")
+            checks.append(
+                {
+                    "name": check_name,
+                    "status": "pass",
+                    "message": f"{label}: {config_path} (not found, using defaults)",
+                    "suggestion": None,
+                }
+            )
+            continue
+
+        # -----
+        # File exists — attempt YAML parse
+        # -----
+        try:
+            data = load_yaml_optional(config_path)
+        except Exception as exc:
+            logger.warning(f"{label} has invalid YAML: path='{config_path}', error={exc}")
+            checks.append(
+                {
+                    "name": check_name,
+                    "status": "fail",
+                    "message": f"{label}: {config_path} (invalid YAML: {exc})",
+                    "suggestion": (
+                        f"Fix the YAML syntax in '{config_path}' or remove the file."
+                    ),
+                }
+            )
+            continue
+
+        # -----
+        # YAML is valid — validate against AamConfig schema
+        # -----
+        if not data:
+            # Empty file is valid — defaults will be used
+            logger.debug(f"{label} is empty: path='{config_path}'")
+            checks.append(
+                {
+                    "name": check_name,
+                    "status": "pass",
+                    "message": f"{label}: {config_path} (empty, using defaults)",
+                    "suggestion": None,
+                }
+            )
+            continue
+
+        try:
+            AamConfig(**data)
+            logger.debug(f"{label} schema valid: path='{config_path}'")
+            checks.append(
+                {
+                    "name": check_name,
+                    "status": "pass",
+                    "message": f"{label}: {config_path} (valid)",
+                    "suggestion": None,
+                }
+            )
+        except ValidationError as exc:
+            error_count = exc.error_count()
+            logger.warning(
+                f"{label} schema invalid: path='{config_path}', errors={error_count}"
+            )
+            checks.append(
+                {
+                    "name": check_name,
+                    "status": "fail",
+                    "message": (
+                        f"{label}: {config_path} "
+                        f"(schema error: {error_count} validation "
+                        f"error{'s' if error_count != 1 else ''})"
+                    ),
+                    "suggestion": (
+                        f"Check '{config_path}' for invalid or unknown fields. "
+                        f"Run 'aam config list' to see expected keys."
+                    ),
+                }
+            )
+
+    return checks
 
 
 def _check_config_valid(project_dir: Path) -> dict[str, Any]:

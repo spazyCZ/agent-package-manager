@@ -51,6 +51,33 @@ PACKAGES_DIR_NAME: str = "packages"
 ################################################################################
 
 
+def resolve_project_dir(is_global: bool = False) -> Path:
+    """Return the effective project directory for workspace operations.
+
+    When ``is_global`` is True, returns ``Path.home()`` so that all
+    workspace paths (packages, lock file) resolve under ``~/.aam/``
+    instead of the project-local ``.aam/`` directory.
+
+    This mirrors npm's ``-g`` / ``--global`` flag behaviour: global
+    installs live in the user's home directory and are available
+    across all projects.
+
+    Args:
+        is_global: If True, use the global home directory.
+
+    Returns:
+        Effective project root directory.
+    """
+    if is_global:
+        home = Path.home()
+        logger.debug(f"Global mode: project_dir resolved to home='{home}'")
+        return home
+
+    cwd = Path.cwd()
+    logger.debug(f"Local mode: project_dir resolved to cwd='{cwd}'")
+    return cwd
+
+
 def get_global_aam_dir() -> Path:
     """Return the global AAM directory (``~/.aam/``).
 

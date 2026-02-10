@@ -35,6 +35,34 @@ aam --version
 aam version 0.1.0
 ```
 
+### --global / -g (per-command)
+
+Install, uninstall, list, upgrade, and check outdated packages in the global `~/.aam/` directory instead of the project-local `.aam/` workspace. This is a per-command flag (not a root-level flag) that mirrors npm's `-g` behaviour.
+
+```bash
+aam install my-agent -g        # Install globally
+aam uninstall my-agent -g      # Uninstall from global
+aam list -g                    # List global packages
+aam upgrade -g                 # Upgrade global packages
+aam outdated -g                # Check global packages for updates
+```
+
+When active, AAM prints a banner to confirm global mode:
+
+```
+Operating in global mode (~/.aam/)
+```
+
+**Affected paths:**
+
+| Resource | Local (default) | Global (`-g`) |
+|----------|----------------|---------------|
+| Packages | `.aam/packages/` | `~/.aam/packages/` |
+| Lock file | `.aam/aam-lock.yaml` | `~/.aam/aam-lock.yaml` |
+| Config | `.aam/config.yaml` | `~/.aam/config.yaml` |
+
+**Supported commands:** `install`, `uninstall`, `list`, `upgrade`, `outdated`
+
 ### --help / -h
 
 Show command help and exit. Can be used with any command or subcommand.

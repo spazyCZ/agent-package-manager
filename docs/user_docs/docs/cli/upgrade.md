@@ -25,7 +25,8 @@ Before overwriting files, AAM checks for local modifications. If modifications a
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
 | `--dry-run` | | false | Preview changes without applying |
-| `--force` | | false | Skip local modification warnings |
+| `--force` | `-f` | false | Skip local modification warnings |
+| `--global` | `-g` | false | Upgrade packages in global `~/.aam/` directory |
 
 ## Examples
 
@@ -75,7 +76,24 @@ aam upgrade --force
 
 Skips local modification checks and overwrites all files.
 
-### Example 5: Handling Local Modifications
+### Example 5: Upgrade Global Packages
+
+```bash
+aam upgrade -g
+```
+
+**Output:**
+```
+Operating in global mode (~/.aam/)
+
+  ✓ Upgraded code-review (abc1234 → def5678)
+
+  1 upgraded, 0 skipped, 0 failed
+```
+
+Upgrades outdated packages in `~/.aam/packages/` instead of the project-local directory.
+
+### Example 6: Handling Local Modifications
 
 ```bash
 aam upgrade code-review

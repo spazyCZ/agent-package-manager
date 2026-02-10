@@ -23,6 +23,7 @@ This command takes no arguments.
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
 | `--tree` | | false | Show dependency tree instead of flat list |
+| `--global` | `-g` | false | List packages from global `~/.aam/` directory |
 
 ## Examples
 
@@ -97,7 +98,28 @@ Installed packages:
 └─────────────────────┴─────────┴─────────────────────────────────────┘
 ```
 
-### Example 5: Tree with Missing Dependencies
+### Example 5: List Global Packages
+
+```bash
+aam list -g
+```
+
+**Output:**
+```
+Operating in global mode (~/.aam/)
+
+Installed packages:
+
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┓
+┃ Name                ┃ Version ┃ Artifacts           ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━┩
+│ shared-agent        │ 1.0.0   │ 2 (1 skill, 1 age…  │
+└─────────────────────┴─────────┴─────────────────────┘
+```
+
+Lists packages installed globally in `~/.aam/packages/` rather than in the current project.
+
+### Example 6: Tree with Missing Dependencies
 
 ```bash
 aam list --tree

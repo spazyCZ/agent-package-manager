@@ -161,15 +161,21 @@ def search(
         registry_label = result.get("registry", "")
 
         # -----
-        # Tag source results with [source] indicator
+        # Extract publisher/source name for display
         # -----
-        source_tag = ""
+        source_info = ""
         if registry_label.startswith("[source]"):
-            source_tag = " [dim][source][/dim]"
+            # Source artifacts: extract source name from "[source] {source_name}"
+            source_name = registry_label.replace("[source] ", "", 1)
+            publisher = source_name.split("/")[0] if "/" in source_name else source_name
+            source_info = f"  [magenta]{publisher}[/magenta] [dim]({source_name})[/dim]"
+        elif registry_label:
+            # Registry artifacts: show registry name as publisher
+            source_info = f"  [magenta]{registry_label}[/magenta]"
 
         console.print(
             f"  [cyan]{result['name']}[/cyan]  "
-            f"{result['version']}{source_tag}"
+            f"{result['version']}{source_info}"
         )
         console.print(f"    {result['description']}")
         if types_str:

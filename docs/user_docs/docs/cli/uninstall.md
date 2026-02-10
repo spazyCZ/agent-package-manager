@@ -22,7 +22,9 @@ If other installed packages depend on this package, AAM will warn you and ask fo
 
 ## Options
 
-This command has no command-specific options.
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--global` | `-g` | false | Uninstall from global `~/.aam/` directory |
 
 ## Examples
 
@@ -96,6 +98,26 @@ aam uninstall non-existent-package
 ```
 Error: 'non-existent-package' is not installed.
 ```
+
+### Example 5: Uninstall Global Package
+
+```bash
+aam uninstall my-package -g
+```
+
+**Output:**
+```
+Operating in global mode (~/.aam/)
+
+Uninstalling my-package@1.0.0...
+
+Removing deployed artifacts from cursor...
+  ✓ Removed skill: my-skill
+
+✓ Uninstalled my-package
+```
+
+Removes the package from `~/.aam/packages/` instead of the project-local directory.
 
 ## Exit Codes
 

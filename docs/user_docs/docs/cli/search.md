@@ -10,7 +10,13 @@ aam search QUERY [OPTIONS]
 
 ## Description
 
-Search configured registries for packages matching a query. Uses case-insensitive substring matching on package name, description, and keywords. Returns packages from all configured registries, with latest version information.
+Search configured registries and git sources for packages matching a
+query. Uses case-insensitive substring matching on package name,
+description, and keywords. Returns packages from all configured
+registries and sources, with version and **publisher** information.
+
+Each result displays the publisher (the organization or registry that
+provides the package) so you can identify the origin at a glance.
 
 Use this to discover packages before installation.
 
@@ -30,7 +36,7 @@ Use this to discover packages before installation.
 
 ## Examples
 
-### Example 1: Basic Search
+### Example 1: Basic search
 
 ```bash
 aam search chatbot
@@ -38,22 +44,25 @@ aam search chatbot
 
 **Output:**
 ```
-Search results for "chatbot" (3 packages):
+Search results for "chatbot" (3 matches):
 
-  chatbot-agent  1.2.0
+  chatbot-agent  1.2.0  local
     Conversational AI agent for customer support
     [skill, agent, prompt]
 
-  @author/advanced-chatbot  2.0.0
+  advanced-chatbot  2.0.0  local
     Advanced chatbot with context awareness
     [agent, prompt, instruction]
 
-  chatbot-skills  0.5.0
+  chatbot-skills  0.5.0  local
     Reusable skills for chatbot development
     [skill]
 ```
 
-### Example 2: Search with Type Filter
+The publisher name appears after the version (for example, `local` for
+packages from a local registry).
+
+### Example 2: Search with type filter
 
 ```bash
 aam search audit --type skill
@@ -61,18 +70,18 @@ aam search audit --type skill
 
 **Output:**
 ```
-Search results for "audit" (2 packages):
+Search results for "audit" (2 matches):
 
-  asvc-audit-skill  1.0.0
+  asvc-audit-skill  1.0.0  local
     ASVC compliance audit skill
     [skill]
 
-  security-audit  0.8.0
+  security-audit  0.8.0  local
     Security audit automation skill
     [skill]
 ```
 
-### Example 3: Limit Results
+### Example 3: Limit results
 
 ```bash
 aam search agent --limit 3
@@ -80,22 +89,22 @@ aam search agent --limit 3
 
 **Output:**
 ```
-Search results for "agent" (3 packages):
+Search results for "agent" (3 matches):
 
-  my-agent  1.0.0
+  my-agent  1.0.0  local
     General purpose automation agent
     [agent, skill]
 
-  code-review-agent  2.1.0
+  code-review-agent  2.1.0  local
     Agent for automated code reviews
     [agent, prompt]
 
-  data-agent  1.5.0
+  data-agent  1.5.0  local
     Data analysis and reporting agent
     [agent, skill, prompt]
 ```
 
-### Example 4: JSON Output
+### Example 4: JSON output
 
 ```bash
 aam search chatbot --json
@@ -113,7 +122,7 @@ aam search chatbot --json
     "registry": "local"
   },
   {
-    "name": "@author/advanced-chatbot",
+    "name": "advanced-chatbot",
     "version": "2.0.0",
     "description": "Advanced chatbot with context awareness",
     "keywords": ["chatbot", "context", "advanced"],
@@ -123,7 +132,7 @@ aam search chatbot --json
 ]
 ```
 
-### Example 5: No Results
+### Example 5: No results
 
 ```bash
 aam search nonexistent-package-xyz
@@ -134,38 +143,47 @@ aam search nonexistent-package-xyz
 No packages found matching "nonexistent-package-xyz".
 ```
 
-### Example 6: Search in Multiple Registries
+### Example 6: Search across registries and git sources
 
 ```bash
-aam search analytics
+aam search doc
 ```
 
-If you have multiple registries configured, results from all registries are shown:
+Results from both registries and git sources are combined. Source
+artifacts display the publisher and full source name so you can tell
+where each result originates.
 
 **Output:**
 ```
-Search results for "analytics" (4 packages):
+Search results for "doc" (5 matches):
 
-  data-analytics  2.0.0
-    Data analytics and visualization tools
-    [skill, prompt]
+  docs-changelog  source@da66c7c  google-gemini (google-gemini/gemini-cli:skills)
+    Generate changelog files from release information
+    [skill]
 
-  @company/analytics-agent  1.5.0      [registry: company-registry]
-    Internal analytics automation agent
-    [agent, skill]
+  docs-writer  source@da66c7c  google-gemini (google-gemini/gemini-cli:skills)
+    Write and review documentation files
+    [skill]
 
-  analytics-prompts  0.3.0
-    Reusable prompts for analytics tasks
-    [prompt]
+  notion-research-documentation  source@4ab6e0f  openai (openai/skills:.curated)
+    Research documentation via Notion
+    [skill]
 
-  @author/ml-analytics  3.0.0          [registry: aam-central]
-    Machine learning analytics suite
-    [skill, agent]
+  openai-docs  source@4ab6e0f  openai (openai/skills:.curated)
+    OpenAI documentation reference
+    [skill]
+
+  doc  source@4ab6e0f  openai (openai/skills:.curated)
+    General documentation skill
+    [skill]
 ```
 
-### Example 7: Filter Multiple Types
+The publisher name (for example, `google-gemini` or `openai`) appears
+in magenta, followed by the full source name in parentheses.
 
-Currently filtering multiple types requires multiple searches:
+### Example 7: Filter multiple types
+
+Currently filtering multiple types requires separate searches:
 
 ```bash
 aam search data --type skill
@@ -179,15 +197,15 @@ aam search data --type agent
 | 0 | Success |
 | 1 | Error - no registries configured |
 
-## Search Behavior
+## Search behavior
 
-### Matching Algorithm
+### Matching algorithm
 
 Search uses case-insensitive substring matching on:
 
-- **Package name** - Matches anywhere in the name
-- **Description** - Matches anywhere in the description
-- **Keywords** - Matches any keyword exactly
+- **Package name** — matches anywhere in the name
+- **Description** — matches anywhere in the description
+- **Keywords** — matches any keyword exactly
 
 Example: Query `"audit"` matches:
 
@@ -196,19 +214,28 @@ Example: Query `"audit"` matches:
 - Package with description "ASVC audit tool" (description)
 - Package with keyword `audit` (keyword)
 
-### Result Ordering
+### Result ordering
 
-Results are returned in order discovered from registries. If you have multiple registries, results from the first configured registry appear first.
+Registry results appear first, followed by git-source results. Within
+each group, results are returned in the order they are discovered.
 
-### Registry Source
+### Publisher display
 
-When multiple registries are configured, the registry name is shown in brackets for packages from non-default registries.
+Every result shows its publisher or origin:
 
-## Related Commands
+- **Registry packages** display the registry name (for example, `local`
+  or `company-registry`).
+- **Source artifacts** display the publisher organization and the full
+  source name. For example, `openai (openai/skills:.curated)` tells you
+  the artifact comes from the `openai` organization, specifically the
+  `openai/skills:.curated` source.
+
+## Related commands
 
 - [`aam install`](install.md) - Install a package found via search
 - [`aam info`](info.md) - Show details about an installed package
 - [`aam registry list`](registry-list.md) - List configured registries
+- [`aam source list`](source-list.md) - List configured git sources
 
 ## Notes
 

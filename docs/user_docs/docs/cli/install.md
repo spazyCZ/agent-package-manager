@@ -37,6 +37,7 @@ Use this command to add new packages to your project or reinstall existing packa
 | `--no-deploy` | | false | Download only, skip deployment |
 | `--force` | `-f` | false | Reinstall even if already present |
 | `--dry-run` | | false | Preview installation without changes |
+| `--global` | `-g` | false | Install to global `~/.aam/` directory |
 
 ## Examples
 
@@ -140,6 +141,24 @@ aam install my-agent --platform cursor
 
 Deploys artifacts only to Cursor, ignoring other configured platforms.
 
+### Example 9: Global Install
+
+```bash
+aam install my-agent -g
+```
+
+**Output:**
+```
+Operating in global mode (~/.aam/)
+
+Resolving my-agent@*...
+  + my-agent@1.2.0
+
+✓ Installed 1 packages
+```
+
+Installs the package to `~/.aam/packages/` so it is available user-wide, similar to `npm install -g`. The global lock file at `~/.aam/aam-lock.yaml` is updated instead of the project-local one.
+
 ## Exit Codes
 
 | Code | Meaning |
@@ -180,6 +199,10 @@ AAM uses semantic versioning for dependency resolution:
 ### Lock File
 
 The lock file (`.aam/aam-lock.yaml`) records exact versions installed. This ensures reproducible installations across different environments.
+
+### Global Installs
+
+When using `-g` / `--global`, packages are installed to `~/.aam/packages/` instead of the project-local `.aam/packages/`. The global lock file `~/.aam/aam-lock.yaml` tracks globally installed packages. This is useful for packages you want available across all projects without adding them to each project individually.
 
 ### Registry Configuration
 

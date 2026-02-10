@@ -408,7 +408,7 @@ class TestSearchPackagesNew:
         assert len(response.results) == 3
 
     # -----
-    # all_names on empty results
+    # all_names on empty results (regression: "Did you mean?" support)
     # -----
 
     @patch("aam_cli.services.search_service.build_source_index")
@@ -418,8 +418,13 @@ class TestSearchPackagesNew:
         mock_create_reg: MagicMock,
         mock_build_index: MagicMock,
     ) -> None:
-        """all_names is populated when 0 results match."""
-        # Registry has entries but query doesn't match
+        """all_names is populated when 0 results match (registry path).
+
+        Regression: all_names must contain ALL candidate names even when
+        no candidate scores > 0, so "Did you mean?" can suggest close
+        matches.
+        """
+        # Registry has entries but query doesn't match any scoring tier
         entries = [_make_registry_entry("chatbot", description="A chatbot")]
         mock_reg = MagicMock()
         mock_reg.search.return_value = entries
@@ -433,12 +438,133 @@ class TestSearchPackagesNew:
         response = search_packages("zzz-nonexistent", config)
 
         assert len(response.results) == 0
-        # all_names should contain names from the registry
-        # Note: all_names is populated from entries that the registry
-        # returns for the query — if registry returns entries but they
-        # don't match our scoring, their names still appear via the
-        # reg.search() results
         assert response.total_count == 0
+        # -----
+        # Regression assertion: all_names must include "chatbot" even
+        # though it scored 0, to power "Did you mean?" suggestions
+        # -----
+        assert "chatbot" in response.all_names
+
+    @patch("aam_cli.services.search_service.build_source_index")
+    def test_unit_search_all_names_near_miss_source_query(
+        self,
+        mock_build_index: MagicMock,
+    ) -> None:
+        """Regression: 'doc-writer' query populates all_names with 'docs-writer'.
+
+        Reproduces the exact bug where searching 'doc-writer' returned
+        zero results AND empty all_names, preventing "Did you mean?"
+        from ever suggesting the correct name 'docs-writer'.
+
+        Root cause was that all_names.append() was placed after the
+        'if score == 0: continue' check, so zero-score entries were
+        never collected for suggestions.
+        """
+        # -----
+        # Set up sources mimicking the real scenario
+        # -----
+        vp_docs_writer = _make_virtual_package(
+            "docs-writer", source_name="gemini-skills",
+            description="Write documentation",
+        )
+        vp_docs_changelog = _make_virtual_package(
+            "docs-changelog", source_name="gemini-skills",
+            description="Generate changelogs",
+        )
+        vp_code_reviewer = _make_virtual_package(
+            "code-reviewer", source_name="gemini-skills",
+            description="Review code",
+        )
+        mock_index = MagicMock()
+        mock_index.by_qualified_name = {
+            "gemini-skills/docs-writer": vp_docs_writer,
+            "gemini-skills/docs-changelog": vp_docs_changelog,
+            "gemini-skills/code-reviewer": vp_code_reviewer,
+        }
+        mock_build_index.return_value = mock_index
+
+        config = _make_config(
+            registries=[],
+            sources=[_make_source("gemini-skills")],
+        )
+
+        # -----
+        # The near-miss query: "doc-writer" vs "docs-writer"
+        # -----
+        response = search_packages("doc-writer", config)
+
+        # No exact/prefix/substring match → 0 results
+        assert len(response.results) == 0
+        assert response.total_count == 0
+
+        # -----
+        # Regression assertions: all_names MUST contain every source
+        # entry so "Did you mean?" can find "docs-writer"
+        # -----
+        assert len(response.all_names) == 3
+        assert "docs-writer" in response.all_names
+        assert "docs-changelog" in response.all_names
+        assert "code-reviewer" in response.all_names
+
+    @patch("aam_cli.services.search_service.build_source_index")
+    @patch("aam_cli.services.search_service.create_registry")
+    def test_unit_search_all_names_near_miss_registry_query(
+        self,
+        mock_create_reg: MagicMock,
+        mock_build_index: MagicMock,
+    ) -> None:
+        """Regression: near-miss query populates all_names from registries.
+
+        Same bug as the source path — registry entries with score 0
+        must still appear in all_names for "Did you mean?" suggestions.
+        """
+        entries = [
+            _make_registry_entry("docs-writer", description="Write docs"),
+            _make_registry_entry("code-reviewer", description="Reviews"),
+        ]
+        mock_reg = MagicMock()
+        mock_reg.search.return_value = entries
+        mock_create_reg.return_value = mock_reg
+
+        mock_index = MagicMock()
+        mock_index.by_qualified_name = {}
+        mock_build_index.return_value = mock_index
+
+        config = _make_config(registries=[_make_source("local")])
+        response = search_packages("doc-writer", config)
+
+        assert len(response.results) == 0
+        # -----
+        # Regression: all_names must include registry entries even at
+        # score 0, so "Did you mean?" can suggest "docs-writer"
+        # -----
+        assert "docs-writer" in response.all_names
+        assert "code-reviewer" in response.all_names
+
+    @patch("aam_cli.services.search_service.build_source_index")
+    def test_unit_search_all_names_empty_when_results_found(
+        self,
+        mock_build_index: MagicMock,
+    ) -> None:
+        """all_names is empty when results ARE found (optimization).
+
+        The all_names list is only populated when no results match,
+        because suggestions are only shown on empty result sets.
+        """
+        vp = _make_virtual_package("doc-writer", source_name="src")
+        mock_index = MagicMock()
+        mock_index.by_qualified_name = {"src/doc-writer": vp}
+        mock_build_index.return_value = mock_index
+
+        config = _make_config(
+            registries=[],
+            sources=[_make_source("src")],
+        )
+        response = search_packages("doc", config)
+
+        assert len(response.results) == 1
+        # all_names is empty when results exist (no need for suggestions)
+        assert response.all_names == []
 
     # -----
     # Empty query / browse mode

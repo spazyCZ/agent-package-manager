@@ -29,7 +29,7 @@ from components.registry import ArtifactRegistry
 from components.secrets import Secrets
 from components.backend_service import BackendService
 from components.web_service import WebService
-from components.load_balancer import LoadBalancer
+from components.domain_mapping import DomainMapping
 from components.monitoring import Monitoring
 
 ################################################################################
@@ -168,16 +168,16 @@ web_service = WebService(
 )
 
 # -------------------------------------------------------------------------
-# 9. Global HTTPS Load Balancer
+# 9. Cloud Run Domain Mappings (custom domains with managed SSL)
 # -------------------------------------------------------------------------
-load_balancer = LoadBalancer(
+domain_mappings = DomainMapping(
     prefix,
     project=cfg.gcp_project,
-    environment=cfg.environment,
-    domain=cfg.domain,
-    backend_service=backend_service.service,
-    web_service=web_service.service,
-    enable_cdn=cfg.enable_cdn,
+    region=cfg.gcp_region,
+    services={
+        cfg.domain: web_service.service,
+        cfg.api_domain: backend_service.service,
+    },
 )
 
 # -------------------------------------------------------------------------
@@ -196,9 +196,10 @@ monitoring = Monitoring(
 pulumi.export("environment", cfg.environment)
 pulumi.export("gcp_project", cfg.gcp_project)
 pulumi.export("gcp_region", cfg.gcp_region)
+pulumi.export("domain", cfg.domain)
+pulumi.export("api_domain", cfg.api_domain)
 pulumi.export("backend_url", backend_service.url)
 pulumi.export("web_url", web_service.url)
-pulumi.export("load_balancer_ip", load_balancer.ip_address.address)
 pulumi.export("db_connection_name", database.connection_name)
 pulumi.export("redis_host", cache.host)
 pulumi.export("storage_bucket", storage.bucket.name)

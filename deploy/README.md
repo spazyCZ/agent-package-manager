@@ -1,7 +1,142 @@
 # AAM Deployment
 
-This directory contains everything needed to deploy AAM locally (Docker Compose)
-and to Google Cloud Platform (Pulumi IaC, with optional `gcloud` helpers).
+This directory contains everything needed to deploy AAM locally (Docker
+Compose) and to Google Cloud Platform (Pulumi IaC, with optional `gcloud`
+helpers).
+
+## Deployment Model
+
+AAM runs on Google Cloud Platform in the `aamregistry` project. Three
+isolated environments share the same GCP project but use independent
+resources. Each environment is provisioned by its own Pulumi stack.
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          aamregistry.io (DNS)                           │
+├───────────────────┬───────────────────┬──────────────────────────────────┤
+│       DEV         │       TEST        │             PROD                 │
+│ dev.aamregistry.io│test.aamregistry.io│ prod.aamregistry.io              │
+├───────────────────┼───────────────────┼──────────────────────────────────┤
+│  Cloud Run (web)  │  Cloud Run (web)  │  Cloud Run (web)                 │
+│  Cloud Run (api)  │  Cloud Run (api)  │  Cloud Run (api)                 │
+│  Cloud SQL        │  Cloud SQL        │  Cloud SQL (HA)                  │
+│  Memorystore      │  Memorystore      │  Memorystore (HA)                │
+│  GCS bucket       │  GCS bucket       │  GCS bucket                      │
+└───────────────────┴───────────────────┴──────────────────────────────────┘
+```
+
+Each Cloud Run service uses **domain mappings** with Google-managed SSL
+certificates. No load balancer is needed.
+
+### Environment summary
+
+| Property          | dev                   | test                   | prod                        |
+|-------------------|-----------------------|------------------------|-----------------------------|
+| Purpose           | Development / CI      | QA / staging           | Production                  |
+| Branch trigger    | Feature branches      | `develop` / RC tags    | `main` / release tags       |
+| Pulumi stack file | `Pulumi.dev.yaml`     | `Pulumi.test.yaml`     | `Pulumi.prod.yaml`          |
+| Scale-to-zero     | Yes                   | No (min 1)             | No (min 2)                  |
+| DB HA             | No                    | No                     | Yes (REGIONAL)              |
+| DB backups        | Off                   | On                     | On + PITR                   |
+| Redis HA          | BASIC                 | BASIC                  | STANDARD_HA                 |
+| Deletion protect  | Off                   | Off                    | On                          |
+
+## Domain Naming Conventions
+
+Every environment follows the same pattern:
+
+```
+{env}.aamregistry.io           — public web (React SPA)
+api.{env}.aamregistry.io       — backend API + HTTP registry API
+{env}.aamregistry.io/docs      — documentation (MkDocs)
+```
+
+### Full domain matrix
+
+| Service             | dev                           | test                           | prod                           |
+|---------------------|-------------------------------|--------------------------------|--------------------------------|
+| **Web (SPA)**       | `dev.aamregistry.io`          | `test.aamregistry.io`          | `prod.aamregistry.io`          |
+| **Backend API**     | `api.dev.aamregistry.io`      | `api.test.aamregistry.io`      | `api.prod.aamregistry.io`      |
+| **Documentation**   | GitHub Pages                  | GitHub Pages                   | GitHub Pages                   |
+
+### DNS records
+
+Each domain requires a single CNAME record pointing to `ghs.googlehosted.com`.
+Cloud Run domain mappings handle SSL termination with Google-managed certificates.
+
+| Record                           | Type  | Target                  | Notes       |
+|----------------------------------|-------|-------------------------|-------------|
+| `dev.aamregistry.io`             | CNAME | `ghs.googlehosted.com.` | Web SPA     |
+| `api.dev.aamregistry.io`         | CNAME | `ghs.googlehosted.com.` | Backend API |
+| `test.aamregistry.io`            | CNAME | `ghs.googlehosted.com.` | Web SPA     |
+| `api.test.aamregistry.io`        | CNAME | `ghs.googlehosted.com.` | Backend API |
+| `prod.aamregistry.io`            | CNAME | `ghs.googlehosted.com.` | Web SPA     |
+| `api.prod.aamregistry.io`        | CNAME | `ghs.googlehosted.com.` | Backend API |
+
+### Routing
+
+Each domain maps directly to its Cloud Run service via **Cloud Run domain
+mappings**. No load balancer or URL map is needed — DNS does the routing.
+
+```
+test.aamregistry.io       → CNAME → ghs.googlehosted.com → Cloud Run (web)
+api.test.aamregistry.io   → CNAME → ghs.googlehosted.com → Cloud Run (backend)
+```
+
+### Managed SSL certificates
+
+Cloud Run domain mappings automatically provision Google-managed SSL
+certificates per domain. Certificates are renewed automatically.
+
+### Adding a new service
+
+To add a new service (e.g. `admin.{env}.aamregistry.io`):
+
+1. Deploy the Cloud Run service
+2. Create a domain mapping: `gcloud beta run domain-mappings create --service=<name> --domain=<domain> --region=us-central1`
+3. Add a DNS CNAME record: `<domain>` → `ghs.googlehosted.com.`
+
+### CLI registry URL
+
+The `aam` CLI connects to the backend API. The default registry URL per
+environment is:
+
+```
+aam source add default https://api.dev.aamregistry.io     # dev
+aam source add default https://api.test.aamregistry.io    # test
+aam source add default https://api.prod.aamregistry.io    # prod
+```
+
+### Resource naming conventions (GCP)
+
+All GCP resources follow the pattern `aam-{resource}-{env}`:
+
+| Resource                | dev                    | test                    | prod                    |
+|-------------------------|------------------------|-------------------------|-------------------------|
+| Cloud Run (web)         | `aam-web-dev`          | `aam-web-test`          | `aam-web-prod`          |
+| Cloud Run (backend)     | `aam-backend-dev`      | `aam-backend-test`      | `aam-backend-prod`      |
+| Cloud SQL instance      | `aam-db-dev`           | `aam-db-test`           | `aam-db-prod`           |
+| Memorystore (Redis)     | `aam-redis-dev`        | `aam-redis-test`        | `aam-redis-prod`        |
+| GCS bucket (packages)   | `aam-packages-dev`     | `aam-packages-test`     | `aam-packages-prod`     |
+| VPC                     | `aam-vpc-dev`          | `aam-vpc-test`          | `aam-vpc-prod`          |
+| VPC connector           | `aam-vpc-conn-dev`     | `aam-vpc-conn-test`     | `aam-vpc-conn-prod`     |
+| Artifact Registry repo  | `aam` (shared)         | `aam` (shared)          | `aam` (shared)          |
+
+> **Note:** Artifact Registry is shared across environments. Container images
+> are differentiated by tag (`web:dev`, `web:test`, `web:latest`).
+
+### Container image naming
+
+Images live in a single Artifact Registry repository:
+
+```
+us-central1-docker.pkg.dev/aamregistry/aam/{service}:{tag}
+```
+
+| Image                   | dev tag  | test tag  | prod tag   |
+|-------------------------|----------|-----------|------------|
+| `aam/backend`           | `dev`    | `test`    | `latest`   |
+| `aam/web`               | `dev`    | `test`    | `latest`   |
 
 ## Directory Structure
 
@@ -47,10 +182,10 @@ deploy/
 │   │   ├── storage.py        # GCS bucket (package archives)
 │   │   ├── registry.py       # Artifact Registry (Docker images)
 │   │   ├── secrets.py        # Secret Manager
-│   │   ├── backend_service.py# Cloud Run (FastAPI backend)
-│   │   ├── web_service.py    # Cloud Run (React web frontend)
-│   │   ├── load_balancer.py  # Global HTTPS Load Balancer
-│   │   └── monitoring.py     # Uptime checks & alerting
+│   │   ├── backend_service.py # Cloud Run (FastAPI backend)
+│   │   ├── web_service.py     # Cloud Run (React web frontend)
+│   │   ├── domain_mapping.py  # Cloud Run domain mappings + SSL
+│   │   └── monitoring.py      # Uptime checks & alerting
 │   └── README.md             # Pulumi deployment guide
 │
 └── README.md                 # This file
@@ -58,7 +193,7 @@ deploy/
 
 ## Deployment Targets
 
-### Local Development
+### Local development
 
 Run the full stack locally using Docker Compose.
 
@@ -73,13 +208,7 @@ See [local/README.md](local/README.md) for full instructions.
 
 ### Google Cloud Platform
 
-Deploy to GCP using Pulumi across three environments:
-
-| Environment | Stack Config         | Trigger                        |
-|-------------|----------------------|--------------------------------|
-| **dev**     | `Pulumi.dev.yaml`    | Feature branches               |
-| **test**    | `Pulumi.test.yaml`   | `develop` / release candidates |
-| **prod**    | `Pulumi.prod.yaml`   | `main` / tagged releases       |
+Deploy to GCP using Pulumi across three environments.
 
 ```bash
 cd deploy/pulumi
@@ -90,8 +219,8 @@ pulumi stack select dev
 pulumi up
 ```
 
-Pulumi references container images in Artifact Registry. If you want to build
-and push the dev web image (`apps/aam-web`) with `gcloud`, run:
+Pulumi references container images in Artifact Registry. To build and push
+the dev web image (`apps/aam-web`) with `gcloud`, run:
 
 ```bash
 ./deploy/gcp/deploy_web_dev.sh
@@ -108,8 +237,8 @@ MkDocs documentation can be deployed to either GitHub Pages or GCP.
 Automatic on pushes to `main` that touch `docs/user_docs/**` via the GitHub
 Actions workflow (`.github/workflows/deploy-docs.yml`).
 
-> **Prerequisite:** In the repository Settings → Pages → Build and deployment,
-> set **Source** to **GitHub Actions**.
+> **Prerequisite:** In the repository Settings, go to Pages, then Build and
+> deployment, and set **Source** to **GitHub Actions**.
 
 Manual deployment from your machine:
 
@@ -132,8 +261,9 @@ npm run docs:deploy:gcp
 ./deploy/gcp/deploy_docs.sh --install  # install MkDocs deps first
 ```
 
-The script creates the bucket on first run, configures static website serving,
-and syncs the built site. See [gcp/README.md](gcp/README.md) for full details.
+The script creates the bucket on first run, configures static website
+serving, and syncs the built site. See [gcp/README.md](gcp/README.md) for
+full details.
 
 ## GCP Resources Overview
 
@@ -141,11 +271,11 @@ and syncs the built site. See [gcp/README.md](gcp/README.md) for full details.
 |-----------------------|------------------------|-------------------------------|
 | API / Backend         | Cloud Run              | FastAPI container hosting     |
 | Web Frontend          | Cloud Run              | React SPA via Nginx container |
+| Domain Routing        | Cloud Run Domain Maps  | Custom domains + managed SSL  |
 | Database              | Cloud SQL (PG 16)      | Persistent storage            |
 | Cache                 | Memorystore (Redis 7)  | Session / query caching       |
 | Package Storage       | Cloud Storage (GCS)    | Package archive storage       |
 | Container Registry    | Artifact Registry      | Docker image storage          |
-| Load Balancer         | Global HTTPS LB        | SSL termination, routing      |
 | Secrets               | Secret Manager         | Credentials, signing keys     |
-| Documentation         | Cloud Storage (GCS)    | MkDocs static site hosting    |
+| Documentation         | GitHub Pages           | MkDocs static site hosting    |
 | Monitoring            | Cloud Monitoring       | Uptime checks, alerting       |

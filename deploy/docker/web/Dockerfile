@@ -19,7 +19,8 @@ RUN npm ci --legacy-peer-deps
 
 COPY . .
 
-RUN npm run web:build
+WORKDIR /app/apps/aam-web
+RUN npx vite build --outDir ../../dist/apps/aam-web --emptyOutDir
 
 # ---------------------------------------------------------------------------
 # Stage 2: Nginx — serve built assets

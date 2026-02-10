@@ -19,8 +19,10 @@ function HomePage() {
               Browse Packages
             </Link>
             <a
-              href="/docs"
+              href="https://storage.googleapis.com/aam-docs-test/index.html"
               className="bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-lg font-medium text-lg"
+              target="_blank"
+              rel="noopener noreferrer"
             >
               Documentation
             </a>
@@ -46,14 +48,14 @@ function HomePage() {
                 <span className="text-slate-400 text-sm">— run from your terminal</span>
               </div>
               <div className="bg-slate-900 rounded-lg p-6 text-white font-mono h-full">
-                <div className="text-slate-400 mb-2"># Install a package</div>
-                <div className="text-green-400 mb-4">$ aam install my-agent</div>
+                <div className="text-slate-400 mb-2"># 1. Add a source repository</div>
+                <div className="text-green-400 mb-4">$ aam source add openai/skills</div>
 
-                <div className="text-slate-400 mb-2"># Search for packages</div>
-                <div className="text-green-400 mb-4">$ aam search chatbot</div>
+                <div className="text-slate-400 mb-2"># 2. List available packages</div>
+                <div className="text-green-400 mb-4">$ aam source list openai/skills</div>
 
-                <div className="text-slate-400 mb-2"># Publish your package</div>
-                <div className="text-green-400">$ aam publish</div>
+                <div className="text-slate-400 mb-2"># 3. Install the skill you need</div>
+                <div className="text-green-400">$ aam install spreadsheet</div>
               </div>
             </div>
             {/* MCP Column */}
@@ -69,11 +71,10 @@ function HomePage() {
                 <div className="text-slate-400 mb-2"># Start the MCP server for your IDE</div>
                 <div className="text-violet-400 mb-4">$ aam mcp serve</div>
 
-                <div className="text-slate-400 mb-2"># Or with write access for full control</div>
-                <div className="text-violet-400 mb-4">$ aam mcp serve --allow-write</div>
-
-                <div className="text-slate-400 mb-2"># Your AI agent can now search, install,</div>
-                <div className="text-slate-400"># and manage packages via natural language</div>
+                <div className="text-slate-400 mb-2"># Then ask your AI agent:</div>
+                <div className="text-slate-300 italic">"Add the openai/skills source,</div>
+                <div className="text-slate-300 italic">&nbsp;show me what's available,</div>
+                <div className="text-slate-300 italic">&nbsp;and install the spreadsheet skill"</div>
               </div>
             </div>
           </div>
@@ -112,7 +113,7 @@ function HomePage() {
               <ul className="text-slate-300 text-sm space-y-2 mb-5">
                 <li className="flex items-start gap-2">
                   <span className="text-emerald-400 mt-0.5">&#10003;</span>
-                  <span>Scaffold packages from existing code with <code className="text-emerald-400 font-mono text-xs">aam create-package</code></span>
+                  <span>Scaffold packages from existing code with <code className="text-emerald-400 font-mono text-xs">aam pkg create</code></span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-emerald-400 mt-0.5">&#10003;</span>
@@ -120,13 +121,13 @@ function HomePage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-emerald-400 mt-0.5">&#10003;</span>
-                  <span>Publish to local or remote registries with <code className="text-emerald-400 font-mono text-xs">aam publish</code></span>
+                  <span>Publish to local or remote registries with <code className="text-emerald-400 font-mono text-xs">aam pkg publish</code></span>
                 </li>
               </ul>
               <div className="bg-slate-950 rounded p-4 font-mono text-sm space-y-2">
                 <div className="text-slate-500"># Package your skill and publish</div>
-                <div className="text-emerald-400">$ aam create-package my-code-review</div>
-                <div className="text-emerald-400">$ aam publish</div>
+                <div className="text-emerald-400">$ aam pkg create my-code-review</div>
+                <div className="text-emerald-400">$ aam pkg publish</div>
               </div>
             </div>
 
@@ -159,7 +160,7 @@ function HomePage() {
               <div className="bg-slate-950 rounded p-4 font-mono text-sm space-y-2">
                 <div className="text-slate-500"># Set up a private team registry</div>
                 <div className="text-blue-400">$ aam registry init ~/team-registry</div>
-                <div className="text-blue-400">$ aam publish --registry file:///team-registry</div>
+                <div className="text-blue-400">$ aam pkg publish --registry file:///team-registry</div>
               </div>
             </div>
 
@@ -333,7 +334,7 @@ function HomePage() {
               <div className="bg-slate-950 rounded p-4 font-mono text-sm space-y-3">
                 <div>
                   <div className="text-slate-500"># Create a package from a source</div>
-                  <div className="text-amber-400">$ aam create-package \</div>
+                  <div className="text-amber-400">$ aam pkg create \</div>
                   <div className="text-amber-400">    --from-source anthropic/claude-skills \</div>
                   <div className="text-amber-400">    --artifacts code-review,refactor-py</div>
                 </div>
@@ -448,7 +449,7 @@ function HomePage() {
                     Created <span className="text-emerald-400">@anthropic/code-review-skills</span> (aam.yaml + 5 files)<br />
                     Provenance: anthropic/claude-skills @ <span className="text-yellow-400">a3f7c2d</span><br />
                     Checksums: SHA-256 for all artifact files<br />
-                    <span className="text-emerald-400">Package ready.</span> Run <span className="text-cyan-400">aam pack</span> to create archive.
+                    <span className="text-emerald-400">Package ready.</span> Run <span className="text-cyan-400">aam pkg pack</span> to create archive.
                   </div>
                 </div>
 

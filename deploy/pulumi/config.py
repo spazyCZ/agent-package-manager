@@ -86,7 +86,7 @@ class StackConfig:
     # Domain / Networking
     # -------------------------------------------------------------------------
     domain: str
-    enable_cdn: bool
+    api_domain: str
 
 
 def load_config() -> StackConfig:
@@ -133,7 +133,7 @@ def load_config() -> StackConfig:
         storage_class=config.require("storage_class"),
         # Networking
         domain=config.require("domain"),
-        enable_cdn=config.require_bool("enable_cdn"),
+        api_domain=config.require("api_domain"),
     )
 
     logger.info(

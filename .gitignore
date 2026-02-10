@@ -36,6 +36,7 @@ venv.bak/
 # Build outputs
 dist/
 *.local
+docs/user_docs/site/
 
 # IDE
 .idea/

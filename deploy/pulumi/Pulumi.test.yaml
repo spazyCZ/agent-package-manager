@@ -51,7 +51,8 @@ config:
   aam-infra:storage_class: STANDARD
 
   # ---------------------------------------------------------------------------
-  # Domain / Networking
+  # Domain / Networking (Cloud Run domain mappings — no load balancer)
+  # DNS: CNAME each domain → ghs.googlehosted.com.
   # ---------------------------------------------------------------------------
-  aam-infra:domain: test.aam.example.com
-  aam-infra:enable_cdn: false
+  aam-infra:domain: test.aamregistry.io
+  aam-infra:api_domain: api.test.aamregistry.io

@@ -211,6 +211,18 @@ DEFAULT_SOURCES: list[dict[str, str]] = [
         "ref": "main",
         "path": "skills/.curated",
     },
+    {
+        "name": "cursor/community-skills",
+        "url": "https://github.com/cursor/community-skills.git",
+        "ref": "main",
+        "path": "skills",
+    },
+    {
+        "name": "anthropic/claude-prompts",
+        "url": "https://github.com/anthropic/claude-prompts.git",
+        "ref": "main",
+        "path": "prompts",
+    },
 ]
 
 
@@ -985,6 +997,81 @@ def register_default_sources() -> dict[str, Any]:
     return {
         "registered": registered,
         "skipped": skipped,
+    }
+
+
+def enable_default_sources() -> dict[str, Any]:
+    """Enable all default skill sources for the current configuration.
+
+    Re-enables any previously removed defaults by clearing their entries
+    from ``removed_defaults``, then registers all missing defaults.
+    This provides an explicit way for users to restore or initialize
+    the full set of community skill sources.
+
+    Returns:
+        Dict with ``registered`` (newly added names),
+        ``re_enabled`` (previously removed names restored),
+        ``skipped`` (already present names), and ``total`` count
+        of default sources now configured.
+    """
+    logger.info("Enabling all default skill sources")
+
+    config = load_config()
+
+    registered: list[str] = []
+    re_enabled: list[str] = []
+    skipped: list[str] = []
+
+    existing_names = {s.name for s in config.sources}
+
+    for default in DEFAULT_SOURCES:
+        name = default["name"]
+
+        # -----
+        # Already registered — skip
+        # -----
+        if name in existing_names:
+            logger.debug(f"Default source already present: {name}")
+            skipped.append(name)
+            continue
+
+        # -----
+        # Was previously removed — clear from removed_defaults
+        # -----
+        was_removed = name in config.removed_defaults
+        if was_removed:
+            config.removed_defaults = [
+                n for n in config.removed_defaults if n != name
+            ]
+            re_enabled.append(name)
+            logger.info(f"Re-enabling previously removed default: {name}")
+
+        # -----
+        # Register the source (without cloning — clone on first scan/update)
+        # -----
+        entry = SourceEntry(
+            name=name,
+            type="git",
+            url=default["url"],
+            ref=default["ref"],
+            path=default.get("path", ""),
+            default=True,
+        )
+        config.sources.append(entry)
+        registered.append(name)
+        logger.info(f"Default source enabled: {name}")
+
+    # -----
+    # Persist if any changes were made
+    # -----
+    if registered or re_enabled:
+        save_global_config(config)
+
+    return {
+        "registered": registered,
+        "re_enabled": re_enabled,
+        "skipped": skipped,
+        "total": len(DEFAULT_SOURCES),
     }
 
 

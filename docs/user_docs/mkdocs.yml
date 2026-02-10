@@ -160,6 +160,7 @@ nav:
       - aam source list: cli/source-list.md
       - aam source remove: cli/source-remove.md
       - aam source candidates: cli/source-candidates.md
+      - aam source enable-defaults: cli/source-enable-defaults.md
     - Registry Management:
       - aam registry init: cli/registry-init.md
       - aam registry add: cli/registry-add.md

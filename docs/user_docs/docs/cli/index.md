@@ -50,6 +50,7 @@ Complete command reference for the AAM (Agent Artifact Manager) command-line int
 | [`aam source list`](source-list.md) | List configured sources |
 | [`aam source remove`](source-remove.md) | Remove a configured source |
 | [`aam source candidates`](source-candidates.md) | List unpackaged artifact candidates |
+| [`aam source enable-defaults`](source-enable-defaults.md) | Enable all default community skill sources |
 
 ### Registry Management
 

@@ -55,3 +55,5 @@ aam source remove openai/skills --purge-cache
 
 - [aam source list](source-list.md) - List sources
 - [aam source add](source-add.md) - Add a source
+- [aam source enable-defaults](source-enable-defaults.md) - Re-enable
+  removed default sources

@@ -63,3 +63,5 @@ aam source scan openai/skills --type skill
 
 - [aam source add](source-add.md) - Add a source
 - [aam source candidates](source-candidates.md) - List unpackaged candidates
+- [aam source enable-defaults](source-enable-defaults.md) - Enable
+  default community sources

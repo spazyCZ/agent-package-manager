@@ -3180,6 +3180,7 @@ The recipient just runs `aam install ./path-to-bundle.aam` and they're ready to 
 | List sources | `aam source list` |
 | Remove source | `aam source remove <name>` |
 | List candidates | `aam source candidates` |
+| Enable default sources | `aam source enable-defaults` |
 | **Package Integrity** | |
 | Verify package | `aam verify <name>` |
 | Diff package | `aam diff <name>` |
@@ -3283,7 +3284,24 @@ When upgrading a package with local modifications, AAM warns you and offers opti
 
 ### 12.7 Default Sources
 
-When you run `aam init`, AAM automatically registers community default sources so you can discover popular skills immediately. Removed defaults are tracked so they won't be re-added.
+AAM ships with 4 curated community skill sources:
+
+- `github/awesome-copilot` - GitHub Copilot skills
+- `openai/skills:.curated` - OpenAI curated skills
+- `cursor/community-skills` - Cursor community skills
+- `anthropic/claude-prompts` - Anthropic Claude prompts
+
+These are registered automatically when you run `aam init`. You can also enable them at any time:
+
+```bash
+# Enable all 4 default sources
+aam source enable-defaults
+
+# Clone and scan the sources
+aam source update --all
+```
+
+If you previously removed a default source, `aam source enable-defaults` re-enables it by clearing it from the `removed_defaults` list. Sources that are already configured are skipped.
 
 ---
 

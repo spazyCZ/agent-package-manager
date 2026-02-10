@@ -61,3 +61,5 @@ The JSON output includes all fields shown in the table, plus `type`,
 
 - [aam source add](source-add.md) - Add a source
 - [aam source remove](source-remove.md) - Remove a source
+- [aam source enable-defaults](source-enable-defaults.md) - Enable
+  default community sources

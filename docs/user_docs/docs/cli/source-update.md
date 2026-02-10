@@ -64,3 +64,5 @@ aam source update openai/skills --dry-run
 
 - [aam source add](source-add.md) - Add a source
 - [aam source scan](source-scan.md) - Scan for artifacts
+- [aam source enable-defaults](source-enable-defaults.md) - Enable
+  default community sources

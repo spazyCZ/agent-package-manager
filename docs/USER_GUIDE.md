@@ -33,17 +33,17 @@ flowchart LR
         direction TB
         
         subgraph NewPkg["From Scratch"]
-            Init["aam init"]
+            Init["aam pkg init"]
             CreateNew["Create Artifacts<br/>skills/, agents/,<br/>prompts/, instructions/"]
         end
         
         subgraph ExistingPkg["From Existing Project"]
-            CreatePkg["aam create-package<br/><i>autodetect + select</i>"]
+            CreatePkg["aam pkg create<br/><i>autodetect + select</i>"]
         end
         
-        Validate["aam validate"]
-        Pack["aam pack"]
-        Publish["aam publish --sign"]
+        Validate["aam pkg validate"]
+        Pack["aam pkg pack"]
+        Publish["aam pkg publish --sign"]
     end
     
     subgraph Registry["Registry"]
@@ -90,26 +90,30 @@ pip install aam
 aam --version
 # aam 0.1.0
 
-# Configure default platform
-aam config set default_platform cursor
+# Set up AAM (detects platform, registers default sources)
+aam init
+# or non-interactive: aam init --yes
 ```
 
 ### Local Workflow (Recommended Starting Path)
 
 ```bash
-# 1. Create a local registry (one-time setup)
+# 1. Initialize AAM (one-time setup)
+aam init
+
+# 2. Create a local registry
 aam registry init ~/my-packages
 aam registry add local file:///home/user/my-packages --default
 
-# 2. Create a package from an existing project
-aam create-package
-aam validate
-aam pack
+# 3. Create a package from an existing project
+aam pkg create
+aam pkg validate
+aam pkg pack
 
-# 3. Publish to local registry (no server needed)
-aam publish --registry local
+# 4. Publish to local registry (no server needed)
+aam pkg publish --registry local
 
-# 4. Install from local registry
+# 5. Install from local registry
 cd another-project/
 aam search "my-package"
 aam install @author/my-package
@@ -120,27 +124,39 @@ aam install @author/my-package
 ### TL;DR Commands
 
 ```bash
+# Set up AAM client (platform, default sources)
+aam init
+
 # Create a package from an existing project (autodetect skills/agents/etc.)
-aam create-package
+aam pkg create
 
 # Or create a new package from scratch (unscoped)
-aam init my-package
+aam pkg init my-package
 
 # Or create a scoped package
-aam init @author/my-package
+aam pkg init @author/my-package
 
 # Validate before publishing
-aam validate
+aam pkg validate
 
 # Build and publish
-aam pack
-aam publish
+aam pkg pack
+aam pkg publish
 
 # Install a package (scoped)
 aam install @author/my-package
 
 # Install a package (unscoped)
 aam install my-package
+
+# Check for updates from sources
+aam outdated
+
+# Upgrade outdated packages
+aam upgrade
+
+# Browse available source artifacts
+aam list --available
 ```
 
 ---
@@ -149,7 +165,7 @@ aam install my-package
 
 You have been working on a project and organically created skills, agents, or instructions — perhaps directly in `.cursor/skills/`, `.cursor/rules/`, or other platform-specific locations. Now you want to bundle them into an AAM package so they can be shared, versioned, and installed elsewhere.
 
-The `aam create-package` command handles this workflow.
+The `aam pkg create` command handles this workflow.
 
 ### 2.1 The Problem
 
@@ -180,11 +196,11 @@ These skills and agents are useful, but they're trapped in your local project. T
 
 ### 2.2 Basic Usage
 
-Run `aam create-package` from your project root:
+Run `aam pkg create` from your project root:
 
 ```bash
 $ cd my-project/
-$ aam create-package
+$ aam pkg create
 
 Scanning for artifacts not managed by AAM...
 
@@ -235,9 +251,9 @@ Creating package...
   5 artifacts (2 skills, 1 agent, 1 instruction, 1 prompt)
 
 Next steps:
-  aam validate    — verify the package is well-formed
-  aam pack        — build distributable .aam archive
-  aam publish     — publish to registry
+  aam pkg validate    — verify the package is well-formed
+  aam pkg pack        — build distributable .aam archive
+  aam pkg publish     — publish to registry
 ```
 
 ### 2.3 What Gets Autodetected
@@ -426,11 +442,11 @@ Would create:
 
 ### 3.1 Initialize a New Package
 
-Use `aam init` to create a new package interactively:
+Use `aam pkg init` to create a new package interactively:
 
 ```bash
 $ mkdir python-best-practices && cd python-best-practices
-$ aam init
+$ aam pkg init
 
 Package name [python-best-practices]: @author/python-best-practices
 Version [1.0.0]: 
@@ -1451,7 +1467,7 @@ version: 1.1.0
 Then publish:
 
 ```bash
-$ aam validate && aam pack && aam publish --sign
+$ aam pkg validate && aam pkg pack && aam pkg publish --sign
 
 ✓ Package is valid
 ✓ Built python-best-practices-1.1.0.aam (4.5 KB)
@@ -1827,23 +1843,32 @@ packages:
 
 **Commit this file to git** for reproducible installs across your team.
 
-### 6.7 Update Dependencies
+### 6.7 Check for Outdated & Upgrade
 
 ```bash
-# Update all packages to latest compatible versions
-$ aam update
+# Check which packages have updates available
+$ aam outdated
 
-Resolving updates...
-  python-best-practices: 1.2.0 (unchanged)
-  code-analysis: 1.0.0 → 1.0.1 (patch update)
-  common-prompts: 2.1.0 → 2.2.0 (minor update)
+Package          Current  Latest  Source               Status
+code-analysis    1a2b3c4  9f8e7d6 community-skills     outdated
+common-prompts   5e6f7a8  b1c2d3e awesome-prompts      outdated (modified)
 
-Update 2 packages? [Y/n] y
+2 outdated, 1 up to date, 0 from registry
 
-✓ Updated 2 packages
+# Upgrade all outdated packages
+$ aam upgrade
 
-# Update a specific package
-$ aam update code-analysis
+  ✓ Upgraded code-analysis (1a2b3c4 → 9f8e7d6)
+  ⊘ Skipped common-prompts: Local modifications detected. Use --force to overwrite.
+
+# Force upgrade (overwrite local changes)
+$ aam upgrade common-prompts --force
+
+# Dry-run — preview without making changes
+$ aam upgrade --dry-run
+
+# JSON output for scripting
+$ aam outdated --json
 ```
 
 ---
@@ -1856,7 +1881,7 @@ Let's build a complete package from scratch: a code review toolkit.
 
 ```bash
 mkdir code-review-toolkit && cd code-review-toolkit
-aam init
+aam pkg init
 ```
 
 Fill in:
@@ -2878,15 +2903,15 @@ keywords:
 
 ```bash
 # Validate
-$ aam validate
+$ aam pkg validate
 ✓ Package is valid and ready to publish
 
 # Pack
-$ aam pack
+$ aam pkg pack
 ✓ Built code-review-toolkit-1.0.0.aam (8.7 KB)
 
 # Publish with signature
-$ aam publish --sign
+$ aam pkg publish --sign
 ✓ Published @author/code-review-toolkit@1.0.0
 ```
 
@@ -3127,35 +3152,45 @@ The recipient just runs `aam install ./path-to-bundle.aam` and they're ready to 
 
 | Task | Command |
 |------|---------|
-| Create package from existing project | `aam create-package` |
-| Create package from scratch | `aam init` |
-| Validate package | `aam validate` |
-| Build archive | `aam pack` |
-| Publish to registry | `aam publish [--sign]` |
+| **Getting Started** | |
+| Set up AAM (platform, sources) | `aam init` |
+| **Package Management** | |
 | Install package (scoped) | `aam install @author/name` |
 | Install package (unscoped) | `aam install name` |
 | Install specific version | `aam install @author/name@version` |
-| List installed | `aam list` |
-| Show package info | `aam info <name>` |
-| Update packages | `aam update` |
+| Install from source | `aam install source-name/artifact` |
 | Uninstall package | `aam uninstall <name>` |
-| Search registry | `aam search <query>` |
-| Create local registry | `aam registry init <path>` |
-| Manage dist-tags | `aam dist-tag add/rm/ls` |
-| Run tests | `aam test` |
-| Run evals | `aam eval [--publish]` |
-| Build portable bundle | `aam build --target <platform>` |
+| Upgrade outdated packages | `aam upgrade [name]` |
+| Check for outdated packages | `aam outdated [--json]` |
+| Search registry + sources | `aam search <query>` |
+| List installed | `aam list` |
+| Browse available artifacts | `aam list --available` |
+| Show package info | `aam info <name>` |
+| **Package Authoring** | |
+| Create package from existing project | `aam pkg create` |
+| Create package from scratch | `aam pkg init <name>` |
+| Validate package | `aam pkg validate` |
+| Build archive | `aam pkg pack` |
+| Publish to registry | `aam pkg publish [--sign]` |
+| Build portable bundle | `aam pkg build --target <platform>` |
+| **Source Management** | |
 | Add git source | `aam source add <url>` |
 | Scan source | `aam source scan <name>` |
 | Update sources | `aam source update [--all]` |
 | List sources | `aam source list` |
 | Remove source | `aam source remove <name>` |
 | List candidates | `aam source candidates` |
-| Create from source | `aam create-package --from-source <name>` |
+| **Package Integrity** | |
 | Verify package | `aam verify <name>` |
 | Diff package | `aam diff <name>` |
+| **Configuration** | |
+| Create local registry | `aam registry init <path>` |
+| Manage dist-tags | `aam dist-tag add/rm/ls` |
+| **Utilities** | |
 | Start MCP server | `aam mcp serve [--transport] [--allow-write]` |
 | Run diagnostics | `aam doctor` |
+| Run tests | `aam test` |
+| Run evals | `aam eval [--publish]` |
 
 ---
 

@@ -51,7 +51,7 @@ AI practitioners create reusable artifacts (skills, prompts, agent configuration
 | P0 | Multi-platform deployment (Cursor, Copilot, Claude, Codex) |
 | P0 | Dependency resolution between packages |
 | P1 | Git-based registry for package discovery and distribution |
-| P1 | `aam init` / `aam publish` workflow for package authors |
+| P1 | `aam pkg init` / `aam pkg publish` workflow for package authors |
 | P1 | Namespace/scope support (`@author/package-name`) |
 | P2 | Version pinning and lock files |
 
@@ -279,7 +279,7 @@ asvc-auditor-1.0.0.aam
 The archive contains the full package directory. This mirrors the `.skill` format from Codex but is generalized for all artifact types.
 
 **Archive constraints:**
-- Maximum size: **50 MB** (enforced by `aam pack` and registry upload)
+- Maximum size: **50 MB** (enforced by `aam pkg pack` and registry upload)
 - Must contain `aam.yaml` at root
 - No symlinks outside package directory
 - No absolute paths
@@ -292,8 +292,8 @@ Dist-tags are **named aliases for package versions**, enabling `aam install @org
 
 | Tag | Behavior |
 |-----|----------|
-| `latest` | Automatically set to the newest published version on each `aam publish` |
-| `stable` | Opt-in; set manually via `aam dist-tag add` or `aam publish --tag stable` |
+| `latest` | Automatically set to the newest published version on each `aam pkg publish` |
+| `stable` | Opt-in; set manually via `aam dist-tag add` or `aam pkg publish --tag stable` |
 
 #### Custom Tags
 
@@ -308,7 +308,7 @@ Organizations can define arbitrary tags (e.g., `staging`, `bank-approved`, `qa-p
 
 ```bash
 # Publish and tag in one step
-aam publish --tag beta
+aam pkg publish --tag beta
 
 # Manage tags after publish
 aam dist-tag add @org/agent@1.2.0 stable
@@ -340,13 +340,13 @@ A portable bundle is a **self-contained, pre-compiled archive** for a specific t
 **Building bundles:**
 
 ```bash
-aam build --target cursor
+aam pkg build --target cursor
 # Produces: dist/my-package-1.0.0-cursor.bundle.aam
 
-aam build --target copilot
+aam pkg build --target copilot
 # Produces: dist/my-package-1.0.0-copilot.bundle.aam
 
-aam build --target all
+aam pkg build --target all
 # Produces one bundle per configured platform
 ```
 
@@ -619,62 +619,35 @@ Eval results are stored in the registry (HTTP only) and shown during `aam search
 
 ### 5.1 Command Overview
 
+Commands are organized by persona/workflow and displayed in categorized sections
+via `aam --help`.
+
 ```
 aam <command> [options] [arguments]
 
+Getting Started:
+  init                           Set up AAM (platform, default sources)
+
 Package Management:
-  install <package> [version]    Install a package and its dependencies
+  install <package>              Install a package and its dependencies
   uninstall <package>            Remove an installed package
-  update [package]               Update packages to latest compatible version
-  list                           List installed packages
+  upgrade [package]              Upgrade outdated source-installed packages
+  outdated                       Check for outdated packages
+  search <query>                 Search registries and sources
+  list                           List installed packages (--available for sources)
   info <package>                 Show package details
 
-Package Authoring:
-  create-package [path]          Create package from existing project (autodetect + interactive)
-  init                           Initialize a new package (interactive)
-  validate                       Validate current package manifest and artifacts
-  pack                           Build distributable .aam archive
-  publish                        Publish package to registry
+Package Integrity:
+  verify [package|--all]         Verify installed file checksums
+  diff <package>                 Show unified diffs for modified files
 
-Deployment:
-  deploy [--platform <name>]     Deploy installed artifacts to platform
-  undeploy [--platform <name>]   Remove deployed artifacts from platform
-
-Registry:
-  search <query>                 Search registry for packages
-  registry add <url>             Add a registry source
-  registry list                  List configured registries
-  registry remove <name>         Remove a registry source
-
-Authentication (HTTP registry):
-  register                       Create a new registry account
-  login                          Authenticate and save API token
-  logout                         Revoke saved API token
-
-Package Lifecycle:
-  yank <package>@<version>       Mark a version as yanked (unpublish)
-  dist-tag add <pkg>@<ver> <tag> Tag a version with a named alias
-  dist-tag rm <pkg> <tag>        Remove a dist-tag
-  dist-tag ls <pkg>              List dist-tags for a package
-
-Quality:
-  test                           Run declared tests from aam.yaml
-  eval                           Run declared evals from aam.yaml
-  eval --publish                 Run evals and attach results to published version
-
-Build:
-  build --target <platform>      Build a portable bundle for a target platform
-  build --target all             Build for all configured platforms
-
-Configuration:
-  config set <key> <value>       Set configuration value (dot-notation for nested keys)
-  config get <key>               Get configuration value
-  config list                    List all configuration
-
-# Config key examples:
-#   aam config set default_platform cursor
-#   aam config set security.require_signature true
-#   aam config set registries.aam-central.url https://registry.aam.dev
+Package Authoring (aam pkg):
+  pkg init <name>                Scaffold a new package from scratch
+  pkg create [path]              Create package from existing project (autodetect)
+  pkg validate                   Validate current package manifest and artifacts
+  pkg pack                       Build distributable .aam archive
+  pkg publish                    Publish package to registry
+  pkg build --target <platform>  Build a portable bundle for a target platform
 
 Source Management:
   source add <url>               Add a remote git repository as artifact source
@@ -684,16 +657,16 @@ Source Management:
   source remove <name>           Remove a configured source
   source candidates              List unpackaged artifact candidates
 
-Package Integrity:
-  verify [package|--all]         Verify installed file checksums
-  diff <package>                 Show unified diffs for modified files
-
-MCP Server:
-  mcp serve                      Start MCP stdio server for IDE integration
+Configuration:
+  config set <key> <value>       Set configuration value
+  config get <key>               Get configuration value
+  registry add <url>             Add a registry source
+  registry list                  List configured registries
+  registry remove <name>         Remove a registry source
 
 Utilities:
+  mcp serve                      Start MCP stdio server for IDE integration
   doctor                         Check environment and diagnose issues
-  completion                     Generate shell completion scripts
 ```
 
 ### 5.2 Command Details
@@ -767,27 +740,27 @@ Deploying to cursor...
 Installed 3 packages (2 skills, 1 agent, 2 prompts, 1 instruction)
 ```
 
-#### `aam create-package [path]`
+#### `aam pkg create [path]`
 
-Creates a new AAM package from an existing working project that already contains skills, agents, prompts, or instructions that are **not** yet managed by AAM. This is the reverse of `aam init` — instead of scaffolding an empty package, it discovers existing artifacts in a project and packages them.
+Creates a new AAM package from an existing working project that already contains skills, agents, prompts, or instructions that are **not** yet managed by AAM. This is the reverse of `aam pkg init` — instead of scaffolding an empty package, it discovers existing artifacts in a project and packages them.
 
 **Use case:** You have been working in a project and created skills (e.g., `.cursor/skills/my-skill/SKILL.md`) or agents (e.g., `.cursor/rules/my-agent.mdc`) or instructions organically — outside of any AAM package. Now you want to bundle them into a distributable AAM package.
 
 ```bash
 # Auto-detect artifacts in current directory
-$ aam create-package
+$ aam pkg create
 
 # Auto-detect artifacts in a specific directory
-$ aam create-package ./my-project/
+$ aam pkg create ./my-project/
 
 # Skip interactive selection — include everything detected
-$ aam create-package --all
+$ aam pkg create --all
 
 # Only detect specific artifact types
-$ aam create-package --type skills --type agents
+$ aam pkg create --type skills --type agents
 
 # Output manifest to stdout without creating files (preview mode)
-$ aam create-package --dry-run
+$ aam pkg create --dry-run
 ```
 
 **Autodetection flow:**
@@ -832,7 +805,7 @@ Files already declared in an existing `aam.yaml` are excluded from detection res
 **Interactive selection flow:**
 
 ```bash
-$ aam create-package
+$ aam pkg create
 
 Scanning for artifacts not managed by AAM...
 
@@ -880,9 +853,9 @@ Creating package...
   4 artifacts (2 skills, 1 agent, 1 instruction)
 
 Next steps:
-  aam validate    — check that everything is correct
-  aam pack        — build distributable archive
-  aam publish     — publish to registry
+  aam pkg validate    — check that everything is correct
+  aam pkg pack        — build distributable archive
+  aam pkg publish     — publish to registry
 ```
 
 **File organization modes:**
@@ -910,16 +883,16 @@ In addition to autodetection, you can manually specify files to include:
 
 ```bash
 # Include specific files that autodetection missed
-$ aam create-package --include docs/my-guide.md --include-as instruction
+$ aam pkg create --include docs/my-guide.md --include-as instruction
 
 # Include a directory as a skill
-$ aam create-package --include ./my-tools/analyzer/ --include-as skill
+$ aam pkg create --include ./my-tools/analyzer/ --include-as skill
 ```
 
 **Command options:**
 
 ```
-aam create-package [PATH]
+aam pkg create [PATH]
 
 Arguments:
   PATH                       Project directory to scan (default: current directory)
@@ -939,34 +912,45 @@ Options:
   -y, --yes                  Skip confirmation prompts
 ```
 
-#### `aam init [name]`
+#### `aam init`
 
-Interactive package scaffolding. Optionally provide a package name as argument.
+Client setup command. Guides new users through platform detection and default
+source configuration. If called with a `[name]` argument, delegates to
+`aam pkg init` for backward compatibility (with a deprecation warning).
 
 ```bash
-# Interactive mode (prompts for name)
+# Interactive client setup
 $ aam init
-Package name: asvc-auditor
+  Detected platform: cursor
+Choose platform [cursor]:
+Register community artifact sources? [Y/n] y
 
-# Or provide name directly
-$ aam init asvc-auditor
+✓ AAM initialized successfully.
+  Platform:  cursor
+  Config:    ~/.aam/config.yaml
+  Sources:   2 community source(s) added
+
+Next steps:
+  aam search <query>   — Find packages to install
+  aam install <pkg>     — Install a package
+  aam list --available  — Browse source artifacts
+  aam pkg init          — Create a new package
+
+# Non-interactive (use defaults)
+$ aam init --yes
+```
+
+#### `aam pkg init [name]`
+
+Interactive package scaffolding. Creates artifact directories and `aam.yaml`.
+
+```bash
+$ aam pkg init asvc-auditor
 Package name: asvc-auditor
 Version (1.0.0):
 Description: ASVC audit agent with reporting capabilities
 Author: spazy
 License (MIT):
-
-What artifacts will this package contain?
-  ✓ Skills
-  ✓ Agents
-  ✓ Prompts
-  ✗ Instructions
-
-Which platforms should this package support?
-  ✓ Cursor
-  ✓ Claude
-  ✓ GitHub Copilot
-  ✗ Codex
 
 Created asvc-auditor/
   ├── aam.yaml
@@ -995,20 +979,20 @@ aam deploy asvc-auditor --platform cursor
 aam deploy --dry-run
 ```
 
-#### `aam build`
+#### `aam pkg build`
 
 Builds a portable, pre-compiled bundle for one or more target platforms.
 
 ```bash
 # Build for a specific platform
-aam build --target cursor
+aam pkg build --target cursor
 # Produces: dist/my-package-1.0.0-cursor.bundle.aam
 
 # Build for all configured platforms
-aam build --target all
+aam pkg build --target all
 
 # Build with custom output directory
-aam build --target cursor --output ./releases/
+aam pkg build --target cursor --output ./releases/
 ```
 
 **Build flow:**
@@ -1153,7 +1137,7 @@ CLI commands are exposed as MCP tools via `@mcp.tool` decorators. Each tool is t
 | `aam_search` | `aam search` | Search registry for packages |
 | `aam_list` | `aam list` | List installed packages |
 | `aam_info` | `aam info <package>` | Show detailed package metadata |
-| `aam_validate` | `aam validate` | Validate current package manifest and artifacts |
+| `aam_validate` | `aam pkg validate` | Validate current package manifest and artifacts |
 | `aam_config_get` | `aam config get` | Get configuration value(s) |
 | `aam_registry_list` | `aam registry list` | List configured registries |
 | `aam_doctor` | `aam doctor` | Check environment and diagnose issues |
@@ -1164,8 +1148,8 @@ CLI commands are exposed as MCP tools via `@mcp.tool` decorators. Each tool is t
 |------|------------|-------------|
 | `aam_install` | `aam install` | Install one or more packages and their dependencies |
 | `aam_uninstall` | `aam uninstall` | Remove an installed package |
-| `aam_publish` | `aam publish` | Publish package to registry |
-| `aam_create_package` | `aam create-package` | Create AAM package from existing project |
+| `aam_publish` | `aam pkg publish` | Publish package to registry |
+| `aam_create_package` | `aam pkg create` | Create AAM package from existing project |
 | `aam_config_set` | `aam config set` | Set a configuration value |
 | `aam_registry_add` | `aam registry add` | Add a new registry source |
 
@@ -1651,7 +1635,7 @@ aam registry init ~/my-aam-registry
 aam registry add local file:///home/spazy/my-aam-registry --default
 
 # Publish to local registry
-aam publish --registry local
+aam pkg publish --registry local
 ```
 
 **Local registry directory structure:**
@@ -1761,35 +1745,35 @@ When resolving a package, AAM searches registries in order:
 
 ```bash
 $ cd asvc-auditor/
-$ aam validate
+$ aam pkg validate
 ✓ aam.yaml is valid
 ✓ All artifact paths exist
 ✓ All artifact definitions are well-formed
 ✓ Dependencies reference valid packages
 
-$ aam pack
+$ aam pkg pack
 ✓ Built asvc-auditor-1.0.0.aam (12.4 KB)
 
-$ aam publish
+$ aam pkg publish
 Publishing asvc-auditor@1.0.0 to aam-central...
 ✓ Published successfully
   https://github.com/aam-packages/registry/packages/asvc-auditor/
 
 # Publish with signature (HTTP registry)
-$ aam publish --sign
+$ aam pkg publish --sign
 Publishing asvc-auditor@1.0.0 to aam-central...
   Signing with Sigstore (OIDC identity)...
 ✓ Published with signature
   Signature: sigstore bundle attached
 
 # Publish with GPG signature
-$ aam publish --sign --sign-type gpg
+$ aam pkg publish --sign --sign-type gpg
 Publishing asvc-auditor@1.0.0 to aam-central...
   Signing with GPG key: ABC123DEF...
 ✓ Published with GPG signature
 ```
 
-Under the hood, `aam publish` either:
+Under the hood, `aam pkg publish` either:
 - Creates a PR to the git registry (for community registry), or
 - Uploads via HTTP API with optional signature (for HTTP registry), or
 - Copies the `.aam` file to the local/private registry
@@ -1913,7 +1897,7 @@ AAM supports multiple levels of package integrity and authenticity verification.
 ```
 Author                          Registry                         User
    │                               │                               │
-   │  aam publish --sign           │                               │
+   │  aam pkg publish --sign      │                               │
    ├──────────────────────────────►│                               │
    │  1. Calculate SHA-256         │                               │
    │  2. Sign with Sigstore/GPG    │                               │
@@ -2001,14 +1985,14 @@ governance:
 | `require_signature` | `aam install` | Block install of unsigned packages |
 | `require_tag` | `aam install` | Only install versions tagged with the specified tag |
 | `blocked_packages` | `aam install` | Block specific packages (supports glob patterns) |
-| `require_approval` | `aam publish` | Require at least one approver to sign off |
-| `require_signature` | `aam publish` | Require package signing before publish is allowed |
+| `require_approval` | `aam pkg publish` | Require at least one approver to sign off |
+| `require_signature` | `aam pkg publish` | Require package signing before publish is allowed |
 
 #### Approval Workflows (Server-Side — HTTP Registry)
 
 When `require_approval: true` is configured and publishing to an HTTP registry, the publish flow becomes:
 
-1. `aam publish` → uploads package with `approval_status: pending`
+1. `aam pkg publish` → uploads package with `approval_status: pending`
 2. Approvers receive notification (webhook/email)
 3. Approvers review and run: `aam approve @org/agent@1.2.0` or via API
 4. Once approved, package becomes visible for install
@@ -2258,7 +2242,7 @@ author:
 
 # Publishing defaults
 publish:
-  default_scope: ""             # Default scope for aam init / aam publish
+  default_scope: ""             # Default scope for aam pkg init / aam pkg publish
                                 # Set to your username or org, e.g. "myorg"
                                 # When set, aam init will default to @scope/name format
 ```
@@ -2374,11 +2358,11 @@ aam/
 ├── cli/
 │   ├── __init__.py
 │   ├── main.py             # Click/Typer CLI app
-│   ├── create_package.py   # aam create-package command (autodetect + interactive)
+│   ├── pkg/               # aam pkg command group (create, validate, pack, publish, build)
 │   ├── install.py          # aam install command
 │   ├── init.py             # aam init command
 │   ├── deploy.py           # aam deploy command
-│   ├── publish.py          # aam publish command
+│   ├── publish.py          # aam pkg publish command
 │   ├── search.py           # aam search command
 │   ├── config.py           # aam config command
 │   ├── register.py         # aam register command (HTTP registry)
@@ -2534,7 +2518,7 @@ class Registry(Protocol):
 
 ### 11.5 CLI Registry Abstraction Layer
 
-The CLI contains a registry abstraction layer that decouples commands from any specific registry backend. This enables the local-first architecture: commands like `aam search`, `aam install`, and `aam publish` work identically against local, git, or HTTP registries.
+The CLI contains a registry abstraction layer that decouples commands from any specific registry backend. This enables the local-first architecture: commands like `aam search`, `aam install`, and `aam pkg publish` work identically against local, git, or HTTP registries.
 
 ```
 aam_cli/
@@ -2587,12 +2571,12 @@ aam registry add local file:///home/user/my-packages --default
 
 # 2. Author creates a package
 cd my-project/
-aam create-package
-aam validate
-aam pack                          # produces my-agent-1.0.0.aam
+aam pkg create
+aam pkg validate
+aam pkg pack                          # produces my-agent-1.0.0.aam
 
 # 3. Publish to local registry (no server needed)
-aam publish --registry local      # copies .aam, updates metadata.yaml + index.yaml
+aam pkg publish --registry local      # copies .aam, updates metadata.yaml + index.yaml
 
 # 4. Another developer installs it (same machine or shared filesystem)
 cd other-project/
@@ -2694,13 +2678,13 @@ dependencies:
 #### Step 6: Validate and publish
 
 ```bash
-$ aam validate
+$ aam pkg validate
 ✓ Package is valid
 
-$ aam pack
+$ aam pkg pack
 ✓ Built asvc-auditor-1.0.0.aam
 
-$ aam publish
+$ aam pkg publish
 ✓ Published asvc-auditor@1.0.0
 ```
 
@@ -2736,12 +2720,12 @@ Phase 1 ships a **fully working tool with zero infrastructure requirements**. Al
 
 - [ ] Core manifest parsing (`aam.yaml` with pydantic validation)
 - [ ] Namespace/scope support (`@author/package-name`) in manifest, CLI, and registry
-- [ ] `aam create-package` — create package from existing project (autodetect + interactive selection)
+- [ ] `aam pkg create` — create package from existing project (autodetect + interactive selection)
 - [ ] `aam init` — interactive package scaffolding (with optional `--scope`)
-- [ ] `aam validate` — manifest and artifact validation
-- [ ] `aam pack` — build `.aam` archive
+- [ ] `aam pkg validate` — manifest and artifact validation
+- [ ] `aam pkg pack` — build `.aam` archive
 - [ ] `aam registry init` — create local registry
-- [ ] `aam publish --registry local` — publish to local registry
+- [ ] `aam pkg publish --registry local` — publish to local registry
 - [ ] `aam search` — search local registry
 - [ ] `aam install` — install from local registry, `.aam` file, or directory
 - [ ] Cursor adapter — deploy skills, agents (as rules), prompts, instructions
@@ -2754,8 +2738,8 @@ Phase 1 ships a **fully working tool with zero infrastructure requirements**. Al
 - [ ] HTTP registry client (`aam/registry/http.py`)
 - [ ] `aam register` — create registry account
 - [ ] `aam login` / `aam logout` — authentication
-- [ ] `aam publish` — publish to registry
-- [ ] `aam publish --sign` — publish with Sigstore/GPG signature
+- [ ] `aam pkg publish` — publish to registry
+- [ ] `aam pkg publish --sign` — publish with Sigstore/GPG signature
 - [ ] `aam search` — search registry index
 - [ ] Package signing and verification (checksum always, Sigstore/GPG optional)
 - [ ] Claude adapter

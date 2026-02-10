@@ -5,284 +5,281 @@
 ## Synopsis
 
 ```bash
-aam search QUERY [OPTIONS]
+aam search [QUERY] [OPTIONS]
 ```
 
 ## Description
 
-Search configured registries and git sources for packages matching a
-query. Uses case-insensitive substring matching on package name,
-description, and keywords. Returns packages from all configured
-registries and sources, with version and **publisher** information.
+Search configured registries and git sources for packages matching
+a query. AAM uses **relevance-ranked scoring** with tiered matching
+on package name, keywords, and description. Results appear in a
+scannable table sorted by relevance score by default.
 
-Each result displays the publisher (the organization or registry that
-provides the package) so you can identify the origin at a glance.
+Each result displays its origin (registry name or git source name)
+so you can identify where it comes from at a glance.
 
-Use this to discover packages before installation.
+Use this command to discover packages before installation.
 
 ## Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| QUERY | Yes | Search query (case-insensitive substring) |
+| QUERY | No | Search query (case-insensitive). Omit for browse mode. |
 
 ## Options
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--limit` | `-l` | 10 | Maximum number of results to display |
-| `--type` | `-t` | all | Filter by artifact type (skill, agent, prompt, instruction) |
-| `--json` | | false | Output results as JSON |
+| `--limit` | `-l` | 10 | Maximum results to display (1--50) |
+| `--type` | `-t` | all | Filter by artifact type. Repeatable for OR logic. |
+| `--source` | `-s` | all | Limit results to a specific git source name |
+| `--registry` | `-r` | all | Limit results to a specific registry name |
+| `--sort` | | relevance | Sort order: `relevance`, `name`, or `recent` |
+| `--json` | | false | Output results as JSON envelope |
 
 ## Examples
 
-### Example 1: Basic search
+### Basic search
 
 ```bash
 aam search chatbot
 ```
 
 **Output:**
+
 ```
-Search results for "chatbot" (3 matches):
-
-  chatbot-agent  1.2.0  local
-    Conversational AI agent for customer support
-    [skill, agent, prompt]
-
-  advanced-chatbot  2.0.0  local
-    Advanced chatbot with context awareness
-    [agent, prompt, instruction]
-
-  chatbot-skills  0.5.0  local
-    Reusable skills for chatbot development
-    [skill]
+        Search results for "chatbot" (3 matches)
+ Name              Version   Type    Source  Description
+ chatbot           1.0.0     agent   local   Conversational AI agent
+ chatbot-agent     1.2.0     skill   local   Customer support chatbot
+ my-chatbot-skill  0.5.0     skill   local   Reusable chatbot skills
 ```
 
-The publisher name appears after the version (for example, `local` for
-packages from a local registry).
+Results are ranked by relevance: exact name match first, then
+prefix, then substring, then keyword, then description matches.
 
-### Example 2: Search with type filter
+### Filter by artifact type
 
 ```bash
 aam search audit --type skill
 ```
 
-**Output:**
-```
-Search results for "audit" (2 matches):
+Only packages with artifact type `skill` are shown.
 
-  asvc-audit-skill  1.0.0  local
-    ASVC compliance audit skill
-    [skill]
-
-  security-audit  0.8.0  local
-    Security audit automation skill
-    [skill]
-```
-
-### Example 3: Limit results
+### Multiple type filters
 
 ```bash
-aam search agent --limit 3
+aam search data --type skill --type agent
 ```
 
-**Output:**
-```
-Search results for "agent" (3 matches):
+This shows packages that have artifact type `skill` **or** `agent`
+(OR logic). Repeat `--type` for each type you want to include.
 
-  my-agent  1.0.0  local
-    General purpose automation agent
-    [agent, skill]
+### Filter by source
 
-  code-review-agent  2.1.0  local
-    Agent for automated code reviews
-    [agent, prompt]
-
-  data-agent  1.5.0  local
-    Data analysis and reporting agent
-    [agent, skill, prompt]
+```bash
+aam search doc --source google-gemini
 ```
 
-### Example 4: JSON output
+Only results from the `google-gemini` git source are shown.
+Registry results are excluded.
+
+### Sort alphabetically
+
+```bash
+aam search agent --sort name
+```
+
+Results are sorted alphabetically by package name instead of by
+relevance score.
+
+### Sort by most recent
+
+```bash
+aam search agent --sort recent
+```
+
+Results are sorted by most recently updated first.
+
+### JSON output
 
 ```bash
 aam search chatbot --json
 ```
 
 **Output:**
+
 ```json
-[
-  {
-    "name": "chatbot-agent",
-    "version": "1.2.0",
-    "description": "Conversational AI agent for customer support",
-    "keywords": ["chatbot", "support", "ai"],
-    "artifact_types": ["skill", "agent", "prompt"],
-    "registry": "local"
-  },
-  {
-    "name": "advanced-chatbot",
-    "version": "2.0.0",
-    "description": "Advanced chatbot with context awareness",
-    "keywords": ["chatbot", "context", "advanced"],
-    "artifact_types": ["agent", "prompt", "instruction"],
-    "registry": "local"
-  }
-]
+{
+  "results": [
+    {
+      "name": "chatbot",
+      "version": "1.0.0",
+      "description": "Conversational AI agent",
+      "keywords": ["chatbot", "ai"],
+      "artifact_types": ["agent"],
+      "origin": "local",
+      "origin_type": "registry",
+      "score": 100,
+      "updated_at": "2026-01-15T10:30:00Z"
+    }
+  ],
+  "total_count": 1,
+  "warnings": []
+}
 ```
 
-### Example 5: No results
+!!! warning "Breaking change (v0.1.0)"
+    The `--json` output format changed from a flat array to an
+    envelope object with `results`, `total_count`, and `warnings`
+    keys.
+
+### No results with suggestions
 
 ```bash
-aam search nonexistent-package-xyz
+aam search chatbt
 ```
 
 **Output:**
+
 ```
-No packages found matching "nonexistent-package-xyz".
+No packages found matching "chatbt".
+
+Did you mean: chatbot, chatbot-agent, chatbot-skills
 ```
 
-### Example 6: Search across registries and git sources
+When no results match, AAM checks for similar package names and
+displays up to 3 suggestions.
+
+### Browse all packages
 
 ```bash
-aam search doc
+aam search
 ```
 
-Results from both registries and git sources are combined. Source
-artifacts display the publisher and full source name so you can tell
-where each result originates.
+Omitting the query returns all packages up to the limit, sorted by
+name. This is useful for exploring what's available.
 
-**Output:**
-```
-Search results for "doc" (5 matches):
-
-  docs-changelog  source@da66c7c  google-gemini (google-gemini/gemini-cli:skills)
-    Generate changelog files from release information
-    [skill]
-
-  docs-writer  source@da66c7c  google-gemini (google-gemini/gemini-cli:skills)
-    Write and review documentation files
-    [skill]
-
-  notion-research-documentation  source@4ab6e0f  openai (openai/skills:.curated)
-    Research documentation via Notion
-    [skill]
-
-  openai-docs  source@4ab6e0f  openai (openai/skills:.curated)
-    OpenAI documentation reference
-    [skill]
-
-  doc  source@4ab6e0f  openai (openai/skills:.curated)
-    General documentation skill
-    [skill]
-```
-
-The publisher name (for example, `google-gemini` or `openai`) appears
-in magenta, followed by the full source name in parentheses.
-
-### Example 7: Filter multiple types
-
-Currently filtering multiple types requires separate searches:
-
-```bash
-aam search data --type skill
-aam search data --type agent
-```
-
-## Exit Codes
+## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | Success |
-| 1 | Error - no registries configured |
+| 1 | Error (no registries or sources configured, invalid arguments) |
 
 ## Search behavior
 
-### Matching algorithm
+### Relevance scoring
 
-Search uses case-insensitive substring matching on:
+AAM uses a **tiered scoring algorithm** where each result receives
+the score of its highest matching tier:
 
-- **Package name** — matches anywhere in the name
-- **Description** — matches anywhere in the description
-- **Keywords** — matches any keyword exactly
+| Tier | Match type | Score | Example (query: `audit`) |
+|------|-----------|-------|--------------------------|
+| 1 | Exact name match | 100 | Package named `audit` |
+| 2 | Name starts with query | 80 | `audit-agent` |
+| 3 | Name contains query | 60 | `security-audit` |
+| 4 | Keyword exact match | 50 | Keyword `audit` |
+| 5 | Description contains query | 30 | "ASVS audit tool" |
 
-Example: Query `"audit"` matches:
-
-- `audit-agent` (name)
-- `security-auditor` (name)
-- Package with description "ASVC audit tool" (description)
-- Package with keyword `audit` (keyword)
+Results that don't match any tier are excluded. All matching is
+case-insensitive.
 
 ### Result ordering
 
-Registry results appear first, followed by git-source results. Within
-each group, results are returned in the order they are discovered.
+By default, results are sorted by **relevance score** (highest
+first). When two results have the same score, they are sub-sorted
+alphabetically by name for deterministic output.
 
-### Publisher display
+Alternative sort orders:
 
-Every result shows its publisher or origin:
+- `--sort name` -- alphabetical by package name
+- `--sort recent` -- most recently updated first
 
-- **Registry packages** display the registry name (for example, `local`
-  or `company-registry`).
-- **Source artifacts** display the publisher organization and the full
-  source name. For example, `openai (openai/skills:.curated)` tells you
-  the artifact comes from the `openai` organization, specifically the
-  `openai/skills:.curated` source.
+### "Did you mean?" suggestions
+
+When a search returns zero results, AAM compares the query against
+all known package and artifact names using fuzzy matching. If any
+name is sufficiently similar (at least 60% similarity), up to 3
+suggestions are displayed.
+
+This catches common typos:
+
+- `chatbt` becomes chatbot
+- `audiit` becomes audit
+- `skil` becomes skill
+
+### Filtering
+
+You can narrow results with these options:
+
+- **`--type`** -- repeatable. Filters results to packages that
+  contain at least one of the specified artifact types. Unknown
+  types generate a warning but don't cause an error.
+- **`--source`** -- limits results to a specific git source.
+  Registry results are excluded entirely.
+- **`--registry`** -- limits results to a specific registry.
+  Source results are excluded entirely.
+
+### Browse mode
+
+When you omit the query (`aam search`), all packages are returned
+up to the limit, each with equal relevance score. This provides a
+"browse all" capability.
+
+### Origin display
+
+Every result shows its origin:
+
+- **Registry packages** display the registry name (for example,
+  `local`).
+- **Source artifacts** display the source label (for example,
+  `[source] google-gemini`).
+
+### Warning display
+
+If a registry or source fails during search (for example, a
+corrupted index or unreachable source), a warning is displayed but
+search continues with the remaining sources. Warnings appear before
+the results table.
 
 ## Related commands
 
-- [`aam install`](install.md) - Install a package found via search
-- [`aam info`](info.md) - Show details about an installed package
-- [`aam registry list`](registry-list.md) - List configured registries
-- [`aam source list`](source-list.md) - List configured git sources
+- [`aam install`](install.md) -- install a package found via search
+- [`aam info`](info.md) -- show details about an installed package
+- [`aam registry list`](registry-list.md) -- list configured
+  registries
+- [`aam source list`](source-list.md) -- list configured git
+  sources
 
 ## Notes
 
-### No Registries Configured
+### No registries or sources configured
 
-If you haven't configured any registries:
+If you haven't configured any registries or sources:
 
 ```
-Error: No registries configured. Run 'aam registry init' to create one.
+Error: [AAM_NO_SOURCES] No registries or sources configured.
+Run 'aam registry init' or 'aam source add' to get started.
 ```
 
-### Keyword Matching
-
-Packages can specify keywords in their `aam.yaml` manifest:
-
-```yaml
-keywords:
-  - chatbot
-  - automation
-  - customer-support
-```
-
-These are indexed by the registry for better search results.
-
-### Case Sensitivity
+### Case sensitivity
 
 All searches are case-insensitive:
 
-- `aam search Agent` finds "agent", "AGENT", "Agent"
-- `aam search CHATBOT` finds "chatbot", "ChatBot", "chatbot-agent"
+- `aam search Agent` finds "agent," "AGENT," and "Agent"
+- `aam search CHATBOT` finds "chatbot," "ChatBot," and
+  "chatbot-agent"
 
-### Partial Matches
+### Partial matches
 
 The search uses substring matching, not prefix matching:
 
-- Query `"bot"` matches "chatbot", "robot", "bot-skill"
-- Query `"chat"` matches "chatbot", "chat-agent", "chat-utility"
+- Query `"bot"` matches "chatbot," "robot," and "bot-skill"
+- Query `"chat"` matches "chatbot," "chat-agent," and
+  "chat-utility"
 
 ### Performance
 
-Search performance depends on registry size. Local registries are typically fast. HTTP registries may have server-side indexing for faster results.
-
-### Future Enhancements
-
-Planned features for future versions:
-
-- Fuzzy matching for typo tolerance
-- Relevance scoring and ranking
-- Multiple type filters (`--type skill --type agent`)
-- Sorting options (`--sort downloads`, `--sort recent`)
+Search completes within 2 seconds for up to 500 indexed packages
+across local registries and cached sources.

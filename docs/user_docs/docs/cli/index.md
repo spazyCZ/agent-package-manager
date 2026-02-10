@@ -18,7 +18,7 @@ Complete command reference for the AAM (Agent Artifact Manager) command-line int
 | [`aam uninstall`](uninstall.md) | Remove an installed package |
 | [`aam upgrade`](upgrade.md) | Upgrade outdated source-installed packages |
 | [`aam outdated`](outdated.md) | Check for outdated packages |
-| [`aam search`](search.md) | Search registries and sources |
+| [`aam search`](search.md) | Search registries and sources (relevance-ranked) |
 | [`aam list`](list.md) | List installed packages (`--available` for sources) |
 | [`aam info`](info.md) | Show detailed package information |
 

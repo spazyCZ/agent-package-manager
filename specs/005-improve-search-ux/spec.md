@@ -190,7 +190,7 @@ A user has configured sources but one has a corrupted cache or network issue. Wh
 **Empty Results & Suggestions**
 
 - **FR-017**: When zero results are found, the CLI MUST search the full package name index for similar names (approximate string matching) and suggest up to 3 alternatives.
-- **FR-018**: Suggestions MUST only appear when at least one name has a similarity score above a reasonable threshold.
+- **FR-018**: Suggestions MUST only appear when at least one name has a similarity score above a threshold of 0.6 (see research.md R-002).
 
 **Error Handling**
 

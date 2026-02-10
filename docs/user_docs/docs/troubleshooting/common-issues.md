@@ -76,8 +76,8 @@ aam info @author/my-package
 # Try with specific version
 aam install @author/my-package@1.0.0
 
-# Check for yanked versions
-aam search @author/my-package --show-all
+# Search for the package
+aam search @author/my-package
 ```
 
 ## Deployment Issues

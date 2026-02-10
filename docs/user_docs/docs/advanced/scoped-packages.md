@@ -32,14 +32,11 @@ code-reviewer  # Who created this?
 @team-c/agent
 ```
 
-### Organization and Discovery
+### Organization and discovery
 
 ```bash
 # Search by scope
 aam search "@mycompany/*"
-
-# List all packages in a scope
-aam search --scope mycompany
 ```
 
 ### Access Control (HTTP Registry)
@@ -227,7 +224,7 @@ aam pkg publish
 | Member | Yes | Yes | No |
 | Contributor | Yes | No | No |
 
-## Searching Scoped Packages
+## Searching scoped packages
 
 ```bash
 # Search all scopes
@@ -236,9 +233,6 @@ aam search "agent"
 # Search specific scope
 aam search "@alice/*"
 aam search "@mycompany/*"
-
-# Filter by scope
-aam search "agent" --scope alice
 ```
 
 ## Private Scoped Packages (HTTP Registry)

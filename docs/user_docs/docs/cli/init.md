@@ -103,6 +103,7 @@ If no platform is detected, `cursor` is used as the default.
 - [`aam pkg create`](create-package.md) - Create package from existing artifacts
 - [`aam install`](install.md) - Install a package
 - [`aam search`](search.md) - Search for packages
+- [`aam source enable-defaults`](source-enable-defaults.md) - Re-enable default sources
 
 ## Notes
 
@@ -115,4 +116,4 @@ If no platform is detected, `cursor` is used as the default.
 
 ### Community Sources
 
-When you accept default sources, AAM registers curated community repositories that contain shared skills, agents, and prompts. You can manage sources later with `aam source add` and `aam source remove`.
+When you accept default sources, AAM registers 4 curated community repositories that contain shared skills, agents, and prompts. You can manage sources later with `aam source add` and `aam source remove`. If you skipped default sources during init or removed them later, run `aam source enable-defaults` to restore them.

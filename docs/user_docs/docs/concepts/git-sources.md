@@ -84,15 +84,20 @@ source's cache with `aam source remove --purge-cache`.
 
 ## Default sources
 
-When you run `aam init`, AAM automatically registers a curated set of
-community sources. These provide immediate access to popular skills
-and agents:
+AAM ships with 4 curated community sources that provide immediate access
+to popular skills, agents, and prompts:
 
 - `github/awesome-copilot` (from `github.com/github/awesome-copilot`)
 - `openai/skills:.curated` (curated subset of `github.com/openai/skills`)
+- `cursor/community-skills` (from `github.com/cursor/community-skills`)
+- `anthropic/claude-prompts` (from `github.com/anthropic/claude-prompts`)
+
+These are automatically registered when you run `aam init`. You can also
+enable them at any time with `aam source enable-defaults`.
 
 You can remove default sources with `aam source remove`. Removed defaults
-are tracked so they won't be re-added on future `aam init` calls.
+are tracked so they won't be re-added on future `aam init` calls. To
+restore removed defaults, run `aam source enable-defaults`.
 
 ## Provenance tracking
 
@@ -148,6 +153,8 @@ MCP resources provide passive data access:
 
 ## Next steps
 
+- [aam source enable-defaults](../cli/source-enable-defaults.md) -
+  Enable all default skill sources
 - [aam source add](../cli/source-add.md) - Add your first source
 - [aam source scan](../cli/source-scan.md) - Discover artifacts
 - [aam pkg create](../cli/create-package.md) - Package from a source

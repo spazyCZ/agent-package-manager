@@ -656,6 +656,7 @@ Source Management:
   source list                    List configured remote git sources
   source remove <name>           Remove a configured source
   source candidates              List unpackaged artifact candidates
+  source enable-defaults         Enable all default community skill sources
 
 Configuration:
   config set <key> <value>       Set configuration value

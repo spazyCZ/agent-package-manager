@@ -59,3 +59,5 @@ aam source candidates --source openai/skills --type skill
 - [aam pkg create](create-package.md) - Create a package (supports
   `--from-source`)
 - [aam source scan](source-scan.md) - Scan a source for artifacts
+- [aam source enable-defaults](source-enable-defaults.md) - Enable
+  default community sources

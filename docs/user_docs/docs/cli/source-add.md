@@ -96,3 +96,5 @@ error. Use `aam source remove` first to replace an existing source.
 - [aam source list](source-list.md) - List configured sources
 - [aam source remove](source-remove.md) - Remove a source
 - [aam source update](source-update.md) - Fetch upstream changes
+- [aam source enable-defaults](source-enable-defaults.md) - Enable
+  default community sources

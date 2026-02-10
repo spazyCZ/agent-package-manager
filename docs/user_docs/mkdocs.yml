@@ -169,6 +169,8 @@ nav:
       - aam config set: cli/config-set.md
       - aam config get: cli/config-get.md
       - aam config list: cli/config-list.md
+    - Utilities:
+      - aam doctor: cli/doctor.md
     - Global Options: cli/global-options.md
   - Configuration:
     - configuration/index.md

@@ -58,7 +58,7 @@ default_platform: cursor
 
 Used by:
 - `aam deploy` (if no `--platform` specified)
-- `aam build` (if no `--target` specified)
+- `aam pkg build` (if no `--target` specified)
 
 ## Section: `active_platforms`
 
@@ -93,7 +93,7 @@ Defines registry sources where AAM searches for packages. Registries are searche
 | `name` | string | - | Yes | Unique registry identifier |
 | `url` | string | - | Yes | Registry URL or file path |
 | `type` | string | `"local"` | No | Registry type: `local`, `git`, `http` |
-| `default` | bool | `false` | No | Mark as default for `aam publish` |
+| `default` | bool | `false` | No | Mark as default for `aam pkg publish` |
 
 ### Example: Multiple Registries
 
@@ -103,7 +103,7 @@ registries:
   - name: aam-central
     url: https://registry.aam.dev
     type: http
-    default: true  # Used by aam publish
+    default: true  # Used by aam pkg publish
 
   # Git-based registry (no server needed)
   - name: company-registry
@@ -162,7 +162,7 @@ Points to a local directory.
 ### Default Registry
 
 The registry marked `default: true` is used by:
-- `aam publish` (if no `--registry` specified)
+- `aam pkg publish` (if no `--registry` specified)
 - `aam search` (searches default registry first)
 
 If no registry is marked default, the first registry in the list is used.
@@ -278,7 +278,7 @@ security:
 
 **Type:** `AuthorConfig`
 
-Default author information used by `aam init` when creating new packages.
+Default author information used by `aam pkg init` when creating new packages.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -293,7 +293,7 @@ author:
   email: "jane@example.com"
 ```
 
-When you run `aam init`, these values pre-populate the `author` field in `aam.yaml`:
+When you run `aam pkg init`, these values pre-populate the `author` field in `aam.yaml`:
 
 ```yaml
 # Generated aam.yaml
@@ -308,7 +308,7 @@ author: "Jane Smith <jane@example.com>"
 
 **Type:** `PublishConfig`
 
-Controls default behavior for `aam publish`.
+Controls default behavior for `aam pkg publish`.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -319,7 +319,7 @@ Controls default behavior for `aam publish`.
 **Type:** `string`
 **Default:** `""`
 
-When set, `aam init` defaults to scoped package names.
+When set, `aam pkg init` defaults to scoped package names.
 
 ```yaml
 publish:
@@ -327,8 +327,8 @@ publish:
 ```
 
 With this setting:
-- `aam init my-package` creates `@myorg/my-package`
-- `aam publish` publishes to the `@myorg` scope by default
+- `aam pkg init my-package` creates `@myorg/my-package`
+- `aam pkg publish` publishes to the `@myorg` scope by default
 
 **Without scope:**
 ```yaml
@@ -336,7 +336,7 @@ publish:
   default_scope: ""
 ```
 
-`aam init my-package` creates unscoped package `my-package`.
+`aam pkg init my-package` creates unscoped package `my-package`.
 
 ## Complete Example: Global Config
 
@@ -374,7 +374,7 @@ security:
   trusted_keys:
     - "ABCD1234EFGH5678IJKL9012MNOP3456QRST7890"
 
-# Author defaults (used by aam init)
+# Author defaults (used by aam pkg init)
 author:
   name: "Jane Smith"
   email: "jane@example.com"

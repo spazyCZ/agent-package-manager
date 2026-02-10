@@ -37,7 +37,7 @@ Create a new directory and initialize the package:
 
 ```bash
 mkdir -p ~/python-best-practices && cd ~/python-best-practices
-aam init
+aam pkg init
 ```
 
 **Interactive prompts:**
@@ -75,7 +75,7 @@ Which platforms should this package support?
 ```
 
 !!! tip "Scoped packages"
-    Using `@yourname/` as a scope helps organize packages and prevents naming conflicts. It's like npm's scoped packages or GitHub's username/repo format.
+    Using `@yourname/` as a scope helps organize packages and prevents naming conflicts. It's like npm's scoped packages or GitHub's username/repo format. To scaffold a package from a template without the interactive wizard, use `aam pkg create` instead of `aam pkg init`.
 
 ---
 
@@ -791,7 +791,7 @@ keywords:
 Validate your complete package:
 
 ```bash
-aam validate
+aam pkg validate
 ```
 
 **Expected output:**
@@ -841,7 +841,7 @@ Dependencies:
 Build the distributable archive:
 
 ```bash
-aam pack
+aam pkg pack
 ```
 
 **Expected output:**
@@ -877,7 +877,7 @@ tar -tzf python-best-practices-1.0.0.aam | head -n 15
 Publish to your local registry:
 
 ```bash
-aam publish --registry local
+aam pkg publish --registry local
 ```
 
 **Expected output:**
@@ -1104,7 +1104,7 @@ Now that you've created a complete package, you can:
 
 ### Validation Errors
 
-If `aam validate` fails:
+If `aam pkg validate` fails:
 
 1. **Check the error message** — It will tell you exactly what's wrong
 2. **Verify file paths** — Ensure paths in `aam.yaml` match actual files
@@ -1146,14 +1146,14 @@ python3 .cursor/skills/yourname--python-reviewer/scripts/analyze.py test.py
 
 In this tutorial, you:
 
-1. ✅ Initialized a scoped package (`@yourname/python-best-practices`)
+1. ✅ Initialized a scoped package with `aam pkg init` (`@yourname/python-best-practices`)
 2. ✅ Created a complete skill with scripts, templates, and references
 3. ✅ Created an agent that uses the skill and prompts
 4. ✅ Created a prompt template with variables
 5. ✅ Created project-level instructions
-6. ✅ Validated the package structure
-7. ✅ Built a distributable `.aam` archive
-8. ✅ Published to a local registry
+6. ✅ Validated the package structure (`aam pkg validate`)
+7. ✅ Built a distributable `.aam` archive (`aam pkg pack`)
+8. ✅ Published to a local registry (`aam pkg publish`)
 9. ✅ Installed and verified deployment
 
 You now have hands-on experience with the full AAM workflow and understand how to create production-ready packages.

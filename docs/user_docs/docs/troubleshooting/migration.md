@@ -2,13 +2,29 @@
 
 This guide covers migrating between AAM versions, platforms, and from manual artifact management to AAM.
 
+## CLI command changes (pkg subcommand)
+
+If you used older AAM commands, note these changes:
+
+| Old command | New command | Notes |
+|-------------|-------------|--------|
+| `aam init <name>` (package scaffolding) | `aam pkg init <name>` | Package scaffolding only. |
+| `aam init` (no args) | `aam init` | **Unchanged** — client setup (config, sources). |
+| `aam create-package` | `aam pkg create` | Create package from existing artifacts. |
+| `aam validate` | `aam pkg validate` | Validate package manifest and contents. |
+| `aam pack` | `aam pkg pack` | Build package archive. |
+| `aam publish` | `aam pkg publish` | Publish to registry. |
+| `aam build` | `aam pkg build` | Build package (e.g. platform-specific). |
+
+**Summary:** `aam init` with no arguments is for **client setup** (creating `~/.aam/`, config, sources). Use `aam pkg init <name>` to **scaffold a new package** in the current directory.
+
 ## Migrating from Manual Skills to AAM
 
 ### Step 1: Detect Existing Artifacts
 
 ```bash
 cd your-project/
-aam create-package --dry-run
+aam pkg create --dry-run
 ```
 
 This scans for skills, agents, prompts, and instructions not yet managed by AAM.
@@ -16,7 +32,7 @@ This scans for skills, agents, prompts, and instructions not yet managed by AAM.
 ### Step 2: Create Package
 
 ```bash
-aam create-package
+aam pkg create
 ```
 
 Interactive selection of artifacts and package metadata.
@@ -24,7 +40,7 @@ Interactive selection of artifacts and package metadata.
 ### Step 3: Validate
 
 ```bash
-aam validate
+aam pkg validate
 ```
 
 Ensures the package is well-formed.
@@ -32,8 +48,8 @@ Ensures the package is well-formed.
 ### Step 4: Publish
 
 ```bash
-aam pack
-aam publish
+aam pkg pack
+aam pkg publish
 ```
 
 ### Step 5: Update Workflow
@@ -73,9 +89,9 @@ version: 2.0.0  # Bump major version
 #### 2. Publish New Version
 
 ```bash
-aam validate
-aam pack
-aam publish
+aam pkg validate
+aam pkg pack
+aam pkg publish
 ```
 
 #### 3. Deprecate Old Package
@@ -140,8 +156,8 @@ dependencies:
 
 4. **Rebuild packages:**
    ```bash
-   aam validate
-   aam pack
+   aam pkg validate
+   aam pkg pack
    ```
 
 5. **Test:**
@@ -180,7 +196,7 @@ aam login
 ```bash
 # For each package
 cd package-directory/
-aam publish --registry company
+aam pkg publish --registry company
 ```
 
 #### 4. Update Consumers

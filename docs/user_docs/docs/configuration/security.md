@@ -57,7 +57,7 @@ security:
 
 ### How Checksums Work
 
-1. **Package creation:** `aam pack` calculates SHA-256 of `.aam` archive
+1. **Package creation:** `aam pkg pack` calculates SHA-256 of `.aam` archive
 2. **Publishing:** Checksum stored in registry metadata
 3. **Installation:** AAM downloads package and verifies checksum
 4. **Lock file:** Checksum recorded in `.aam/aam-lock.yaml`
@@ -117,7 +117,7 @@ Sigstore uses OIDC identities (e.g., email addresses) instead of managing keys.
 
 **Publishing with Sigstore:**
 ```bash
-aam publish --sign
+aam pkg publish --sign
 # Opens browser for OIDC authentication
 # Signs package with your identity
 ```
@@ -140,7 +140,7 @@ Traditional GPG key-based signing.
 
 **Publishing with GPG:**
 ```bash
-aam publish --sign --gpg-key KEY_ID
+aam pkg publish --sign --gpg-key KEY_ID
 ```
 
 **Verification:**
@@ -431,7 +431,7 @@ security:
 
 **Workflow:**
 ```bash
-aam publish
+aam pkg publish
 # Package uploaded but marked "pending approval"
 # Approver runs: aam approve @myorg/my-package@1.0.0
 # Package becomes available
@@ -537,7 +537,7 @@ gpg --gen-key
 2. **Sign and publish:**
 
 ```bash
-aam publish --sign
+aam pkg publish --sign
 # Signs package and publishes
 ```
 
@@ -652,7 +652,7 @@ Never disable checksum verification (it's enforced anyway).
 If publishing packages, always sign them:
 
 ```bash
-aam publish --sign
+aam pkg publish --sign
 ```
 
 ### Use Sigstore for Simplicity
@@ -661,7 +661,7 @@ Sigstore is easier than GPG (no key management).
 
 ```bash
 aam login sigstore
-aam publish --sign
+aam pkg publish --sign
 ```
 
 ### Configure Trust Lists

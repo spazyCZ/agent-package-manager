@@ -1,11 +1,15 @@
-# aam validate
+# aam validate (deprecated)
 
 **Package Authoring**
+
+!!! warning "Deprecated"
+    `aam validate` is deprecated and will be removed in v0.3.0.
+    Use [`aam pkg validate`](validate.md) instead. The command still works but prints a deprecation warning.
 
 ## Synopsis
 
 ```bash
-aam validate [PATH]
+aam pkg validate [PATH]
 ```
 
 ## Description
@@ -29,7 +33,7 @@ This command has no command-specific options.
 ### Example 1: Validate Current Directory
 
 ```bash
-aam validate
+aam pkg validate
 ```
 
 **Output:**
@@ -60,7 +64,7 @@ Dependencies:
 ### Example 2: Validate Specific Directory
 
 ```bash
-aam validate ./my-package/
+aam pkg validate ./my-package/
 ```
 
 Validates the package in the specified directory.
@@ -68,7 +72,7 @@ Validates the package in the specified directory.
 ### Example 3: Validation Errors
 
 ```bash
-aam validate
+aam pkg validate
 ```
 
 **Output:**
@@ -97,7 +101,7 @@ Dependencies:
 ### Example 4: Schema Validation Error
 
 ```bash
-aam validate
+aam pkg validate
 ```
 
 **Output:**
@@ -115,18 +119,18 @@ Manifest:
 ### Example 5: No Manifest Found
 
 ```bash
-aam validate ./empty-directory/
+aam pkg validate ./empty-directory/
 ```
 
 **Output:**
 ```
-Error: No aam.yaml found. Run 'aam create-package' or 'aam init' first.
+Error: No aam.yaml found. Run 'aam pkg create' or 'aam pkg init' first.
 ```
 
 ### Example 6: Valid Package with Warnings
 
 ```bash
-aam validate
+aam pkg validate
 ```
 
 **Output:**
@@ -185,16 +189,16 @@ These fields generate warnings if missing but don't fail validation:
 
 ## Related Commands
 
-- [`aam pack`](pack.md) - Build archive (runs validation first)
-- [`aam publish`](publish.md) - Publish to registry (requires valid package)
-- [`aam init`](init.md) - Initialize new package
-- [`aam create-package`](create-package.md) - Create package from existing artifacts
+- [`aam pkg pack`](pack.md) - Build archive (runs validation first)
+- [`aam pkg publish`](publish.md) - Publish to registry (requires valid package)
+- [`aam pkg init`](init.md) - Initialize new package
+- [`aam pkg create`](create-package.md) - Create package from existing artifacts
 
 ## Notes
 
 ### Run Before Packing
 
-Always run `aam validate` before `aam pack`. The pack command will fail if validation errors exist, so catching them early saves time.
+Always run `aam pkg validate` before `aam pkg pack`. The pack command will fail if validation errors exist, so catching them early saves time.
 
 ### Fixing Validation Errors
 
@@ -247,7 +251,7 @@ Invalid:
 For detailed validation output:
 
 ```bash
-aam validate --verbose
+aam pkg validate --verbose
 ```
 
 Shows debug information about the validation process.
@@ -259,8 +263,8 @@ Use validation in continuous integration:
 ```bash
 #!/bin/bash
 set -e
-aam validate
-aam pack
+aam pkg validate
+aam pkg pack
 ```
 
 The script will fail immediately if validation fails.

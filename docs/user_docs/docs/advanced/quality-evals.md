@@ -308,7 +308,7 @@ jobs:
 
       - name: Publish package
         if: success()
-        run: aam publish --sign
+        run: aam pkg publish --sign
         env:
           AAM_TOKEN: ${{ secrets.AAM_TOKEN }}
 ```

@@ -39,20 +39,34 @@ logger = logging.getLogger(__name__)
 
 @click.command("list")
 @click.option("--tree", is_flag=True, help="Show dependency tree")
+@click.option(
+    "--available",
+    is_flag=True,
+    help="Show available artifacts from configured sources",
+)
 @click.pass_context
-def list_packages(ctx: click.Context, tree: bool) -> None:
-    """List installed packages.
+def list_packages(ctx: click.Context, tree: bool, available: bool) -> None:
+    """List installed packages or available source artifacts.
 
     Shows a table of installed packages with version and artifact counts.
     Use ``--tree`` to see the dependency tree.
+    Use ``--available`` to list artifacts from configured git sources.
 
     Examples::
 
         aam list
         aam list --tree
+        aam list --available
     """
     console: Console = ctx.obj["console"]
     project_dir = Path.cwd()
+
+    # -----
+    # Route to available artifacts view if requested
+    # -----
+    if available:
+        _show_available(console)
+        return
 
     lock = read_lock_file(project_dir)
 
@@ -143,3 +157,59 @@ def _add_deps_to_tree(
             _add_deps_to_tree(branch, dep_locked, lock)
         else:
             parent.add(f"{dep_name} [dim](not installed)[/dim]")
+
+
+################################################################################
+#                                                                              #
+# AVAILABLE ARTIFACTS (spec 004)                                               #
+#                                                                              #
+################################################################################
+
+
+def _show_available(console: Console) -> None:
+    """Display artifacts available from configured git sources.
+
+    Groups artifacts by source name with type and description columns.
+    """
+    from aam_cli.services.source_service import build_source_index
+
+    logger.info("Listing available source artifacts")
+
+    index = build_source_index()
+
+    if index.total_count == 0:
+        console.print(
+            "No source artifacts available. "
+            "Use 'aam source add' to register a source."
+        )
+        return
+
+    # -----
+    # Group artifacts by source
+    # -----
+    by_source: dict[str, list] = {}
+    for vp in index.by_qualified_name.values():
+        by_source.setdefault(vp.source_name, []).append(vp)
+
+    console.print(
+        f"[bold]Available artifacts[/bold] "
+        f"({index.total_count} from {index.sources_indexed} source(s)):\n"
+    )
+
+    for source_name, artifacts in by_source.items():
+        console.print(f"  [bold cyan]{source_name}[/bold cyan]")
+
+        table = Table(show_header=True, header_style="bold", padding=(0, 2))
+        table.add_column("Name", style="cyan")
+        table.add_column("Type")
+        table.add_column("Description", max_width=50)
+
+        for vp in sorted(artifacts, key=lambda a: a.name):
+            table.add_row(
+                vp.name,
+                vp.type,
+                (vp.description or "")[:50],
+            )
+
+        console.print(table)
+        console.print()

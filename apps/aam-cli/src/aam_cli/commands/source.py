@@ -19,7 +19,6 @@ Reference: contracts/cli-commands.md
 
 import json
 import logging
-import sys
 
 import click
 from rich.console import Console
@@ -45,27 +44,27 @@ logger = logging.getLogger(__name__)
 
 ################################################################################
 #                                                                              #
-# CONSOLE                                                                      #
-#                                                                              #
-################################################################################
-
-console = Console()
-err_console = Console(stderr=True)
-
-################################################################################
-#                                                                              #
 # COMMAND GROUP                                                                 #
 #                                                                              #
 ################################################################################
 
 
 @click.group()
-def source() -> None:
+@click.pass_context
+def source(ctx: click.Context) -> None:
     """Manage remote git artifact sources.
 
     Add, scan, update, list, and remove remote git repositories
     as artifact sources for AAM.
     """
+    # -----
+    # Ensure console is available in subcommands via ctx
+    # -----
+    ctx.ensure_object(dict)
+    if "console" not in ctx.obj:
+        ctx.obj["console"] = Console()
+    if "err_console" not in ctx.obj:
+        ctx.obj["err_console"] = Console(stderr=True)
 
 
 ################################################################################
@@ -81,7 +80,9 @@ def source() -> None:
 @click.option("--path", "scan_path", default=None, help="Subdirectory to scan within the repo")
 @click.option("--name", default=None, help="Custom display name for the source")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.pass_context
 def add(
+    ctx: click.Context,
     source_url: str,
     ref: str | None,
     scan_path: str | None,
@@ -104,6 +105,8 @@ def add(
 
       aam source add git@github.com:openai/skills.git --name my-skills
     """
+    console: Console = ctx.obj["console"]
+    err_console: Console = ctx.obj["err_console"]
     logger.info(f"CLI source add: url='{source_url}'")
 
     try:
@@ -115,11 +118,13 @@ def add(
         )
     except ValueError as e:
         err_console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
+        ctx.exit(1)
+        return
     except Exception as e:
         err_console.print(f"[red]Error:[/red] Failed to add source: {e}")
         logger.error(f"Source add failed: {e}", exc_info=True)
-        sys.exit(1)
+        ctx.exit(1)
+        return
 
     if output_json:
         click.echo(json.dumps(result, indent=2))
@@ -162,7 +167,9 @@ def add(
 @click.argument("name")
 @click.option("--type", "type_filter", multiple=True, help="Filter by artifact type")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.pass_context
 def scan(
+    ctx: click.Context,
     name: str,
     type_filter: tuple[str, ...],
     output_json: bool,
@@ -177,13 +184,16 @@ def scan(
 
       aam source scan openai/skills --type skill --type agent
     """
+    console: Console = ctx.obj["console"]
+    err_console: Console = ctx.obj["err_console"]
     logger.info(f"CLI source scan: name='{name}'")
 
     try:
         result = scan_source(name)
     except ValueError as e:
         err_console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
+        ctx.exit(1)
+        return
 
     # -----
     # Apply type filter if specified
@@ -250,7 +260,9 @@ def scan(
 @click.option("--all", "update_all", is_flag=True, help="Update all sources")
 @click.option("--dry-run", is_flag=True, help="Preview changes without modifying cache")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.pass_context
 def update(
+    ctx: click.Context,
     name: str | None,
     update_all: bool,
     dry_run: bool,
@@ -268,13 +280,16 @@ def update(
 
       aam source update openai/skills --dry-run
     """
+    console: Console = ctx.obj["console"]
+    err_console: Console = ctx.obj["err_console"]
     logger.info(f"CLI source update: name='{name}', all={update_all}")
 
     if not name and not update_all:
         err_console.print(
             "[red]Error:[/red] Specify a source name or use --all"
         )
-        sys.exit(1)
+        ctx.exit(1)
+        return
 
     try:
         result = update_source(
@@ -284,11 +299,13 @@ def update(
         )
     except ValueError as e:
         err_console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
+        ctx.exit(1)
+        return
     except Exception as e:
         err_console.print(f"[red]Error:[/red] Update failed: {e}")
         logger.error(f"Source update failed: {e}", exc_info=True)
-        sys.exit(1)
+        ctx.exit(1)
+        return
 
     if output_json:
         click.echo(json.dumps(result, indent=2))
@@ -350,7 +367,8 @@ def update(
 
 @source.command(name="list")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
-def list_cmd(output_json: bool) -> None:
+@click.pass_context
+def list_cmd(ctx: click.Context, output_json: bool) -> None:
     """List all configured remote sources.
 
     Examples:
@@ -359,6 +377,7 @@ def list_cmd(output_json: bool) -> None:
 
       aam source list --json
     """
+    console: Console = ctx.obj["console"]
     logger.info("CLI source list")
 
     result = list_sources()
@@ -423,7 +442,8 @@ def list_cmd(output_json: bool) -> None:
 @click.argument("name")
 @click.option("--purge-cache", is_flag=True, help="Delete the cached clone directory")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
-def remove(name: str, purge_cache: bool, output_json: bool) -> None:
+@click.pass_context
+def remove(ctx: click.Context, name: str, purge_cache: bool, output_json: bool) -> None:
     """Remove a configured source.
 
     NAME is the display name of the source to remove.
@@ -434,13 +454,16 @@ def remove(name: str, purge_cache: bool, output_json: bool) -> None:
 
       aam source remove openai/skills --purge-cache
     """
+    console: Console = ctx.obj["console"]
+    err_console: Console = ctx.obj["err_console"]
     logger.info(f"CLI source remove: name='{name}'")
 
     try:
         result = remove_source(name, purge_cache=purge_cache)
     except ValueError as e:
         err_console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
+        ctx.exit(1)
+        return
 
     if output_json:
         click.echo(json.dumps(result, indent=2))
@@ -466,7 +489,9 @@ def remove(name: str, purge_cache: bool, output_json: bool) -> None:
 @click.option("--source", "source_filter", default=None, help="Filter by source name")
 @click.option("--type", "type_filter", multiple=True, help="Filter by artifact type")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.pass_context
 def candidates(
+    ctx: click.Context,
     source_filter: str | None,
     type_filter: tuple[str, ...],
     output_json: bool,
@@ -482,6 +507,8 @@ def candidates(
 
       aam source candidates --source openai/skills --type skill
     """
+    console: Console = ctx.obj["console"]
+    err_console: Console = ctx.obj["err_console"]
     logger.info("CLI source candidates")
 
     type_list = list(type_filter) if type_filter else None
@@ -493,7 +520,8 @@ def candidates(
         )
     except ValueError as e:
         err_console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
+        ctx.exit(1)
+        return
 
     if output_json:
         click.echo(json.dumps(result, indent=2))

@@ -13,7 +13,7 @@ This tutorial demonstrates:
 - Organizing complex skills with scripts, templates, and references
 - Wiring up dependencies between artifacts
 - Adding quality tests and validations
-- The complete workflow from `aam init` through `aam publish`
+- The complete workflow from `aam pkg init` through `aam pkg publish`
 
 ## Prerequisites
 
@@ -44,7 +44,7 @@ Create a new directory and initialize the AAM package:
 mkdir code-review-toolkit
 cd code-review-toolkit
 
-aam init
+aam pkg init
 ```
 
 Fill in the prompts:
@@ -863,7 +863,7 @@ quality:
 Check that everything is properly configured:
 
 ```bash
-aam validate
+aam pkg validate
 ```
 
 Expected output:
@@ -944,7 +944,7 @@ rm test_vulnerable.py
 Build the distributable archive:
 
 ```bash
-aam pack
+aam pkg pack
 ```
 
 Expected output:
@@ -1018,10 +1018,10 @@ If you have a registry configured:
 cd ~/code-review-toolkit
 
 # Publish to local registry
-aam publish --registry local
+aam pkg publish --registry local
 
 # Or publish with signature (requires signing setup)
-aam publish --sign
+aam pkg publish --sign
 ```
 
 ---

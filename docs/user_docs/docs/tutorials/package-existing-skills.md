@@ -5,7 +5,7 @@
 
 ## What You'll Learn
 
-In this tutorial, you'll learn how to use `aam create-package` to transform an existing project with scattered skills, agents, and instructions into a proper AAM package ready for sharing and installation.
+In this tutorial, you'll learn how to use `aam pkg create` to transform an existing project with scattered skills, agents, and instructions into a proper AAM package ready for sharing and installation.
 
 ## Prerequisites
 
@@ -34,7 +34,7 @@ These artifacts work great in your project, but they're trapped in platform-spec
 3. Reuse them in other projects
 4. Version them properly
 
-Let's see how `aam create-package` makes this easy.
+Let's see how `aam pkg create` makes this easy.
 
 ---
 
@@ -174,7 +174,7 @@ You should see output like:
 Now let's see what AAM can detect:
 
 ```bash
-aam create-package
+aam pkg create
 ```
 
 You'll see AAM scan your project and find all the artifacts:
@@ -366,9 +366,9 @@ Creating package...
   5 artifacts (2 skills, 1 agent, 1 instruction, 1 prompt)
 
 Next steps:
-  aam validate    — verify the package is well-formed
-  aam pack        — build distributable .aam archive
-  aam publish     — publish to registry
+  aam pkg validate    — verify the package is well-formed
+  aam pkg pack        — build distributable .aam archive
+  aam pkg publish     — publish to registry
 ```
 
 Let's examine what was created:
@@ -507,7 +507,7 @@ platforms:
 Before publishing, always validate:
 
 ```bash
-aam validate
+aam pkg validate
 ```
 
 Expected output:
@@ -535,7 +535,7 @@ If there are any issues, AAM will tell you exactly what needs fixing.
 Create a distributable archive:
 
 ```bash
-aam pack
+aam pkg pack
 ```
 
 ```
@@ -607,7 +607,7 @@ For scripting or CI/CD, skip the interactive prompts:
 ```bash
 cd my-python-toolkit
 
-aam create-package \
+aam pkg create \
   --all \
   --name my-python-toolkit \
   --version 1.0.0 \
@@ -626,7 +626,7 @@ This selects all detected artifacts and uses the provided metadata without promp
 Want to see what would happen without creating any files?
 
 ```bash
-aam create-package --dry-run
+aam pkg create --dry-run
 ```
 
 ```
@@ -677,7 +677,7 @@ Now you can:
 - Ensure you're in the project root directory
 - Use `--include` to manually add files:
   ```bash
-  aam create-package --include ./my-skill/ --include-as skill
+  aam pkg create --include ./my-skill/ --include-as skill
   ```
 
 ### Files in wrong locations after copy
@@ -691,7 +691,7 @@ Now you can:
 
 ### Package validation fails
 
-**Problem:** `aam validate` shows errors
+**Problem:** `aam pkg validate` shows errors
 
 **Solution:**
 
@@ -707,7 +707,7 @@ Now you can:
 
 In this tutorial, you learned:
 
-- How to use `aam create-package` to detect existing artifacts
+- How to use `aam pkg create` to detect existing artifacts
 - The difference between Copy, Reference, and Move organization modes
 - How AAM converts platform-specific formats to neutral formats
 - How to validate and package artifacts for distribution
@@ -715,10 +715,10 @@ In this tutorial, you learned:
 **Key Commands:**
 
 ```bash
-aam create-package              # Interactive package creation
-aam create-package --dry-run    # Preview without creating files
-aam validate                    # Verify package structure
-aam pack                        # Build distributable archive
+aam pkg create              # Interactive package creation
+aam pkg create --dry-run    # Preview without creating files
+aam pkg validate                    # Verify package structure
+aam pkg pack                        # Build distributable archive
 ```
 
 Ready for more? Try the [Building a Code Review Package](build-code-review-package.md) tutorial to build a complete package from scratch!

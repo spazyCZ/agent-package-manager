@@ -26,7 +26,7 @@ All tutorials include:
 
     ---
 
-    Learn how to use `aam create-package` to bundle skills, agents, and instructions from an existing project.
+    Learn how to use `aam pkg create` to bundle skills, agents, and instructions from an existing project.
 
     **Difficulty:** Beginner
     **Time:** 10 minutes

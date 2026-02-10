@@ -20,14 +20,14 @@ my-package/
 ### Automatic Creation
 
 ```bash
-aam init
+aam pkg init
 # Interactive prompts, generates aam.yaml
 ```
 
 Or:
 
 ```bash
-aam create-package
+aam pkg create
 # Auto-detects artifacts, generates aam.yaml
 ```
 
@@ -175,7 +175,7 @@ author: "Jane Smith <jane@example.com>"
 - `"jane@example.com"`
 - `"Jane Smith <jane@example.com>"`
 
-**Auto-populated:** From `~/.aam/config.yaml` when using `aam init`:
+**Auto-populated:** From `~/.aam/config.yaml` when using `aam pkg init`:
 
 ```yaml
 # In ~/.aam/config.yaml
@@ -872,16 +872,16 @@ platforms:
 ## Validation
 
 AAM validates manifests automatically on:
-- `aam init`
-- `aam create-package`
-- `aam pack`
-- `aam publish`
+- `aam pkg init`
+- `aam pkg create`
+- `aam pkg pack`
+- `aam pkg publish`
 - `aam install`
 
 ### Manual Validation
 
 ```bash
-aam validate
+aam pkg validate
 # Validates aam.yaml in current directory
 ```
 

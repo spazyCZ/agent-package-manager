@@ -1,11 +1,15 @@
-# aam build
+# aam build (deprecated)
 
 **Package Authoring**
+
+!!! warning "Deprecated"
+    `aam build` is deprecated and will be removed in v0.3.0.
+    Use [`aam pkg build`](build.md) instead. The command still works but prints a deprecation warning.
 
 ## Synopsis
 
 ```bash
-aam build --target PLATFORM [OPTIONS]
+aam pkg build --target PLATFORM [OPTIONS]
 ```
 
 ## Description
@@ -32,7 +36,7 @@ This command takes no arguments.
 ### Example 1: Build for Cursor
 
 ```bash
-aam build --target cursor
+aam pkg build --target cursor
 ```
 
 **Planned Output:**
@@ -54,7 +58,7 @@ Compiling artifacts for cursor...
 ### Example 2: Build for All Platforms
 
 ```bash
-aam build --target all
+aam pkg build --target all
 ```
 
 **Planned Output:**
@@ -72,7 +76,7 @@ Built 4 platform bundles
 ### Example 3: Custom Output Directory
 
 ```bash
-aam build --target cursor --output ./releases/
+aam pkg build --target cursor --output ./releases/
 ```
 
 Creates bundle in `./releases/` instead of `./dist/`.
@@ -82,7 +86,7 @@ Creates bundle in `./releases/` instead of `./dist/`.
 After building:
 
 ```bash
-aam build --target cursor
+aam pkg build --target cursor
 aam install ./dist/my-package-1.0.0-cursor.bundle.aam
 ```
 
@@ -140,9 +144,9 @@ my-package-1.0.0-cursor.bundle.aam
 
 ## Related Commands
 
-- [`aam pack`](pack.md) - Create registry-publishable archive
+- [`aam pkg pack`](pack.md) - Create registry-publishable archive
 - [`aam install`](install.md) - Install from bundle
-- [`aam validate`](validate.md) - Validate before building
+- [`aam pkg validate`](validate.md) - Validate before building
 
 ## Notes
 
@@ -163,7 +167,7 @@ Expected in version 0.2.0.
 
 ```bash
 # Build and share via Slack
-aam build --target cursor
+aam pkg build --target cursor
 # Send dist/my-package-1.0.0-cursor.bundle.aam to team
 ```
 
@@ -171,7 +175,7 @@ aam build --target cursor
 
 ```bash
 # Build bundles on machine with registry access
-aam build --target all
+aam pkg build --target all
 
 # Transfer to offline machine
 scp dist/*.bundle.aam offline-machine:~/
@@ -184,20 +188,20 @@ aam install ~/my-package-1.0.0-cursor.bundle.aam
 
 ```bash
 # Build and tag for GitHub release
-aam build --target all
+aam pkg build --target all
 gh release create v1.0.0 dist/*.bundle.aam
 ```
 
 ### Bundle vs. Pack
 
-**`aam pack`** creates registry archives:
+**`aam pkg pack`** creates registry archives:
 
 - Contains raw artifacts
 - Requires deployment during install
 - Dependencies resolved at install time
 - Smaller file size
 
-**`aam build`** creates platform bundles:
+**`aam pkg build`** creates platform bundles:
 
 - Contains pre-compiled artifacts
 - Ready to deploy immediately
@@ -221,7 +225,7 @@ Use bundles when:
 - You want to avoid dependency resolution
 - Distributing via manual channels (email, Slack, file shares)
 
-Use `aam pack` + publish when:
+Use `aam pkg pack` + publish when:
 
 - Publishing to a registry
 - Dependency resolution is acceptable

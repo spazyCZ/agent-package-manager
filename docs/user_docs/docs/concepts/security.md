@@ -40,10 +40,10 @@ graph TB
 
 ```bash
 # Author publishes package
-aam pack
+aam pkg pack
 # Calculates: sha256:abc123...
 
-aam publish
+aam pkg publish
 # Stores checksum in registry metadata.yaml
 
 # User installs package
@@ -112,7 +112,7 @@ AAM supports three signing methods:
 
 ```bash
 # Sign and publish
-aam publish --sign
+aam pkg publish --sign
 
 # AAM prompts for OIDC authentication (opens browser)
 # Signs package with ephemeral certificate
@@ -161,7 +161,7 @@ aam install @author/my-package --verify
 
 ```bash
 # Sign and publish with GPG
-aam publish --sign --sign-type gpg
+aam pkg publish --sign --sign-type gpg
 
 # AAM uses your default GPG key
 # Or specify key: --gpg-key ABC123...
@@ -349,7 +349,7 @@ Sigstore records all signatures in **Rekor**, a public transparency log:
 When you publish with Sigstore:
 
 ```bash
-aam publish --sign
+aam pkg publish --sign
 
 # Output:
 # ✓ Signed with Sigstore
@@ -458,11 +458,11 @@ graph TB
 
 ```bash
 # 1. Create and validate package
-aam validate
-aam pack
+aam pkg validate
+aam pkg pack
 
 # 2. Publish with Sigstore signing
-aam publish --sign
+aam pkg publish --sign
 
 # AAM opens browser for OIDC authentication
 # (e.g., login with GitHub)
@@ -488,10 +488,10 @@ aam publish --sign
 gpg --list-keys
 
 # 2. Publish with GPG signing
-aam publish --sign --sign-type gpg
+aam pkg publish --sign --sign-type gpg
 
 # Or specify key:
-aam publish --sign --sign-type gpg --gpg-key ABCD1234...
+aam pkg publish --sign --sign-type gpg --gpg-key ABCD1234...
 
 # Output:
 # ✓ Package signed with GPG

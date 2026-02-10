@@ -17,7 +17,7 @@ import click
 from rich.console import Console
 from rich.prompt import Confirm
 
-from aam_cli.adapters.cursor import CursorAdapter
+from aam_cli.adapters.factory import create_adapter
 from aam_cli.core.config import load_config
 from aam_cli.core.manifest import load_manifest
 from aam_cli.core.workspace import (
@@ -102,7 +102,7 @@ def uninstall(ctx: click.Context, package: str) -> None:
     if pkg_dir.is_dir():
         try:
             manifest = load_manifest(pkg_dir)
-            adapter = CursorAdapter(project_dir)
+            adapter = create_adapter(config.default_platform, project_dir)
 
             console.print(f"\nRemoving deployed artifacts from {config.default_platform}...")
 

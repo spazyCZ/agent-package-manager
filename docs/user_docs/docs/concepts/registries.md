@@ -219,7 +219,7 @@ git remote add origin https://github.com/myorg/aam-registry.git
 git push -u origin main
 
 cd ~/my-package
-aam publish --registry local
+aam pkg publish --registry local
 
 cd ~/my-registry
 git add . && git commit -m "Publish my-package@1.0.0" && git push
@@ -292,7 +292,7 @@ aam registry add community https://github.com/aam-packages/registry
 
 Publishing to a git registry typically involves:
 
-1. **Pack your package** — `aam pack` creates the `.aam` archive
+1. **Pack your package** — `aam pkg pack` creates the `.aam` archive
 2. **Create a pull request** — Fork the registry repo, add your package
 3. **Registry maintainers review** — Code review, validation
 4. **Merge** — Package becomes available to all users
@@ -305,7 +305,7 @@ git clone https://github.com/aam-packages/registry.git ~/aam-registry-fork
 
 # 2. Pack your package
 cd ~/my-package
-aam pack  # produces dist/my-package-1.0.0.aam
+aam pkg pack  # produces dist/my-package-1.0.0.aam
 
 # 3. Add to registry
 cd ~/aam-registry-fork
@@ -339,13 +339,13 @@ git push origin main
 # Create PR on GitHub
 ```
 
-### Git Registry with `aam publish` (Future)
+### Git Registry with `aam pkg publish` (Future)
 
-In future versions, `aam publish` can automate git registry publishing:
+In future versions, `aam pkg publish` can automate git registry publishing:
 
 ```bash
 # Automated git registry publish (creates PR automatically)
-aam publish --registry community
+aam pkg publish --registry community
 # AAM clones, creates branch, commits, pushes, opens PR
 ```
 
@@ -430,7 +430,7 @@ aam register
 aam login
 
 # Token is automatically used for publish
-aam publish
+aam pkg publish
 
 # Log out (revokes token)
 aam logout
@@ -499,7 +499,7 @@ Configured registries:
     aam-central     https://registry.aam.dev
 ```
 
-The `*` indicates the default registry used by `aam publish`.
+The `*` indicates the default registry used by `aam pkg publish`.
 
 ### Removing a Registry
 
@@ -513,7 +513,7 @@ aam registry list
 
 ### Setting Default Registry
 
-The default registry is used by `aam publish` when no `--registry` flag is provided:
+The default registry is used by `aam pkg publish` when no `--registry` flag is provided:
 
 ```bash
 # Set default during add
@@ -546,15 +546,15 @@ aam registry add mylocal file:///home/user/my-aam-registry --default
 
 # 3. Create a package
 cd ~/projects
-aam init my-agent
+aam pkg init my-agent
 # ... create artifacts ...
 
 # 4. Validate and pack
-aam validate
-aam pack
+aam pkg validate
+aam pkg pack
 
 # 5. Publish to local registry
-aam publish --registry mylocal
+aam pkg publish --registry mylocal
 
 # Behind the scenes:
 # - Extracts aam.yaml from archive

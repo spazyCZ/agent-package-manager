@@ -4,26 +4,52 @@ Complete command reference for the AAM (Agent Artifact Manager) command-line int
 
 ## Quick Reference
 
+### Getting Started
+
+| Command | Description |
+|---------|-------------|
+| [`aam init`](init.md) | Set up AAM (platform, default sources) |
+
 ### Package Management
 
 | Command | Description |
 |---------|-------------|
 | [`aam install`](install.md) | Install a package and its dependencies |
 | [`aam uninstall`](uninstall.md) | Remove an installed package |
-| [`aam list`](list.md) | List installed packages |
+| [`aam upgrade`](upgrade.md) | Upgrade outdated source-installed packages |
+| [`aam outdated`](outdated.md) | Check for outdated packages |
+| [`aam search`](search.md) | Search registries and sources |
+| [`aam list`](list.md) | List installed packages (`--available` for sources) |
 | [`aam info`](info.md) | Show detailed package information |
-| [`aam search`](search.md) | Search registries for packages |
 
-### Package Authoring
+### Package Integrity
 
 | Command | Description |
 |---------|-------------|
-| [`aam init`](init.md) | Initialize a new package interactively |
-| [`aam create-package`](create-package.md) | Create package from existing project |
-| [`aam validate`](validate.md) | Validate package manifest and artifacts |
-| [`aam pack`](pack.md) | Build distributable .aam archive |
-| [`aam publish`](publish.md) | Publish package to registry |
-| [`aam build`](build.md) | Build portable platform-specific bundle |
+| [`aam verify`](verify.md) | Verify installed file checksums |
+| [`aam diff`](diff.md) | Show unified diffs for modified files |
+
+### Package Authoring (`aam pkg`)
+
+| Command | Description |
+|---------|-------------|
+| [`aam pkg init`](pkg-init.md) | Scaffold a new package from scratch |
+| [`aam pkg create`](create-package.md) | Create package from existing project |
+| [`aam pkg validate`](validate.md) | Validate package manifest and artifacts |
+| [`aam pkg pack`](pack.md) | Build distributable .aam archive |
+| [`aam pkg publish`](publish.md) | Publish package to registry |
+| [`aam pkg build`](build.md) | Build portable platform-specific bundle |
+
+### Source Management
+
+| Command | Description |
+|---------|-------------|
+| [`aam source add`](source-add.md) | Add a remote git repository as source |
+| [`aam source scan`](source-scan.md) | Scan a source for artifacts |
+| [`aam source update`](source-update.md) | Fetch upstream changes |
+| [`aam source list`](source-list.md) | List configured sources |
+| [`aam source remove`](source-remove.md) | Remove a configured source |
+| [`aam source candidates`](source-candidates.md) | List unpackaged artifact candidates |
 
 ### Registry Management
 
@@ -60,22 +86,12 @@ See [Global Options](global-options.md) for detailed information about global fl
 
 AAM supports multiple package specifier formats:
 
-- `name` - Install latest version from registry
+- `name` - Install latest version from registry or source
 - `name@version` - Install specific version
 - `@scope/name` - Scoped package from registry
-- `@scope/name@version` - Scoped package with version
+- `source/artifact` - Qualified name from a specific source
 - `./path/` - Install from local directory
 - `file.aam` - Install from archive file
-
-### Version Constraints
-
-When specifying version constraints in dependencies:
-
-- `1.0.0` - Exact version
-- `>=1.0.0` - Minimum version
-- `^1.0.0` - Compatible (>=1.0.0 <2.0.0)
-- `~1.0.0` - Approximate (>=1.0.0 <1.1.0)
-- `*` - Any version
 
 ### Exit Codes
 
@@ -89,16 +105,15 @@ All AAM commands follow standard exit code conventions:
 
 ## Getting Help
 
-For any command, use `--help` to see detailed usage:
-
 ```bash
 aam --help              # Show all commands
 aam install --help      # Show install command options
-aam registry --help     # Show registry subcommands
+aam pkg --help          # Show package authoring commands
+aam source --help       # Show source management commands
 ```
 
 ## Related Documentation
 
 - [Getting Started](../getting-started/installation.md) - Install and configure AAM
 - [Concepts](../concepts/packages.md) - Learn about AAM concepts
-- [Configuration](../configuration/config-file.md) - Configure AAM behavior
+- [Configuration](../configuration/global.md) - Configure AAM behavior

@@ -72,16 +72,16 @@ Works fully **offline** with local registries. No server required. Git directori
 A typical workflow from zero to a published and installed package:
 
 ```bash title="Terminal"
-# 1. Create a local registry
-aam registry init ~/my-registry
+# 1. Set up AAM client (config, sources)
+aam init
 
 # 2. Create a new package interactively
-aam create-package my-code-review-skill
+aam pkg create my-code-review-skill
 
-# 3. Publish to your local registry
-aam publish --registry file:///home/user/my-registry
+# 3. Publish to your registry
+aam pkg publish --registry file:///home/user/my-registry
 
-# 4. Install it in any project
+# 4. Install a package in any project
 aam install @yourname/my-code-review-skill
 ```
 

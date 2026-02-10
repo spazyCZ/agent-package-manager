@@ -11,7 +11,7 @@ The git source workflow has three stages:
 
 1. **Add** a source with `aam source add`, which clones the repository
 2. **Scan** the source with `aam source scan` to discover artifacts
-3. **Package** selected artifacts with `aam create-package --from-source`
+3. **Package** selected artifacts with `aam pkg create --from-source`
 
 ```mermaid
 graph LR
@@ -97,7 +97,7 @@ are tracked so they won't be re-added on future `aam init` calls.
 ## Provenance tracking
 
 When you create a package from a source with
-`aam create-package --from-source`, AAM records provenance metadata in
+`aam pkg create --from-source`, AAM records provenance metadata in
 the package manifest (`aam.yaml`):
 
 ```yaml
@@ -150,5 +150,5 @@ MCP resources provide passive data access:
 
 - [aam source add](../cli/source-add.md) - Add your first source
 - [aam source scan](../cli/source-scan.md) - Discover artifacts
-- [aam create-package](../cli/create-package.md) - Package from a source
+- [aam pkg create](../cli/create-package.md) - Package from a source
 - [aam verify](../cli/verify.md) - Verify installed packages

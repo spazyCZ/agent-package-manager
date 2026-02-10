@@ -350,4 +350,121 @@ def register_read_tools(mcp: FastMCP) -> None:
         logger.info(f"MCP tool aam_diff: package='{package_name}'")
         return diff_package(package_name)
 
-    logger.info("Registered 13 read-only MCP tools")
+    ############################################################################
+    #                                                                          #
+    # OUTDATED & AVAILABLE TOOLS (spec 004)                                    #
+    #                                                                          #
+    ############################################################################
+
+    @mcp.tool(tags={"read"})
+    def aam_outdated() -> dict[str, Any]:
+        """Check for outdated source-installed packages.
+
+        Compares installed package commit SHAs against the source HEAD.
+        Returns categorized results: outdated, up_to_date, no_source,
+        and stale_sources.
+
+        Returns:
+            Outdated result dict with outdated packages, counts, and
+            stale source warnings.
+        """
+        from aam_cli.commands.outdated import check_outdated
+        from aam_cli.core.workspace import read_lock_file
+
+        logger.info("MCP tool aam_outdated")
+        config = load_config()
+        lock = read_lock_file()
+
+        result = check_outdated(lock, config)
+
+        return {
+            "outdated": [
+                {
+                    "name": o.name,
+                    "current_commit": o.current_commit,
+                    "latest_commit": o.latest_commit,
+                    "source_name": o.source_name,
+                    "has_local_modifications": o.has_local_modifications,
+                }
+                for o in result.outdated
+            ],
+            "up_to_date": result.up_to_date,
+            "no_source": result.no_source,
+            "stale_sources": result.stale_sources,
+            "total_outdated": result.total_outdated,
+        }
+
+    @mcp.tool(tags={"read"})
+    def aam_available() -> dict[str, Any]:
+        """List all available artifacts from configured sources.
+
+        Builds an in-memory index of all artifacts across registered
+        sources and returns them grouped by source name.
+
+        Returns:
+            Dict with artifacts grouped by source, total count, and
+            number of sources indexed.
+        """
+        from aam_cli.services.source_service import build_source_index
+
+        logger.info("MCP tool aam_available")
+        config = load_config()
+        index = build_source_index(config)
+
+        # -----
+        # Group by source for structured output
+        # -----
+        by_source: dict[str, list[dict[str, Any]]] = {}
+        for qname, vp in index.by_qualified_name.items():
+            source_group = by_source.setdefault(vp.source_name, [])
+            source_group.append({
+                "name": vp.name,
+                "qualified_name": vp.qualified_name,
+                "type": vp.type,
+                "path": vp.path,
+                "description": vp.description,
+            })
+
+        return {
+            "by_source": by_source,
+            "total_count": index.total_count,
+            "sources_indexed": index.sources_indexed,
+            "build_timestamp": index.build_timestamp,
+        }
+
+    ############################################################################
+    #                                                                          #
+    # CLIENT INIT INFO TOOL (spec 004)                                         #
+    #                                                                          #
+    ############################################################################
+
+    @mcp.tool(tags={"read"})
+    def aam_init_info() -> dict[str, Any]:
+        """Get client initialization information.
+
+        Detects the current AI platform from project directory indicators
+        and returns recommended defaults for ``aam init``.
+
+        Returns:
+            Dict with detected_platform, supported_platforms, and
+            recommended defaults.
+        """
+        from aam_cli.services.client_init_service import (
+            SUPPORTED_PLATFORMS,
+            detect_platform,
+        )
+
+        logger.info("MCP tool aam_init_info")
+
+        detected = detect_platform()
+        config = load_config()
+
+        return {
+            "detected_platform": detected,
+            "current_platform": config.default_platform,
+            "supported_platforms": SUPPORTED_PLATFORMS,
+            "has_config": config.default_platform is not None,
+            "recommended_platform": detected or "cursor",
+        }
+
+    logger.info("Registered 16 read-only MCP tools")

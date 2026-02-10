@@ -126,7 +126,7 @@ deploy/
         ├── secrets.py            #     Secret Manager
         ├── backend_service.py    #     Cloud Run (FastAPI)
         ├── web_service.py        #     Cloud Run (React SPA)
-        ├── load_balancer.py      #     Global HTTPS Load Balancer
+        ├── domain_mapping.py     #     Cloud Run domain mappings + SSL
         └── monitoring.py         #     Uptime checks & alerting
 ```
 
@@ -188,7 +188,7 @@ pulumi up
 | Cache                 | Memorystore (Redis 7)    | Session / query caching        |
 | Object Storage        | Cloud Storage (GCS)      | Package archive storage        |
 | Container Registry    | Artifact Registry        | Docker image storage           |
-| DNS / Load Balancing  | Global HTTPS LB          | SSL termination, routing       |
+| Domain Routing        | Cloud Run Domain Maps    | Custom domains + managed SSL   |
 | Secrets               | Secret Manager           | API keys, DB credentials       |
 | Monitoring            | Cloud Monitoring         | Uptime checks, alerting        |
 
@@ -206,7 +206,7 @@ Each infrastructure concern is encapsulated in a `pulumi.ComponentResource`:
 | Secrets            | `components/secrets.py`          | Secret Manager entries               |
 | BackendService     | `components/backend_service.py`  | Cloud Run service + IAM              |
 | WebService         | `components/web_service.py`      | Cloud Run service + IAM              |
-| LoadBalancer       | `components/load_balancer.py`    | GLB, SSL cert, URL map, NEGs         |
+| DomainMapping      | `components/domain_mapping.py`   | Cloud Run domain mappings + SSL      |
 | Monitoring         | `components/monitoring.py`       | Uptime checks                        |
 
 ### Environment Sizing
@@ -242,7 +242,7 @@ Each infrastructure concern is encapsulated in a `pulumi.ComponentResource`:
 - **CLI -> Backend:** HTTP REST API (see `docs/HTTP_REGISTRY_SPEC.md`)
 - **Web -> Backend:** Same REST API, consumed from the browser
 - **Local:** Nginx reverse proxy sits in front of Backend and Web
-- **Cloud:** Global HTTPS Load Balancer routes `/api/*` to Backend, `/*` to Web
+- **Cloud:** Cloud Run domain mappings route custom domains to services (no load balancer)
 
 ---
 

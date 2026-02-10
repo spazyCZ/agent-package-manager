@@ -60,7 +60,7 @@ function Layout() {
               <span className="text-blue-400 font-bold">AAM</span> - Agent Package Manager
             </div>
             <div className="flex gap-6">
-              <a href="/docs" className="hover:text-white">
+              <a href="https://storage.googleapis.com/aam-docs-test/index.html" className="hover:text-white" target="_blank" rel="noopener noreferrer">
                 Documentation
               </a>
               <a href="/api/docs" className="hover:text-white">

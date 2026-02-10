@@ -21,7 +21,7 @@ Distribution tags (dist-tags) are **named aliases for package versions**. They a
 aam install @author/my-agent@stable
 
 # Authors can test new versions before promoting to stable
-aam publish  # Creates 2.0.0 tagged as "latest"
+aam pkg publish  # Creates 2.0.0 tagged as "latest"
 # Test 2.0.0 in production
 aam dist-tag add @author/my-agent@2.0.0 stable  # Promote when ready
 ```
@@ -55,12 +55,12 @@ aam install @author/my-agent@bank-approved
 ### `latest`
 
 - Automatically set to the newest published version
-- Updated on every `aam publish`
+- Updated on every `aam pkg publish`
 - Default tag when no version specified
 
 ```bash
-aam publish  # Publishes 1.0.0, sets "latest" to 1.0.0
-aam publish  # Publishes 1.1.0, updates "latest" to 1.1.0
+aam pkg publish  # Publishes 1.0.0, sets "latest" to 1.0.0
+aam pkg publish  # Publishes 1.1.0, updates "latest" to 1.1.0
 ```
 
 ### `stable`
@@ -126,7 +126,7 @@ Tags for @author/my-agent:
 
 ```bash
 # Publish and tag in one step
-aam publish --tag beta
+aam pkg publish --tag beta
 
 # Publishes new version and tags it as "beta"
 # Also updates "latest" (automatic)
@@ -201,7 +201,7 @@ aam install @author/my-agent@stable
 
 ```bash
 # 1. Publish new version
-aam publish
+aam pkg publish
 # Created @author/my-agent@1.2.0 (tagged as "latest")
 
 # 2. Test in staging
@@ -218,7 +218,7 @@ aam install @author/my-agent@stable
 
 ```bash
 # 1. Publish beta version
-aam publish --tag beta
+aam pkg publish --tag beta
 # Created @author/my-agent@2.0.0-beta.1 (tagged as "latest" and "beta")
 
 # 2. Beta testers use beta tag
@@ -235,7 +235,7 @@ aam dist-tag add @author/my-agent@2.0.0 stable
 
 ```bash
 # 1. Author publishes
-aam publish
+aam pkg publish
 # Created @author/my-agent@1.3.0
 
 # 2. Compliance team reviews and approves
@@ -390,7 +390,7 @@ aam install @author/my-agent@current  # Cutting edge
 # All three → tag as "production-ready"
 
 # CI/CD workflow:
-aam publish                                          # Publishes 1.5.0
+aam pkg publish                                       # Publishes 1.5.0
 ./run-tests.sh && aam dist-tag add ... qa-passed
 ./manual-review.sh && aam dist-tag add ... reviewed
 ./security-scan.sh && aam dist-tag add ... security-approved

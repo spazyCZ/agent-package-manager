@@ -1,16 +1,20 @@
-# aam publish
+# aam publish (deprecated)
 
 **Package Authoring**
+
+!!! warning "Deprecated"
+    `aam publish` is deprecated and will be removed in v0.3.0.
+    Use [`aam pkg publish`](publish.md) instead. The command still works but prints a deprecation warning.
 
 ## Synopsis
 
 ```bash
-aam publish [OPTIONS]
+aam pkg publish [OPTIONS]
 ```
 
 ## Description
 
-Publish a packed `.aam` archive to a configured registry. Must be run from the package directory containing `aam.yaml`. The archive must exist (run `aam pack` first).
+Publish a packed `.aam` archive to a configured registry. Must be run from the package directory containing `aam.yaml`. The archive must exist (run `aam pkg pack` first).
 
 For local registries, copies the archive and updates metadata. For HTTP registries, uploads the archive and updates the package index.
 
@@ -31,7 +35,7 @@ This command takes no arguments.
 ### Example 1: Publish to Default Registry
 
 ```bash
-aam publish
+aam pkg publish
 ```
 
 **Output:**
@@ -50,7 +54,7 @@ Publishing my-package@1.0.0 to local...
 ### Example 2: Publish to Specific Registry
 
 ```bash
-aam publish --registry company-registry
+aam pkg publish --registry company-registry
 ```
 
 **Output:**
@@ -69,7 +73,7 @@ Publishing my-package@1.0.0 to company-registry...
 ### Example 3: Publish with Custom Tag
 
 ```bash
-aam publish --tag beta
+aam pkg publish --tag beta
 ```
 
 Publishes and tags the version as `beta`. Users can install with:
@@ -81,7 +85,7 @@ aam install my-package@beta
 ### Example 4: Dry Run
 
 ```bash
-aam publish --dry-run
+aam pkg publish --dry-run
 ```
 
 **Output:**
@@ -96,24 +100,24 @@ Publishing my-package@1.0.0 to local...
 ### Example 5: Missing Archive
 
 ```bash
-aam publish
+aam pkg publish
 ```
 
 **Output:**
 ```
-Error: No archive found. Run 'aam pack' first.
+Error: No archive found. Run 'aam pkg pack' first.
 ```
 
 Solution:
 
 ```bash
-aam pack && aam publish
+aam pkg pack && aam pkg publish
 ```
 
 ### Example 6: No Registries Configured
 
 ```bash
-aam publish
+aam pkg publish
 ```
 
 **Output:**
@@ -124,7 +128,7 @@ Error: No registries configured. Run 'aam registry init' to create one.
 ### Example 7: Registry Not Found
 
 ```bash
-aam publish --registry nonexistent
+aam pkg publish --registry nonexistent
 ```
 
 **Output:**
@@ -141,7 +145,7 @@ Error: Registry 'nonexistent' not found. Run 'aam registry list'.
 
 ## Publishing Flow
 
-When you run `aam publish`:
+When you run `aam pkg publish`:
 
 1. Load manifest to get package name and version
 2. Find `.aam` archive in directory
@@ -171,8 +175,8 @@ aam install my-package@stable
 
 ## Related Commands
 
-- [`aam pack`](pack.md) - Create distributable archive
-- [`aam validate`](validate.md) - Validate before publishing
+- [`aam pkg pack`](pack.md) - Create distributable archive
+- [`aam pkg validate`](validate.md) - Validate before publishing
 - [`aam registry list`](registry-list.md) - List configured registries
 
 ## Notes
@@ -199,16 +203,16 @@ Typical publishing workflow:
 
 ```bash
 # 1. Create or update package
-aam validate
+aam pkg validate
 
 # 2. Pack archive
-aam pack
+aam pkg pack
 
 # 3. Publish to registry
-aam publish
+aam pkg publish
 
 # Or chain commands:
-aam validate && aam pack && aam publish
+aam pkg validate && aam pkg pack && aam pkg publish
 ```
 
 ### Version Conflicts
@@ -243,13 +247,13 @@ If you have multiple registries:
 
 ```bash
 # Publish to default
-aam publish
+aam pkg publish
 
 # Publish to company internal registry
-aam publish --registry company-internal
+aam pkg publish --registry company-internal
 
 # Publish to public registry
-aam publish --registry aam-central
+aam pkg publish --registry aam-central
 ```
 
 ### Archive Naming
@@ -274,7 +278,7 @@ Advanced tagging workflow:
 
 ```bash
 # Publish as beta first
-aam publish --tag beta
+aam pkg publish --tag beta
 
 # After testing, promote to latest
 aam dist-tag add my-package@1.0.0 latest
@@ -291,8 +295,8 @@ Example for automated publishing:
 # .github/workflows/publish.yml
 - name: Pack and publish
   run: |
-    aam pack
-    aam publish --registry internal
+    aam pkg pack
+    aam pkg publish --registry internal
   env:
     AAM_REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
 ```

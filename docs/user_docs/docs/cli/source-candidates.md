@@ -15,7 +15,7 @@ sources. Candidates are artifacts discovered in source repositories that
 have not yet been packaged in the current workspace.
 
 Use this to find artifacts you can package with
-`aam create-package --from-source`.
+`aam pkg create --from-source`.
 
 ## Options
 
@@ -56,6 +56,6 @@ aam source candidates --source openai/skills --type skill
 
 ## See also
 
-- [aam create-package](create-package.md) - Create a package (supports
+- [aam pkg create](create-package.md) - Create a package (supports
   `--from-source`)
 - [aam source scan](source-scan.md) - Scan a source for artifacts

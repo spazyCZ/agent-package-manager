@@ -86,7 +86,7 @@ With AAM, you get:
 
 ```mermaid
 flowchart LR
-    Author["📦 Package Author"] -->|aam publish| Registry["🗄️ Registry"]
+    Author["📦 Package Author"] -->|aam pkg publish| Registry["🗄️ Registry"]
     Registry -->|aam install| User["👤 User"]
     User -->|deploys to| Platforms["🤖 AI Platforms<br/>(Cursor, Claude, etc.)"]
 

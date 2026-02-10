@@ -351,12 +351,12 @@ The archive contains the complete package directory tree.
 
 ```bash
 # Build a distributable .aam archive
-aam pack
+aam pkg pack
 
 # Output: dist/my-package-1.0.0.aam
 ```
 
-The `pack` command:
+The `pkg pack` command:
 
 1. Validates `aam.yaml`
 2. Verifies all artifact paths exist
@@ -452,7 +452,7 @@ du -sh .
 du -sh * | sort -hr | head -n 10
 
 # Pack and check archive size
-aam pack
+aam pkg pack
 ls -lh dist/
 ```
 

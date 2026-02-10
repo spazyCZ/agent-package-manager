@@ -97,10 +97,13 @@ Create a new directory for your first package:
 mkdir -p ~/code-reviewer && cd ~/code-reviewer
 ```
 
+!!! tip "Client vs package setup"
+    In a directory where you only *consume* packages (e.g. a project that uses `aam install`), run `aam init` to set up the client (config, lock file). Here we're *creating* a new package, so we use `aam pkg init`.
+
 Initialize a new package interactively:
 
 ```bash
-aam init
+aam pkg init
 ```
 
 **Follow the prompts:**
@@ -228,7 +231,7 @@ platforms:
 Validate your package structure:
 
 ```bash
-aam validate
+aam pkg validate
 ```
 
 **Expected output:**
@@ -252,7 +255,7 @@ Artifacts:
 Build the package archive:
 
 ```bash
-aam pack
+aam pkg pack
 ```
 
 **Expected output:**
@@ -276,7 +279,7 @@ Building code-reviewer@1.0.0...
 Publish your package to the local registry:
 
 ```bash
-aam publish --registry local
+aam pkg publish --registry local
 ```
 
 **Expected output:**
@@ -420,9 +423,9 @@ Here's a recap of the workflow:
 
 ```mermaid
 flowchart LR
-    Create["1️⃣ Create Package<br/>(aam init)"] --> Validate["2️⃣ Validate<br/>(aam validate)"]
-    Validate --> Pack["3️⃣ Pack<br/>(aam pack)"]
-    Pack --> Publish["4️⃣ Publish<br/>(aam publish)"]
+    Create["1️⃣ Create Package<br/>(aam pkg init)"] --> Validate["2️⃣ Validate<br/>(aam pkg validate)"]
+    Validate --> Pack["3️⃣ Pack<br/>(aam pkg pack)"]
+    Pack --> Publish["4️⃣ Publish<br/>(aam pkg publish)"]
     Publish --> Registry["📦 Registry<br/>(~/my-packages)"]
     Registry --> Install["5️⃣ Install<br/>(aam install)"]
     Install --> Deploy["6️⃣ Deploy<br/>(.cursor/skills/)"]
@@ -432,10 +435,10 @@ flowchart LR
     style Deploy fill:#e8f5e9
 ```
 
-1. **Created a package** — Defined a package with `aam.yaml` and a skill artifact
-2. **Validated** — Checked that the package structure is correct
-3. **Packed** — Built a distributable `.aam` archive
-4. **Published** — Uploaded to a local file-based registry
+1. **Created a package** — Defined a package with `aam.yaml` and a skill artifact (`aam pkg init`)
+2. **Validated** — Checked that the package structure is correct (`aam pkg validate`)
+3. **Packed** — Built a distributable `.aam` archive (`aam pkg pack`)
+4. **Published** — Uploaded to a local file-based registry (`aam pkg publish`)
 5. **Installed** — Downloaded and resolved dependencies (none in this case)
 6. **Deployed** — Placed files in `.cursor/skills/` for Cursor to discover
 
@@ -455,6 +458,7 @@ You've completed the quick start! Here's where to go from here:
 
 ### Explore Advanced Features
 
+- **Keeping packages up to date** — Use `aam outdated` to list packages with newer versions and `aam upgrade` to upgrade them
 - **[Dependencies](../concepts/dependencies.md)** — Learn how to declare and resolve dependencies between packages
 - **[Dist-Tags](../concepts/dist-tags.md)** — Use named aliases like `stable` or `beta` for versions
 - **[Signing Packages](../tutorials/signing-packages.md)** — Sign packages with Sigstore or GPG for authenticity
@@ -533,6 +537,6 @@ In just 5 minutes, you:
 - ✅ Installed it in another directory
 - ✅ Verified deployment to Cursor
 
-You now understand the core AAM workflow: **create → validate → pack → publish → install → deploy**.
+You now understand the core AAM workflow: **create → validate → pack → publish → install → deploy**. To check for newer versions of installed packages, use `aam outdated`; to upgrade them, use `aam upgrade`.
 
 Ready to build something more complex? Continue to [Your First Package](first-package.md) for an extended tutorial with all artifact types.

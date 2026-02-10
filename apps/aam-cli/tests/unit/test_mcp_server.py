@@ -43,9 +43,11 @@ class TestMCPServerFactory:
 
     @pytest.mark.asyncio
     async def test_unit_create_server_read_only(self) -> None:
-        """Verify only 13 read tools listed when allow_write=False.
+        """Verify only 16 read tools listed when allow_write=False.
 
-        7 spec-002 read tools + 6 spec-003 read tools = 13.
+        7 spec-002 read tools + 6 spec-003 read tools
+        + 2 spec-004 read tools (outdated, available)
+        + 1 spec-004 init info tool = 16.
         """
         server = create_mcp_server(allow_write=False)
         # -----
@@ -54,7 +56,7 @@ class TestMCPServerFactory:
         async with Client(server) as client:
             tools = await client.list_tools()
             tool_names = [t.name for t in tools]
-            assert len(tool_names) == 13
+            assert len(tool_names) == 16
             # -----
             # Spec 002 read-only tools
             # -----
@@ -75,6 +77,12 @@ class TestMCPServerFactory:
             assert "aam_verify" in tool_names
             assert "aam_diff" in tool_names
             # -----
+            # Spec 004 read-only tools
+            # -----
+            assert "aam_outdated" in tool_names
+            assert "aam_available" in tool_names
+            assert "aam_init_info" in tool_names
+            # -----
             # Write tools should NOT be present
             # -----
             assert "aam_install" not in tool_names
@@ -85,15 +93,16 @@ class TestMCPServerFactory:
 
     @pytest.mark.asyncio
     async def test_unit_create_server_allow_write(self) -> None:
-        """Verify all 23 tools listed when allow_write=True.
+        """Verify all 28 tools listed when allow_write=True.
 
-        13 read tools + 7 spec-002 write + 3 spec-003 write = 23.
+        16 read tools + 7 spec-002 write + 3 spec-003 write
+        + 1 spec-004 upgrade + 1 spec-004 init = 28.
         """
         server = create_mcp_server(allow_write=True)
         async with Client(server) as client:
             tools = await client.list_tools()
             tool_names = [t.name for t in tools]
-            assert len(tool_names) == 23
+            assert len(tool_names) == 28
             # -----
             # Check spec 002 write tools present
             # -----
@@ -110,6 +119,11 @@ class TestMCPServerFactory:
             assert "aam_source_add" in tool_names
             assert "aam_source_remove" in tool_names
             assert "aam_source_update" in tool_names
+            # -----
+            # Check spec 004 write tools present
+            # -----
+            assert "aam_upgrade" in tool_names
+            assert "aam_init" in tool_names
 
     @pytest.mark.asyncio
     async def test_unit_server_resources(self) -> None:

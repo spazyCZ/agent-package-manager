@@ -149,7 +149,7 @@ If you remove the default registry, AAM will not have a default:
 ```bash
 aam registry remove local  # Was default
 
-aam publish  # Error: no default registry
+aam pkg publish  # Error: no default registry
 ```
 
 Solution: Set a new default:

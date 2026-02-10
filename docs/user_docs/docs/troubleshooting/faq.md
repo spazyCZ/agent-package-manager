@@ -114,10 +114,10 @@ platforms:
 ### How do I publish a package?
 
 ```bash
-aam init my-package        # Create package
-aam validate               # Validate
-aam pack                   # Build archive
-aam publish                # Publish to registry
+aam pkg init my-package    # Scaffold new package (or aam pkg create from existing)
+aam pkg validate           # Validate
+aam pkg pack               # Build archive
+aam pkg publish            # Publish to registry
 ```
 
 ### Do I need to sign packages?
@@ -125,7 +125,7 @@ aam publish                # Publish to registry
 No, but it's recommended for security:
 
 ```bash
-aam publish --sign
+aam pkg publish --sign
 ```
 
 ### Can I unpublish a package?
@@ -141,7 +141,7 @@ Yanked versions can't be installed but remain for existing users.
 ### How do I update a published package?
 
 1. Increment version in `aam.yaml`
-2. Run `aam publish`
+2. Run `aam pkg publish`
 
 ## Dependencies
 
@@ -200,7 +200,7 @@ aam registry add <new-registry> --default
 Optionally. Authors can sign with Sigstore or GPG:
 
 ```bash
-aam publish --sign
+aam pkg publish --sign
 ```
 
 ### How do I verify signatures?
@@ -276,14 +276,14 @@ pip install aam
 
 # Use token for authentication
 export AAM_TOKEN=$SECRET_TOKEN
-aam publish
+aam pkg publish
 ```
 
 ### How do I migrate from manual skills to AAM?
 
 ```bash
 # Auto-detect existing artifacts
-aam create-package
+aam pkg create
 
 # Creates package from current project
 ```
@@ -295,7 +295,7 @@ See [Migration Guide](migration.md) for details.
 Yes:
 
 ```bash
-aam build --target cursor
+aam pkg build --target cursor
 ```
 
 Creates a pre-built bundle for Cursor only.

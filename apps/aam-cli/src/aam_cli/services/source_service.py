@@ -135,6 +135,62 @@ class SourceChangeReport:
     has_changes: bool = False
 
 
+@dataclass
+class VirtualPackage:
+    """A source artifact represented as a virtual installable package.
+
+    Created during source index building. Provides all information
+    needed to install directly from a source without explicit packaging.
+
+    Attributes:
+        name: Unqualified artifact name (e.g., ``code-review``).
+        qualified_name: Source-qualified name (e.g., ``my-source/code-review``).
+        source_name: Source display name.
+        type: Artifact type: ``skill``, ``agent``, ``prompt``,
+            or ``instruction``.
+        path: Relative path from source root.
+        commit_sha: Source HEAD commit SHA at index build time.
+        cache_dir: Absolute path to the cached source clone.
+        description: Extracted from SKILL.md or artifact metadata.
+        has_vendor_agent: True if companion vendor agent exists.
+        vendor_agent_file: Path to vendor agent file, if any.
+    """
+
+    name: str
+    qualified_name: str
+    source_name: str
+    type: str
+    path: str
+    commit_sha: str
+    cache_dir: str
+    description: str | None = None
+    has_vendor_agent: bool = False
+    vendor_agent_file: str | None = None
+
+
+@dataclass
+class ArtifactIndex:
+    """Index of all artifacts across all configured sources.
+
+    Provides fast lookup by name (unqualified) and qualified name.
+
+    Attributes:
+        by_name: Mapping of unqualified names to lists of
+            :class:`VirtualPackage` (multiple if ambiguous).
+        by_qualified_name: Mapping of qualified (``source/name``)
+            names to a single :class:`VirtualPackage`.
+        total_count: Total number of indexed artifacts.
+        sources_indexed: Number of sources successfully indexed.
+        build_timestamp: ISO 8601 timestamp of when the index was built.
+    """
+
+    by_name: dict[str, list[VirtualPackage]] = field(default_factory=dict)
+    by_qualified_name: dict[str, VirtualPackage] = field(default_factory=dict)
+    total_count: int = 0
+    sources_indexed: int = 0
+    build_timestamp: str = ""
+
+
 ################################################################################
 #                                                                              #
 # CONSTANTS                                                                    #
@@ -930,3 +986,181 @@ def register_default_sources() -> dict[str, Any]:
         "registered": registered,
         "skipped": skipped,
     }
+
+
+################################################################################
+#                                                                              #
+# PUBLIC API: SOURCE INDEX & RESOLUTION (spec 004)                             #
+#                                                                              #
+################################################################################
+
+
+def build_source_index(config: AamConfig | None = None) -> ArtifactIndex:
+    """Build an in-memory index of all artifacts across configured sources.
+
+    Iterates each configured source, scans the cache using existing
+    logic, and builds :class:`VirtualPackage` entries for O(1) lookup.
+
+    Args:
+        config: AAM configuration. Loaded from disk if not provided.
+
+    Returns:
+        Populated :class:`ArtifactIndex`.
+    """
+    if config is None:
+        config = load_config()
+
+    logger.info(
+        f"Building source artifact index: sources={len(config.sources)}"
+    )
+
+    index = ArtifactIndex(
+        build_timestamp=datetime.now(UTC).isoformat(),
+    )
+
+    for source_entry in config.sources:
+        try:
+            # -----
+            # Resolve cache path from URL components
+            # -----
+            parsed = parse(source_entry.url)
+            cache_dir = get_cache_dir(parsed.host, parsed.owner, parsed.repo)
+
+            if not validate_cache(cache_dir):
+                logger.warning(
+                    f"Cache missing for source '{source_entry.name}', "
+                    f"skipping. Run 'aam source update {source_entry.name}'."
+                )
+                continue
+
+            # -----
+            # Get commit and scan
+            # -----
+            commit_sha = get_head_sha(cache_dir)
+            scan_result = _scan_cached_source(
+                cache_dir,
+                source_entry.name,
+                source_entry.path,
+                commit_sha,
+            )
+
+            # -----
+            # Build VirtualPackage for each discovered artifact
+            # -----
+            for artifact in scan_result.artifacts:
+                qualified = f"{source_entry.name}/{artifact.name}"
+
+                vp = VirtualPackage(
+                    name=artifact.name,
+                    qualified_name=qualified,
+                    source_name=source_entry.name,
+                    type=artifact.type,
+                    path=artifact.path,
+                    commit_sha=commit_sha,
+                    cache_dir=str(cache_dir),
+                    description=artifact.description,
+                    has_vendor_agent=artifact.has_vendor_agent,
+                    vendor_agent_file=artifact.vendor_agent_file,
+                )
+
+                # -----
+                # Index by qualified name (unique)
+                # -----
+                index.by_qualified_name[qualified] = vp
+
+                # -----
+                # Index by unqualified name (may have duplicates)
+                # -----
+                if artifact.name not in index.by_name:
+                    index.by_name[artifact.name] = []
+                index.by_name[artifact.name].append(vp)
+
+                index.total_count += 1
+
+            index.sources_indexed += 1
+
+        except (ValueError, OSError) as e:
+            logger.warning(
+                f"Failed to index source '{source_entry.name}': {e}"
+            )
+
+    logger.info(
+        f"Source index built: total={index.total_count}, "
+        f"sources={index.sources_indexed}"
+    )
+
+    return index
+
+
+def resolve_artifact(
+    name: str,
+    index: ArtifactIndex,
+) -> VirtualPackage:
+    """Resolve an artifact name to a :class:`VirtualPackage`.
+
+    Resolution order:
+      1. Qualified name (``source/artifact``): direct lookup
+      2. Unqualified name: first match wins (config order),
+         warns if ambiguous
+
+    Args:
+        name: Artifact name, qualified or unqualified.
+        index: Pre-built :class:`ArtifactIndex`.
+
+    Returns:
+        Resolved :class:`VirtualPackage`.
+
+    Raises:
+        ValueError: If the artifact is not found or ambiguous
+            without suggestion.
+    """
+    logger.info(f"Resolving artifact: name='{name}'")
+
+    # -----
+    # Step 1: Try qualified name lookup (contains "/")
+    # -----
+    if "/" in name:
+        vp = index.by_qualified_name.get(name)
+        if vp:
+            logger.info(f"Resolved via qualified name: {name}")
+            return vp
+
+        raise ValueError(
+            f"[AAM_ARTIFACT_NOT_FOUND] Artifact '{name}' not found in "
+            f"any configured source. "
+            f"Run 'aam source update --all' to refresh, or "
+            f"'aam list --available' to see what's available."
+        )
+
+    # -----
+    # Step 2: Try unqualified name lookup
+    # -----
+    matches = index.by_name.get(name)
+
+    if not matches:
+        raise ValueError(
+            f"[AAM_ARTIFACT_NOT_FOUND] Artifact '{name}' not found in "
+            f"any configured source. "
+            f"Run 'aam source update --all' to refresh, or "
+            f"'aam search {name}' to search registries."
+        )
+
+    # -----
+    # Use first match (config order), warn if ambiguous
+    # -----
+    if len(matches) > 1:
+        sources_list = ", ".join(m.source_name for m in matches)
+        logger.warning(
+            f"Ambiguous artifact '{name}' found in multiple sources: "
+            f"{sources_list}. Using first match: '{matches[0].source_name}'. "
+            f"Use qualified name (e.g., '{matches[0].qualified_name}') "
+            f"to be explicit."
+        )
+
+    resolved = matches[0]
+    logger.info(
+        f"Resolved artifact: name='{name}', "
+        f"source='{resolved.source_name}', type='{resolved.type}'"
+    )
+
+    return resolved

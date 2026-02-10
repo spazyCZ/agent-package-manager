@@ -407,4 +407,160 @@ def register_write_tools(mcp: FastMCP) -> None:
             update_all=update_all,
         )
 
-    logger.info("Registered 10 write MCP tools")
+    ############################################################################
+    #                                                                          #
+    # UPGRADE TOOL (spec 004)                                                  #
+    #                                                                          #
+    ############################################################################
+
+    @mcp.tool(tags={"write"})
+    def aam_upgrade(
+        package_name: str | None = None,
+        dry_run: bool = False,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        """Upgrade outdated source-installed packages.
+
+        Without package_name, upgrades all outdated packages. Specify
+        a package_name to upgrade a single package. Checks for local
+        modifications before overwriting; use force=True to skip.
+
+        Args:
+            package_name: Name of a specific package to upgrade.
+                If None, upgrades all outdated packages.
+            dry_run: If True, preview changes without applying.
+            force: If True, skip modification warnings and overwrite.
+
+        Returns:
+            Upgrade result dict with upgraded, skipped, and failed
+            package lists.
+        """
+        from rich.console import Console
+
+        from aam_cli.commands.outdated import check_outdated
+        from aam_cli.commands.upgrade import upgrade_packages
+        from aam_cli.core.workspace import read_lock_file
+
+        logger.info(
+            f"MCP tool aam_upgrade: package={package_name}, "
+            f"dry_run={dry_run}, force={force}"
+        )
+
+        config = load_config()
+        project_dir = Path.cwd()
+        lock = read_lock_file(project_dir)
+
+        # -----
+        # Step 1: Check outdated
+        # -----
+        outdated_result = check_outdated(lock, config)
+
+        if not outdated_result.outdated:
+            return {
+                "upgraded": [],
+                "skipped": [],
+                "failed": [],
+                "total_upgraded": 0,
+                "message": "All packages are up to date.",
+            }
+
+        # -----
+        # Step 2: Filter targets
+        # -----
+        targets = outdated_result.outdated
+        if package_name:
+            targets = [o for o in targets if o.name == package_name]
+            if not targets:
+                return {
+                    "upgraded": [],
+                    "skipped": [],
+                    "failed": [],
+                    "total_upgraded": 0,
+                    "message": (
+                        f"Package '{package_name}' is not outdated "
+                        f"or not installed from a source."
+                    ),
+                }
+
+        # -----
+        # Step 3: Execute upgrade
+        # -----
+        console = Console(quiet=True)
+        result = upgrade_packages(
+            targets=targets,
+            config=config,
+            project_dir=project_dir,
+            force=force,
+            dry_run=dry_run,
+            console=console,
+        )
+
+        return {
+            "upgraded": result.upgraded,
+            "skipped": result.skipped,
+            "failed": result.failed,
+            "total_upgraded": result.total_upgraded,
+        }
+
+    ############################################################################
+    #                                                                          #
+    # CLIENT INIT TOOL (spec 004)                                              #
+    #                                                                          #
+    ############################################################################
+
+    @mcp.tool(tags={"write"})
+    def aam_init(
+        platform: str,
+        skip_sources: bool = False,
+    ) -> dict[str, Any]:
+        """Initialize the AAM client for a specific AI platform.
+
+        Sets the default platform in the global configuration and
+        optionally registers community artifact sources.
+
+        Args:
+            platform: AI platform to configure. Choices:
+                cursor, copilot, claude, codex.
+            skip_sources: If True, skip registering default community
+                sources.
+
+        Returns:
+            Init result dict with platform, config_path,
+            sources_added, and is_reconfigure flag.
+        """
+        from aam_cli.services.client_init_service import (
+            SUPPORTED_PLATFORMS,
+            orchestrate_init,
+        )
+
+        logger.info(
+            f"MCP tool aam_init: platform='{platform}', "
+            f"skip_sources={skip_sources}"
+        )
+
+        # -----
+        # Validate platform
+        # -----
+        if platform not in SUPPORTED_PLATFORMS:
+            return {
+                "error": (
+                    f"Unsupported platform '{platform}'. "
+                    f"Choose from: {', '.join(SUPPORTED_PLATFORMS)}"
+                ),
+            }
+
+        result = orchestrate_init(
+            platform=platform,
+            skip_sources=skip_sources,
+        )
+
+        return {
+            "platform": result.platform,
+            "config_path": str(result.config_path),
+            "sources_added": result.sources_added,
+            "registry_created": result.registry_created,
+            "registry_name": result.registry_name,
+            "is_reconfigure": result.is_reconfigure,
+        }
+
+    logger.info("Registered 12 write MCP tools")

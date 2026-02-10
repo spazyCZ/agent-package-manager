@@ -40,7 +40,7 @@ Sigstore provides "keyless" signing using your existing identity providers (GitH
 pip install sigstore
 
 # Publish with Sigstore signing
-aam publish --sign
+aam pkg publish --sign
 
 # Interactive OIDC flow:
 # 1. Browser opens for GitHub/Google login
@@ -134,7 +134,7 @@ aam config set security.gpg_key alice@example.com
 
 ```bash
 # Publish with GPG signing
-aam publish --sign --signing-method gpg
+aam pkg publish --sign --signing-method gpg
 
 # Enter GPG passphrase when prompted
 ```
@@ -215,7 +215,7 @@ Registry administrators can enforce signing:
 REQUIRE_SIGNATURES=true
 
 # Now all published packages must be signed
-aam publish
+aam pkg publish
 # Error: Package must be signed. Use --sign flag.
 ```
 
@@ -282,7 +282,7 @@ Signatures stored in database and S3:
 
 1. **Always sign packages:**
    ```bash
-   aam publish --sign
+   aam pkg publish --sign
    ```
 
 2. **Use Sigstore for simplicity:**
@@ -364,7 +364,7 @@ Signatures stored in database and S3:
 
 2. **Manual OIDC flow:**
    ```bash
-   aam publish --sign --oidc-manual
+   aam pkg publish --sign --oidc-manual
    ```
 
 3. **Use different issuer:**
@@ -442,7 +442,7 @@ Sign with multiple keys for redundancy:
 
 ```bash
 # Sign with multiple keys
-aam publish --sign --gpg-keys alice@example.com,backup@example.com
+aam pkg publish --sign --gpg-keys alice@example.com,backup@example.com
 ```
 
 ### Signature Delegation

@@ -8,6 +8,7 @@ site_author: AAM Team
 repo_url: https://github.com/spazyCZ/agent-package-manager
 repo_name: agent-package-manager
 edit_uri: edit/main/docs/user_docs/docs/
+use_directory_urls: false
 
 theme:
   name: material
@@ -95,6 +96,9 @@ markdown_extensions:
   - pymdownx.tilde
 
 extra:
+  analytics:
+    provider: google
+    property: G-T07MY8H6RE
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/spazyCZ/agent-package-manager
@@ -129,19 +133,26 @@ nav:
     - Workspaces & Lock Files: concepts/workspaces.md
   - CLI Reference:
     - cli/index.md
+    - Getting Started:
+      - aam init: cli/init.md
     - Package Management:
       - aam install: cli/install.md
       - aam uninstall: cli/uninstall.md
+      - aam upgrade: cli/upgrade.md
+      - aam outdated: cli/outdated.md
+      - aam search: cli/search.md
       - aam list: cli/list.md
       - aam info: cli/info.md
-      - aam search: cli/search.md
-    - Package Authoring:
-      - aam init: cli/init.md
-      - aam create-package: cli/create-package.md
-      - aam validate: cli/validate.md
-      - aam pack: cli/pack.md
-      - aam publish: cli/publish.md
-      - aam build: cli/build.md
+    - Package Integrity:
+      - aam verify: cli/verify.md
+      - aam diff: cli/diff.md
+    - Package Authoring (aam pkg):
+      - aam pkg init: cli/pkg-init.md
+      - aam pkg create: cli/create-package.md
+      - aam pkg validate: cli/validate.md
+      - aam pkg pack: cli/pack.md
+      - aam pkg publish: cli/publish.md
+      - aam pkg build: cli/build.md
     - Source Management:
       - aam source add: cli/source-add.md
       - aam source scan: cli/source-scan.md
@@ -149,9 +160,6 @@ nav:
       - aam source list: cli/source-list.md
       - aam source remove: cli/source-remove.md
       - aam source candidates: cli/source-candidates.md
-    - Package Integrity:
-      - aam verify: cli/verify.md
-      - aam diff: cli/diff.md
     - Registry Management:
       - aam registry init: cli/registry-init.md
       - aam registry add: cli/registry-add.md

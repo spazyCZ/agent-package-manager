@@ -312,9 +312,9 @@ def install(
             return
 
     # -----
-    # Registry-based install
+    # Registry-based install (with source fallback)
     # -----
-    _install_from_registry(
+    _install_from_registry_or_source(
         ctx,
         console,
         package,
@@ -334,7 +334,7 @@ def install(
 ################################################################################
 
 
-def _install_from_registry(
+def _install_from_registry_or_source(
     ctx: click.Context,
     console: Console,
     package_spec: str,
@@ -345,7 +345,13 @@ def _install_from_registry(
     force: bool,
     dry_run: bool,
 ) -> None:
-    """Install a package from configured registries."""
+    """Install a package from registries, with source fallback.
+
+    Resolution order per spec 004 research.md R3:
+      1. Qualified name (contains "/"): try source index directly
+      2. Registry lookup (unqualified): try configured registries
+      3. Source fallback (unqualified): try source artifact index
+    """
     # -----
     # Step 1: Parse package spec
     # -----
@@ -357,18 +363,6 @@ def _install_from_registry(
         return
 
     # -----
-    # Check for configured registries
-    # -----
-    if not config.registries:
-        console.print(
-            "[red]Error:[/red] No registries configured. "
-            "Run 'aam registry init' to create one, then "
-            "'aam registry add' to register it."
-        )
-        ctx.exit(1)
-        return
-
-    # -----
     # Check if already installed
     # -----
     if not force and is_package_installed(pkg_name, project_dir):
@@ -376,67 +370,164 @@ def _install_from_registry(
         existing = lock.packages.get(pkg_name)
         if existing:
             console.print(
-                f"{pkg_name}@{existing.version} is already installed. Use --force to reinstall."
+                f"{pkg_name}@{existing.version} is already installed. "
+                f"Use --force to reinstall."
             )
             return
 
-    constraint = pkg_version or "*"
-    console.print(f"Resolving {pkg_name}@{constraint}...")
+    # -----
+    # Step 2: Try qualified name in source index (if contains "/")
+    # -----
+    if "/" in package_spec and not pkg_version:
+        try:
+            _try_install_from_source(
+                ctx, console, package_spec, project_dir,
+                config, platform_name, no_deploy, force, dry_run,
+            )
+            return
+        except ValueError:
+            pass  # Fall through to registry
 
     # -----
-    # Step 2: Get registries
+    # Step 3: Try registry resolution
     # -----
-    registries = []
-    for reg_source in config.registries:
-        registries.append(create_registry(reg_source))
+    registry_resolved = False
 
-    # -----
-    # Step 3: Resolve dependencies
-    # -----
-    try:
-        resolved = resolve_dependencies(
-            [(pkg_name, constraint)],
-            registries,
-        )
-    except ValueError as exc:
-        console.print(f"[red]Error:[/red] {exc}")
-        ctx.exit(1)
-        return
+    if config.registries:
+        constraint = pkg_version or "*"
+        console.print(f"Resolving {pkg_name}@{constraint}...")
 
-    for pkg in resolved:
-        console.print(f"  + {pkg.name}@{pkg.version}")
+        registries = []
+        for reg_source in config.registries:
+            registries.append(create_registry(reg_source))
 
-    if dry_run:
-        console.print("\n[yellow]\\[Dry run — no packages installed][/yellow]")
-        return
+        try:
+            resolved = resolve_dependencies(
+                [(pkg_name, constraint)],
+                registries,
+            )
 
-    # -----
-    # Step 4: Install
-    # -----
-    adapter = None
-    if not no_deploy:
-        if not is_supported_platform(platform_name):
+            for pkg in resolved:
+                console.print(f"  + {pkg.name}@{pkg.version}")
+
+            if dry_run:
+                console.print(
+                    "\n[yellow]\\[Dry run — no packages installed][/yellow]"
+                )
+                return
+
+            adapter = None
+            if not no_deploy:
+                if not is_supported_platform(platform_name):
+                    console.print(
+                        f"[red]Error:[/red] Unsupported platform "
+                        f"'{platform_name}'. "
+                        "Supported: cursor, copilot, claude, codex"
+                    )
+                    ctx.exit(1)
+                    return
+                adapter = create_adapter(platform_name, project_dir)
+
+            installed = install_packages(
+                resolved,
+                adapter,
+                config,
+                project_dir,
+                no_deploy=no_deploy,
+                force=force,
+            )
+
             console.print(
-                f"[red]Error:[/red] Unsupported platform '{platform_name}'. "
-                "Supported: cursor, copilot, claude, codex"
+                f"\n[green]✓[/green] Installed {len(installed)} packages"
             )
-            ctx.exit(1)
-            return
-        adapter = create_adapter(platform_name, project_dir)
+            registry_resolved = True
 
-    installed = install_packages(
-        resolved,
-        adapter,
-        config,
-        project_dir,
-        no_deploy=no_deploy,
-        force=force,
+        except ValueError:
+            # -----
+            # Registry resolution failed — fall through to source
+            # -----
+            logger.debug(
+                f"Registry resolution failed for '{pkg_name}', "
+                f"trying source fallback"
+            )
+
+    # -----
+    # Step 4: Source fallback for unqualified names
+    # -----
+    if not registry_resolved:
+        try:
+            _try_install_from_source(
+                ctx, console, pkg_name, project_dir,
+                config, platform_name, no_deploy, force, dry_run,
+            )
+        except ValueError as exc:
+            console.print(f"[red]Error:[/red] {exc}")
+            ctx.exit(1)
+
+
+def _try_install_from_source(
+    ctx: click.Context,
+    console: Console,
+    artifact_name: str,
+    project_dir: Path,
+    config: "AamConfig",  # noqa: F821
+    platform_name: str,
+    no_deploy: bool,
+    force: bool,
+    dry_run: bool,
+) -> None:
+    """Attempt to install an artifact from source index.
+
+    Args:
+        artifact_name: Qualified or unqualified artifact name.
+
+    Raises:
+        ValueError: If the artifact cannot be found in sources.
+    """
+    from aam_cli.services.source_service import (
+        build_source_index,
+        resolve_artifact,
+    )
+    from aam_cli.services.install_service import install_from_source
+
+    console.print(f"Searching sources for '{artifact_name}'...")
+
+    index = build_source_index(config)
+    virtual_package = resolve_artifact(artifact_name, index)
+
+    console.print(
+        f"  Found [bold]{virtual_package.name}[/bold] "
+        f"({virtual_package.type}) in source "
+        f"[cyan]{virtual_package.source_name}[/cyan]"
     )
 
-    # -----
-    # Summary
-    # -----
-    console.print(f"\n[green]✓[/green] Installed {len(installed)} packages")
+    if dry_run:
+        console.print(
+            "\n[yellow]\\[Dry run — no packages installed][/yellow]"
+        )
+        return
+
+    result = install_from_source(
+        virtual_package=virtual_package,
+        project_dir=project_dir,
+        platform_name=platform_name,
+        config=config,
+        force=force,
+        no_deploy=no_deploy,
+    )
+
+    if result["status"] == "already_installed":
+        console.print(
+            f"'{virtual_package.name}' is already installed. "
+            f"Use --force to reinstall."
+        )
+        return
+
+    console.print(
+        f"\n[green]✓[/green] Installed [bold]{virtual_package.name}[/bold] "
+        f"from source [cyan]{virtual_package.source_name}[/cyan] "
+        f"@ {virtual_package.commit_sha[:8]}"
+    )
 
 
 ################################################################################

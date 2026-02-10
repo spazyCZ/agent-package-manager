@@ -97,10 +97,10 @@ The package author publishes:
 cd my-package/
 
 # Build the package
-aam pack
+aam pkg pack
 
 # Publish to the shared registry
-aam publish --registry team
+aam pkg publish --registry team
 ```
 
 Expected output:
@@ -138,8 +138,8 @@ When you publish a new version:
 # Bump version in aam.yaml
 # version: 1.1.0
 
-aam pack
-aam publish --registry team
+aam pkg pack
+aam pkg publish --registry team
 ```
 
 The registry structure becomes:
@@ -239,10 +239,10 @@ The package author:
 cd my-package/
 
 # Pack the package
-aam pack
+aam pkg pack
 
 # Publish to the git registry
-aam publish --registry team
+aam pkg publish --registry team
 
 # The registry is now updated locally
 cd ~/aam-registry
@@ -280,7 +280,7 @@ For more controlled publishing:
 ```bash
 # Publish to a branch
 git checkout -b publish/python-toolkit-1.0.0
-aam publish --registry team
+aam pkg publish --registry team
 git add .
 git commit -m "Publish @myteam/python-toolkit@1.0.0"
 git push origin publish/python-toolkit-1.0.0
@@ -387,8 +387,8 @@ aam registry add team file:///C:/Users/yourname/Dropbox/aam-registry --default
 ### Publishing
 
 ```bash
-aam pack
-aam publish --registry team
+aam pkg pack
+aam pkg publish --registry team
 
 # Dropbox automatically syncs to teammates
 ```
@@ -408,7 +408,7 @@ You can skip the registry entirely and share `.aam` files directly:
 
 ```bash
 # Pack the package
-aam pack
+aam pkg pack
 
 # Share dist/my-package-1.0.0.aam via Slack, email, etc.
 ```
@@ -660,7 +660,7 @@ You've learned how to share AAM packages with your team using:
 aam registry init <path>                   # Create new registry
 aam registry add <name> <url> [--default]  # Add registry
 aam registry list                          # View configured registries
-aam publish --registry <name>              # Publish to specific registry
+aam pkg publish --registry <name>              # Publish to specific registry
 aam registry update <name>                 # Sync registry (git-based)
 ```
 

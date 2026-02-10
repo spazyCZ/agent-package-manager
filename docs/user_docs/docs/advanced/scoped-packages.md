@@ -65,7 +65,7 @@ aam search --scope mycompany
 
 ```bash
 # Create scoped package
-aam init @alice/my-agent
+aam pkg init @alice/my-agent
 
 # Interactive prompts
 Package name: @alice/my-agent
@@ -122,7 +122,7 @@ name: "@alice/my-agent"  # Scoped
 
 ```bash
 # Publish scoped package
-aam publish
+aam pkg publish
 
 # Package name from aam.yaml: @alice/my-agent
 # Published as: @alice/my-agent@1.0.0
@@ -199,7 +199,7 @@ aam register
 # Scope @alice is automatically yours
 
 # Publish to your scope
-aam publish
+aam pkg publish
 # Package: @alice/my-agent
 # ✓ Published (you own @alice scope)
 ```
@@ -214,7 +214,7 @@ aam publish
 # Members can publish to @mycompany/*
 
 # Member publishes
-aam publish
+aam pkg publish
 # Package: @mycompany/internal-tool
 # ✓ Published (member of @mycompany)
 ```
@@ -253,7 +253,7 @@ private: true  # Only accessible to scope members
 
 ```bash
 # Publish private package
-aam publish
+aam pkg publish
 # ✓ Published @mycompany/secret-agent@1.0.0 (private)
 
 # Install requires authentication
@@ -283,8 +283,8 @@ version: 2.0.0
 ### Step 3: Publish
 
 ```bash
-aam pack
-aam publish
+aam pkg pack
+aam pkg publish
 
 # Now available as @alice/my-agent@2.0.0
 ```

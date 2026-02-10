@@ -1,11 +1,15 @@
-# aam pack
+# aam pack (deprecated)
 
 **Package Authoring**
+
+!!! warning "Deprecated"
+    `aam pack` is deprecated and will be removed in v0.3.0.
+    Use [`aam pkg pack`](pack.md) instead. The command still works but prints a deprecation warning.
 
 ## Synopsis
 
 ```bash
-aam pack [PATH]
+aam pkg pack [PATH]
 ```
 
 ## Description
@@ -29,7 +33,7 @@ This command has no command-specific options.
 ### Example 1: Pack Current Directory
 
 ```bash
-aam pack
+aam pkg pack
 ```
 
 **Output:**
@@ -47,7 +51,7 @@ Building my-package@1.0.0...
 ### Example 2: Pack Specific Directory
 
 ```bash
-aam pack ./my-package/
+aam pkg pack ./my-package/
 ```
 
 Creates archive in the package directory.
@@ -56,7 +60,7 @@ Creates archive in the package directory.
 
 ```bash
 cd my-scoped-package
-aam pack
+aam pkg pack
 ```
 
 **Output:**
@@ -72,19 +76,19 @@ Building @author/my-package@2.0.0...
 ### Example 4: Validation Failure
 
 ```bash
-aam pack
+aam pkg pack
 ```
 
 **Output:**
 ```
-Error: Package validation failed. Run 'aam validate' for details.
+Error: Package validation failed. Run 'aam pkg validate' for details.
   ✗ Missing: agents/broken-agent/
 ```
 
 ### Example 5: Large Package
 
 ```bash
-aam pack
+aam pkg pack
 ```
 
 **Output:**
@@ -104,7 +108,7 @@ Building large-package@1.0.0...
 ### Example 6: Minimal Package
 
 ```bash
-aam pack
+aam pkg pack
 ```
 
 **Output:**
@@ -179,8 +183,8 @@ Error: Archive size exceeds 50 MB limit (actual: 65.3 MB)
 
 ## Related Commands
 
-- [`aam validate`](validate.md) - Validate before packing
-- [`aam publish`](publish.md) - Publish the archive to a registry
+- [`aam pkg validate`](validate.md) - Validate before packing
+- [`aam pkg publish`](publish.md) - Publish the archive to a registry
 - [`aam install`](install.md) - Install from an archive file
 
 ## Notes
@@ -190,7 +194,7 @@ Error: Archive size exceeds 50 MB limit (actual: 65.3 MB)
 The pack command runs validation automatically. If validation fails, packing is aborted. You can pre-validate with:
 
 ```bash
-aam validate && aam pack
+aam pkg validate && aam pkg pack
 ```
 
 ### Checksum
@@ -229,16 +233,16 @@ Typical workflow:
 
 ```bash
 # 1. Validate package
-aam validate
+aam pkg validate
 
 # 2. Pack archive
-aam pack
+aam pkg pack
 
 # 3. Publish to registry
-aam publish
+aam pkg publish
 
 # Or combine:
-aam validate && aam pack && aam publish
+aam pkg validate && aam pkg pack && aam pkg publish
 ```
 
 ### Local Installation
@@ -246,7 +250,7 @@ aam validate && aam pack && aam publish
 You can install directly from the packed archive without publishing:
 
 ```bash
-aam pack
+aam pkg pack
 aam install ./my-package-1.0.0.aam
 ```
 
@@ -258,7 +262,7 @@ Example GitHub Actions workflow:
 
 ```yaml
 - name: Pack package
-  run: aam pack
+  run: aam pkg pack
 
 - name: Upload artifact
   uses: actions/upload-artifact@v3

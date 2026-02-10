@@ -1,18 +1,22 @@
-# aam create-package
+# aam create-package (deprecated)
 
 **Package Authoring**
+
+!!! warning "Deprecated"
+    `aam create-package` is deprecated and will be removed in v0.3.0.
+    Use [`aam pkg create`](create-package.md) instead. The command still works but prints a deprecation warning.
 
 ## Synopsis
 
 ```bash
-aam create-package [PATH] [OPTIONS]
+aam pkg create [PATH] [OPTIONS]
 ```
 
 ## Description
 
 Create an AAM package from an existing project by auto-detecting artifacts. Scans the project for skills, agents, prompts, and instructions, allows interactive selection, and generates `aam.yaml` with proper artifact references.
 
-Use this when you have existing artifacts in your project that aren't yet managed by AAM. For new packages, use [`aam init`](init.md) instead.
+Use this when you have existing artifacts in your project that aren't yet managed by AAM. For new packages, use [`aam pkg init`](init.md) instead.
 
 ## Arguments
 
@@ -43,7 +47,7 @@ Use this when you have existing artifacts in your project that aren't yet manage
 ### Example 1: Interactive Creation
 
 ```bash
-aam create-package
+aam pkg create
 ```
 
 **Output:**
@@ -88,15 +92,15 @@ Creating package...
   5 artifacts (2 skills, 1 agents, 2 prompts)
 
 Next steps:
-  aam validate    — verify the package is well-formed
-  aam pack        — build distributable .aam archive
-  aam publish     — publish to registry
+  aam pkg validate    — verify the package is well-formed
+  aam pkg pack        — build distributable .aam archive
+  aam pkg publish     — publish to registry
 ```
 
 ### Example 2: Include All Artifacts
 
 ```bash
-aam create-package --all --name my-package --yes
+aam pkg create --all --name my-package --yes
 ```
 
 Non-interactive mode: detects and includes all artifacts without prompting.
@@ -104,7 +108,7 @@ Non-interactive mode: detects and includes all artifacts without prompting.
 ### Example 3: Filter by Type
 
 ```bash
-aam create-package --type skill --type agent
+aam pkg create --type skill --type agent
 ```
 
 Only detects skills and agents, ignoring prompts and instructions.
@@ -112,7 +116,7 @@ Only detects skills and agents, ignoring prompts and instructions.
 ### Example 4: Reference Mode (No Copying)
 
 ```bash
-aam create-package --organize reference
+aam pkg create --organize reference
 ```
 
 Creates `aam.yaml` with artifact paths pointing to existing locations. Files are not copied or moved.
@@ -129,7 +133,7 @@ artifacts:
 ### Example 5: Move Files
 
 ```bash
-aam create-package --organize move
+aam pkg create --organize move
 ```
 
 Moves artifact files into the AAM package structure instead of copying (destructive).
@@ -137,7 +141,7 @@ Moves artifact files into the AAM package structure instead of copying (destruct
 ### Example 6: Manual Includes
 
 ```bash
-aam create-package --include ./custom-skill/ --include-as skill
+aam pkg create --include ./custom-skill/ --include-as skill
 ```
 
 Manually includes `./custom-skill/` as a skill, even if auto-detection doesn't find it.
@@ -145,7 +149,7 @@ Manually includes `./custom-skill/` as a skill, even if auto-detection doesn't f
 ### Example 7: Dry Run Preview
 
 ```bash
-aam create-package --dry-run
+aam pkg create --dry-run
 ```
 
 **Output:**
@@ -178,7 +182,7 @@ Would create:
 ### Example 8: Scoped Package
 
 ```bash
-aam create-package --scope mycompany --name internal-tools
+aam pkg create --scope mycompany --name internal-tools
 ```
 
 Creates `@mycompany/internal-tools`.
@@ -186,7 +190,7 @@ Creates `@mycompany/internal-tools`.
 ### Example 9: Custom Output Directory
 
 ```bash
-aam create-package --output-dir ./packages/my-new-package
+aam pkg create --output-dir ./packages/my-new-package
 ```
 
 Creates package files in the specified output directory instead of the scanned directory.
@@ -256,9 +260,9 @@ Moves artifact files into the AAM structure. Original files are deleted.
 
 ## Related Commands
 
-- [`aam init`](init.md) - Initialize a new package from scratch
-- [`aam validate`](validate.md) - Validate the created package
-- [`aam pack`](pack.md) - Build distributable archive
+- [`aam pkg init`](init.md) - Initialize a new package from scratch
+- [`aam pkg validate`](validate.md) - Validate the created package
+- [`aam pkg pack`](pack.md) - Build distributable archive
 
 ## Notes
 
@@ -287,7 +291,7 @@ If no artifacts are detected:
 
 ```
 No unmanaged artifacts found in this project.
-Use 'aam init' to create a new package from scratch.
+Use 'aam pkg init' to create a new package from scratch.
 ```
 
 ### Large Projects
@@ -295,7 +299,7 @@ Use 'aam init' to create a new package from scratch.
 For large projects with many artifacts, filtering by type can speed up scanning:
 
 ```bash
-aam create-package --type skill
+aam pkg create --type skill
 ```
 
 ### Post-Creation Steps
@@ -304,6 +308,6 @@ After creating the package:
 
 1. Review `aam.yaml` and edit descriptions
 2. Add any missing metadata (repository, keywords)
-3. Run `aam validate` to check correctness
+3. Run `aam pkg validate` to check correctness
 4. Test locally with `aam install ./`
 5. Pack and publish when ready

@@ -10,7 +10,7 @@ Enable verbose output with debug-level logging.
 
 ```bash
 aam install my-package --verbose
-aam validate -v
+aam pkg validate -v
 ```
 
 When enabled:
@@ -117,7 +117,7 @@ Set the logging level without using `--verbose`.
 **Usage:**
 ```bash
 export AAM_LOG_LEVEL=DEBUG
-aam validate
+aam pkg validate
 ```
 
 ### AAM_CACHE_DIR

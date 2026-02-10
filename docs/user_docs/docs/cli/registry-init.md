@@ -150,7 +150,7 @@ Initially empty, populated when you publish packages.
 
 - [`aam registry add`](registry-add.md) - Register the initialized registry
 - [`aam registry list`](registry-list.md) - List all registries
-- [`aam publish`](publish.md) - Publish packages to the registry
+- [`aam pkg publish`](publish.md) - Publish packages to the registry
 
 ## Notes
 

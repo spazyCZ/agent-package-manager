@@ -160,13 +160,13 @@ aam registry list
 
 ```bash
 # Publish package (requires authentication)
-aam publish
+aam pkg publish
 
 # Publish with signing
-aam publish --sign
+aam pkg publish --sign
 
 # Publish to specific registry
-aam publish --registry central
+aam pkg publish --registry central
 ```
 
 ### Install from HTTP Registry
@@ -192,7 +192,7 @@ aam token create --name "ci-token" --expires 90d
 # Token is saved in ~/.aam/credentials.json
 # Use in CI/CD:
 export AAM_TOKEN=your-token-here
-aam publish
+aam pkg publish
 ```
 
 ### Package Operations
@@ -251,7 +251,7 @@ Enable package signing to verify artifact integrity:
 REQUIRE_SIGNATURES=true
 
 # Publish with signature
-aam publish --sign
+aam pkg publish --sign
 
 # Install with verification
 aam install @author/my-package --verify-signature

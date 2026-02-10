@@ -159,7 +159,7 @@ Names must be unique.
 
 The default registry is used for:
 
-- `aam publish` (without `--registry` flag)
+- `aam pkg publish` (without `--registry` flag)
 - First source for `aam search` and `aam install`
 
 Set a default when adding:

@@ -14,7 +14,7 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from aam_cli.utils.paths import (
     ensure_project_workspace,
@@ -64,6 +64,32 @@ class LockedPackage(BaseModel):
     # Backward compatible: None for packages installed before this feature
     # -----
     file_checksums: FileChecksums | None = None
+
+    # -----
+    # Source tracking fields (spec 004)
+    # Enables outdated detection and upgrade from git sources.
+    # Co-presence rule: both None or both set.
+    # -----
+    source_name: str | None = None
+    source_commit: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_source_fields(self) -> "LockedPackage":
+        """Ensure source_name and source_commit are either both set or both None.
+
+        Raises:
+            ValueError: If only one of the pair is set.
+        """
+        has_name = self.source_name is not None
+        has_commit = self.source_commit is not None
+
+        if has_name != has_commit:
+            raise ValueError(
+                "source_name and source_commit must both be set or both be None. "
+                f"Got source_name={self.source_name!r}, source_commit={self.source_commit!r}"
+            )
+
+        return self
 
 
 class LockFile(BaseModel):

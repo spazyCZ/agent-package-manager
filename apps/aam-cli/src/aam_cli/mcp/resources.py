@@ -214,4 +214,44 @@ def register_resources(mcp: FastMCP) -> None:
             logger.debug(f"Source not found for candidates: {source_name}")
             return []
 
-    logger.info("Registered 8 MCP resources")
+    ############################################################################
+    #                                                                          #
+    # CLIENT INIT RESOURCE (spec 004)                                          #
+    #                                                                          #
+    ############################################################################
+
+    @mcp.resource("aam://init_status")
+    def resource_init_status() -> dict[str, Any]:
+        """Read the current client initialization status.
+
+        Returns detected platform, current config, and setup completeness
+        based on the global configuration state.
+
+        Returns:
+            Init status dict with detected_platform, current_platform,
+            sources_configured, and is_initialized flag.
+        """
+        from aam_cli.services.client_init_service import (
+            SUPPORTED_PLATFORMS,
+            detect_platform,
+        )
+
+        logger.debug("MCP resource aam://init_status accessed")
+
+        config = get_config(key=None)
+        config_data = config.get("value", {})
+
+        detected = detect_platform()
+        current_platform = config_data.get("default_platform")
+        sources = config_data.get("sources", {})
+
+        return {
+            "detected_platform": detected,
+            "current_platform": current_platform,
+            "supported_platforms": SUPPORTED_PLATFORMS,
+            "is_initialized": current_platform is not None,
+            "sources_configured": len(sources),
+            "source_names": list(sources.keys()) if sources else [],
+        }
+
+    logger.info("Registered 9 MCP resources")

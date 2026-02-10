@@ -305,7 +305,9 @@ aam search code-reviewer
 **Expected output:**
 
 ```
-code-reviewer  1.0.0  A simple code review skill for Python
+    Search results for "code-reviewer" (1 match)
+ Name            Version  Type   Source  Description
+ code-reviewer   1.0.0    skill  local   A simple code review skill for Python
 ```
 
 !!! success "You published a package!"

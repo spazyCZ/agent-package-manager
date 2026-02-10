@@ -287,7 +287,7 @@ class TestSearchCommand:
         self.runner = CliRunner()
 
     def test_unit_search_no_registries(self) -> None:
-        """Test search shows error when no registries configured."""
+        """Test search shows error when no registries or sources configured."""
         with self.runner.isolated_filesystem() as tmpdir:
             # Isolate HOME so global ~/.aam/config.yaml is not read
             result = self.runner.invoke(
@@ -296,7 +296,7 @@ class TestSearchCommand:
                 env={"HOME": tmpdir},
             )
             assert result.exit_code != 0
-            assert "No registries configured" in result.output
+            assert "No registries or sources configured" in result.output
 
 
 ################################################################################

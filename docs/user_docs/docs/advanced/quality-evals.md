@@ -357,7 +357,7 @@ jobs:
 
 2. **Compare packages:**
    ```bash
-   aam search "code-reviewer" --sort-by quality
+   aam search "code-reviewer" --sort relevance
    ```
 
 3. **Verify recent evaluation:**

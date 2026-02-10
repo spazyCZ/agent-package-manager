@@ -10,10 +10,9 @@ import asyncio
 import logging
 from unittest.mock import patch
 
-import pytest
+from fastmcp import Client
 
 from aam_cli.mcp.server import create_mcp_server
-from fastmcp import Client
 
 ################################################################################
 #                                                                              #
@@ -38,50 +37,151 @@ class TestReadTools:
         return asyncio.run(coro)
 
     def test_unit_aam_search_returns_results(self) -> None:
-        """Mock search_service, verify tool returns list."""
-        mock_results = [
-            {
-                "name": "test-pkg",
-                "version": "1.0.0",
-                "description": "Test",
-                "author": None,
-                "artifact_types": ["skill"],
-                "registry": "local",
-            }
-        ]
-        with patch(
-            "aam_cli.mcp.tools_read.search_packages",
-            return_value=mock_results,
+        """Mock search_service, verify tool returns dict with results."""
+        from aam_cli.services.search_service import SearchResponse, SearchResult
+
+        mock_response = SearchResponse(
+            results=[
+                SearchResult(
+                    name="test-pkg",
+                    version="1.0.0",
+                    description="Test",
+                    artifact_types=["skill"],
+                    origin="local",
+                    origin_type="registry",
+                    score=80,
+                )
+            ],
+            total_count=1,
+            warnings=[],
+            all_names=[],
+        )
+        with (
+            patch(
+                "aam_cli.mcp.tools_read.search_packages",
+                return_value=mock_response,
+            ),
+            patch("aam_cli.mcp.tools_read.load_config"),
         ):
-            with patch("aam_cli.mcp.tools_read.load_config"):
-                server = create_mcp_server(allow_write=False)
+            server = create_mcp_server(allow_write=False)
 
-                async def check() -> None:
-                    async with Client(server) as client:
-                        result = await client.call_tool(
-                            "aam_search", {"query": "test"}
-                        )
-                        assert result is not None
+            async def check() -> None:
+                async with Client(server) as client:
+                    result = await client.call_tool(
+                        "aam_search", {"query": "test"}
+                    )
+                    assert result is not None
 
-                self._run_async(check())
+            self._run_async(check())
 
     def test_unit_aam_search_empty_query(self) -> None:
         """Verify empty results returned for empty query."""
-        with patch(
-            "aam_cli.mcp.tools_read.search_packages",
-            return_value=[],
+        from aam_cli.services.search_service import SearchResponse
+
+        mock_response = SearchResponse(
+            results=[],
+            total_count=0,
+            warnings=[],
+            all_names=[],
+        )
+        with (
+            patch(
+                "aam_cli.mcp.tools_read.search_packages",
+                return_value=mock_response,
+            ),
+            patch("aam_cli.mcp.tools_read.load_config"),
         ):
-            with patch("aam_cli.mcp.tools_read.load_config"):
-                server = create_mcp_server(allow_write=False)
+            server = create_mcp_server(allow_write=False)
 
-                async def check() -> None:
-                    async with Client(server) as client:
-                        result = await client.call_tool(
-                            "aam_search", {"query": ""}
-                        )
-                        assert result is not None
+            async def check() -> None:
+                async with Client(server) as client:
+                    result = await client.call_tool(
+                        "aam_search", {"query": ""}
+                    )
+                    assert result is not None
 
-                self._run_async(check())
+            self._run_async(check())
+
+    def test_unit_aam_search_new_params(self) -> None:
+        """Verify new search parameters (package_types, source_filter, etc.)."""
+        from aam_cli.services.search_service import SearchResponse, SearchResult
+
+        mock_response = SearchResponse(
+            results=[
+                SearchResult(
+                    name="skill-pkg",
+                    version="1.0.0",
+                    description="A skill",
+                    artifact_types=["skill"],
+                    origin="local",
+                    origin_type="registry",
+                    score=100,
+                )
+            ],
+            total_count=1,
+            warnings=[],
+            all_names=[],
+        )
+        with (
+            patch(
+                "aam_cli.mcp.tools_read.search_packages",
+                return_value=mock_response,
+            ),
+            patch("aam_cli.mcp.tools_read.load_config"),
+        ):
+            server = create_mcp_server(allow_write=False)
+
+            async def check() -> None:
+                async with Client(server) as client:
+                    result = await client.call_tool(
+                        "aam_search",
+                        {
+                            "query": "skill",
+                            "package_types": ["skill"],
+                            "sort_by": "name",
+                        },
+                    )
+                    assert result is not None
+
+            self._run_async(check())
+
+    def test_unit_aam_search_response_structure(self) -> None:
+        """Verify response has results, total_count, warnings keys."""
+        from aam_cli.services.search_service import SearchResponse, SearchResult
+
+        mock_response = SearchResponse(
+            results=[
+                SearchResult(
+                    name="test-pkg",
+                    version="1.0.0",
+                    description="Test",
+                    artifact_types=["skill"],
+                    origin="local",
+                    origin_type="registry",
+                    score=80,
+                )
+            ],
+            total_count=1,
+            warnings=["Test warning"],
+            all_names=[],
+        )
+        with (
+            patch(
+                "aam_cli.mcp.tools_read.search_packages",
+                return_value=mock_response,
+            ),
+            patch("aam_cli.mcp.tools_read.load_config"),
+        ):
+            server = create_mcp_server(allow_write=False)
+
+            async def check() -> None:
+                async with Client(server) as client:
+                    result = await client.call_tool(
+                        "aam_search", {"query": "test"}
+                    )
+                    assert result is not None
+
+            self._run_async(check())
 
     def test_unit_aam_list_no_workspace(self) -> None:
         """Verify empty list (not error) when no workspace."""

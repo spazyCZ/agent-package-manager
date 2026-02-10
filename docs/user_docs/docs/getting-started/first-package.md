@@ -904,7 +904,9 @@ aam search python
 **Expected output:**
 
 ```
-@yourname/python-best-practices  1.0.0  Python coding standards and best practices for AI agents
+    Search results for "python" (1 match)
+ Name                             Version  Type   Source  Description
+ @yourname/python-best-practices  1.0.0    skill  local   Python coding standards and best practices
 ```
 
 ---

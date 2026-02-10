@@ -62,29 +62,46 @@ def register_read_tools(mcp: FastMCP) -> None:
     def aam_search(
         query: str,
         limit: int = 10,
-        package_type: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """Search configured registries for AAM packages.
+        package_types: list[str] | None = None,
+        source_filter: str | None = None,
+        registry_filter: str | None = None,
+        sort_by: str = "relevance",
+    ) -> dict[str, Any]:
+        """Search configured registries and sources for AAM packages.
 
-        Returns a list of matching packages with name, version,
-        description, and artifact types.
+        Returns a structured response with scored, ranked results,
+        total count, and any warnings.
 
         Args:
-            query: Search query (case-insensitive substring match).
+            query: Search query (case-insensitive). Empty string for browse mode.
             limit: Maximum results to return (1-50, default 10).
-            package_type: Filter by artifact type (skill, agent, prompt, instruction).
+            package_types: Filter by artifact types (OR logic).
+                Valid: skill, agent, prompt, instruction.
+            source_filter: Limit to a specific git source name.
+            registry_filter: Limit to a specific registry name.
+            sort_by: Sort order — relevance, name, or recent (default: relevance).
 
         Returns:
-            List of search results with package metadata.
+            Dict with results, total_count, and warnings.
         """
-        logger.info(f"MCP tool aam_search: query='{query}', limit={limit}")
+        logger.info(
+            f"MCP tool aam_search: query='{query}', limit={limit}, "
+            f"types={package_types}, sort={sort_by}"
+        )
         config = load_config()
-        return search_packages(
+        response = search_packages(
             query=query,
             config=config,
             limit=limit,
-            package_type=package_type,
+            package_types=package_types,
+            source_filter=source_filter,
+            registry_filter=registry_filter,
+            sort_by=sort_by,
         )
+        result = response.model_dump(mode="json")
+        # Remove all_names — internal use only
+        result.pop("all_names", None)
+        return result
 
     @mcp.tool(tags={"read"})
     def aam_list() -> list[dict[str, Any]]:

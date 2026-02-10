@@ -341,8 +341,8 @@ Signatures stored in database and S3:
 
 3. **Audit signing compliance:**
    ```bash
-   # Check unsigned packages
-   aam search --filter unsigned
+   # Check package signing status
+   aam info @author/my-package
    ```
 
 4. **Integrate with CI/CD:**

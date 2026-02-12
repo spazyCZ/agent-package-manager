@@ -34,7 +34,7 @@ Pick the path that best describes what you want to do:
 
     Already using custom skills, prompts, or agent configs in `.cursor/`, `.claude/`, or elsewhere? Package them for versioning and sharing.
 
-    [:octicons-arrow-right-24: Package Existing Artifacts](../tutorials/package-existing-artifacts.md)
+    [:octicons-arrow-right-24: Package Existing Artifacts](../tutorials/package-existing-skills.md)
 
 </div>
 

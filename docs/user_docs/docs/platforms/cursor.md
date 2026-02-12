@@ -581,6 +581,6 @@ rm .cursor/rules/agent-author--asvc-audit.mdc
 ## Next Steps
 
 - [Platform Overview](index.md) - Compare all platforms
-- [Configuration: Cursor](../configuration/platforms.md#cursor) - Detailed configuration reference
-- [Tutorial: Install a Package](../tutorials/install-package.md) - Hands-on installation guide
+- [Configuration: Project config](../configuration/project.md) - Platform settings
+- [Getting Started: Quick Start](../getting-started/quickstart.md) - Hands-on installation guide
 - [Concepts: Platform Adapters](../concepts/platform-adapters.md) - Deep dive into adapter architecture

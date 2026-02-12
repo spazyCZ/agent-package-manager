@@ -551,5 +551,5 @@ quality:
 
 - **Learn about artifact types:** See [Artifacts](artifacts.md) for detailed schemas
 - **Understand dependencies:** See [Dependencies](dependencies.md) for resolution details
-- **Publish your package:** See [CLI Reference - publish](../cli-reference/publish.md)
+- **Publish your package:** See [CLI Reference - publish](../cli/publish.md)
 - **Deploy to platforms:** See [Platform Adapters](platform-adapters.md)

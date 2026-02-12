@@ -203,5 +203,5 @@ aam search my-query --verbose
 
 ## Related Documentation
 
-- [Configuration File](../configuration/config-file.md) - Configuration file format
+- [Configuration File](../configuration/global.md) - Configuration file format
 - [Environment Setup](../getting-started/installation.md) - Initial setup

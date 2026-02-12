@@ -14,7 +14,7 @@ All tutorials include:
 - **Clear explanations** of what's happening at each step
 
 !!! tip "New to AAM?"
-    Start with [Packaging Existing Skills](#packaging-existing-skills) to learn the basics, then move on to [Building a Code Review Package](#building-a-code-review-package) for a complete end-to-end workflow.
+    Start with [Packaging Existing Skills](package-existing-skills.md) to learn the basics, then move on to [Building a Code Review Package](build-code-review-package.md) for a complete end-to-end example.
 
 ---
 
@@ -22,7 +22,7 @@ All tutorials include:
 
 <div class="grid cards" markdown>
 
--   :material-package-variant:{ .lg .middle } __Packaging Existing Skills__
+-   :material-package-variant:{ .lg .middle } __Packaging Existing Skills__ {#packaging-existing-skills}
 
     ---
 
@@ -33,7 +33,7 @@ All tutorials include:
 
     [:octicons-arrow-right-24: Start tutorial](package-existing-skills.md)
 
--   :material-hammer-wrench:{ .lg .middle } __Building a Code Review Package__
+-   :material-hammer-wrench:{ .lg .middle } __Building a Code Review Package__ {#building-a-code-review-package}
 
     ---
 
@@ -105,7 +105,7 @@ Once you've completed these tutorials, you'll be ready to:
 
 For deeper dives into specific topics, check out:
 
-- [CLI Reference](../cli-reference/index.md) - Complete command documentation
+- [CLI Reference](../cli/index.md) - Complete command documentation
 - [Configuration Guide](../configuration/index.md) - Advanced configuration options
 - [Platform Guides](../platforms/index.md) - Platform-specific deployment details
 - [Advanced Topics](../advanced/index.md) - Security, governance, and custom registries
@@ -118,7 +118,7 @@ If you run into issues while following these tutorials:
 
 1. Check the [Troubleshooting Guide](../troubleshooting/index.md)
 2. Run `aam doctor` to diagnose common problems
-3. Review the relevant [CLI reference](../cli-reference/index.md) for command details
+3. Review the relevant [CLI reference](../cli/index.md) for command details
 4. Ask in the [GitHub Discussions](https://github.com/aam-dev/aam/discussions)
 
 Happy learning!

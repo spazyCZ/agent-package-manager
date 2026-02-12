@@ -308,7 +308,7 @@ Yes! AAM can run as an MCP server:
 aam mcp serve
 ```
 
-See [MCP Integration](../tutorials/mcp-integration.md) for details.
+See [MCP tool integration](../concepts/git-sources.md#mcp-tool-integration) for details.
 
 ## Performance
 

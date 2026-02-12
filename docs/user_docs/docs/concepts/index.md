@@ -133,6 +133,6 @@ Understanding these concepts helps you work more effectively with AAM:
 ## Next Steps
 
 - **New to AAM?** Start with [Getting Started](../getting-started/index.md) for practical tutorials
-- **Looking for commands?** See [CLI Reference](../cli-reference/index.md) for command documentation
+- **Looking for commands?** See [CLI Reference](../cli/index.md) for command documentation
 - **Want to dive deep?** Continue reading the concepts in order
 - **Need help?** Check [Troubleshooting](../troubleshooting/index.md) for common issues

@@ -538,4 +538,4 @@ This updates deprecated fields and validates the schema.
 
 - [Project Configuration](project.md) - Override global settings per-project
 - [Security Configuration](security.md) - Advanced security policies
-- [CLI Reference: config](../cli/config.md) - `aam config` commands
+- [CLI Reference: config](../cli/config-list.md) - `aam config` commands

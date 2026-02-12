@@ -789,7 +789,7 @@ aam info <package>                   # View dependency information
 
 ## Next Steps
 
-- **[CLI Reference](../cli-reference/index.md)** - Complete command documentation
+- **[CLI Reference](../cli/index.md)** - Complete command documentation
 - **[Configuration Guide](../configuration/index.md)** - Advanced dependency configuration
 - **[Troubleshooting](../troubleshooting/index.md)** - Resolve common dependency issues
 

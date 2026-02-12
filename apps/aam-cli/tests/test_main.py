@@ -467,7 +467,8 @@ class TestPackCommand:
 
             result = self.runner.invoke(cli, ["pack"])
             assert result.exit_code == 0
-            assert "test-pkg-1.0.0.aam" in result.output
+            # Archive file should be created on disk
+            assert Path("test-pkg-1.0.0.aam").exists()
 
 
 ################################################################################

@@ -78,19 +78,22 @@ class TestCommandRegistration:
     """Test that all expected commands are registered."""
 
     EXPECTED_COMMANDS = [
-        "build",
         "config",
-        "create-package",
+        "diff",
+        "doctor",
         "info",
         "init",
         "install",
         "list",
-        "pack",
-        "publish",
+        "mcp",
+        "outdated",
+        "pkg",
         "registry",
         "search",
+        "source",
         "uninstall",
-        "validate",
+        "upgrade",
+        "verify",
     ]
 
     def setup_method(self) -> None:

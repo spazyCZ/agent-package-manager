@@ -36,6 +36,7 @@ venv.bak/
 # Build outputs
 dist/
 *.local
+docs/user_docs/site/
 
 # IDE
 .idea/
@@ -83,3 +84,13 @@ Thumbs.db
 *.key
 .cache/
 tmp/
+.github/skills/
+.github/prompts/
+.github/copilot-instructions.md
+.github/instructions/
+.cursor/
+.vscode/
+scripts/
+docs/work/
+.specify/
+.claude/

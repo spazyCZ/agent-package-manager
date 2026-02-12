@@ -14,6 +14,7 @@
 3. [Package Format](#3-package-format)
 4. [Artifact Definitions](#4-artifact-definitions)
 5. [CLI Design](#5-cli-design)
+   - [5.3 MCP Server Mode](#53-mcp-server-mode)
 6. [Registry Design](#6-registry-design)
 7. [Dependency Resolution](#7-dependency-resolution)
 8. [Platform Adapters](#8-platform-adapters)
@@ -50,9 +51,9 @@ AI practitioners create reusable artifacts (skills, prompts, agent configuration
 | P0 | Multi-platform deployment (Cursor, Copilot, Claude, Codex) |
 | P0 | Dependency resolution between packages |
 | P1 | Git-based registry for package discovery and distribution |
-| P1 | `aam init` / `aam publish` workflow for package authors |
+| P1 | `aam pkg init` / `aam pkg publish` workflow for package authors |
+| P1 | Namespace/scope support (`@author/package-name`) |
 | P2 | Version pinning and lock files |
-| P2 | Namespace/scope support (e.g., `@myorg/asvc-auditor`) |
 
 ### Non-Goals (v1)
 
@@ -105,6 +106,17 @@ A **workspace** is a project directory where AAM operates. It contains:
 - `.aam/` — local AAM state (installed packages, config)
 - `aam.yaml` — project-level manifest (optional, for projects that are themselves packages)
 
+### 2.6 Local-First Principle
+
+AAM follows a **local-first architecture**. The CLI is fully functional without any server-side infrastructure. All core operations — create, validate, pack, publish, search, install, deploy — work against local file-based registries. The HTTP registry (aam-backend) adds collaboration features (auth, signing verification, download stats, governance approvals) but is **never required** for the core packaging workflow.
+
+This means:
+
+- A single developer can try AAM in under 5 minutes with zero infrastructure
+- Teams can share packages via a shared filesystem, NFS, or a git-synced directory
+- The HTTP registry is an optional upgrade, not a prerequisite
+- The CLI has zero required network dependencies; `httpx` is only imported when an HTTP registry is configured
+
 ---
 
 ## 3. Package Format
@@ -115,11 +127,11 @@ The manifest is the heart of every package. It uses YAML for readability.
 
 ```yaml
 # aam.yaml — Package Manifest
-name: asvc-auditor
+name: "@author/asvc-auditor"        # Scoped package name (@scope/name format)
 version: 1.0.0
 description: "ASVC audit agent with reporting skill and prompts"
-author: spazy
-license: MIT
+author: author
+license: Apache-2.0
 repository: https://github.com/spazy/asvc-auditor
 
 # Artifact declarations — what this package provides
@@ -148,8 +160,9 @@ artifacts:
       description: "Coding standards for ASVC-compliant projects"
 
 # Dependencies — other AAM packages this package requires
+# Both scoped (@scope/name) and unscoped (name) dependencies are supported
 dependencies:
-  generic-auditor: ">=1.0.0"
+  "@author/generic-auditor": ">=1.0.0"
   report-templates: "^2.0.0"
 
 # Platform-specific deployment configuration
@@ -176,7 +189,8 @@ keywords:
 
 ```yaml
 # Required fields
-name: string            # ^[a-z0-9][a-z0-9-]*$ , max 64 chars
+name: string            # ^(@[a-z0-9][a-z0-9_-]{0,63}/)?[a-z0-9][a-z0-9-]{0,63}$
+                        # Unscoped: "my-package" or scoped: "@author/my-package"
 version: string         # semver: MAJOR.MINOR.PATCH
 description: string     # max 256 chars
 
@@ -215,6 +229,20 @@ platforms:
   copilot: CopilotConfig
   claude: ClaudeConfig
   codex: CodexConfig
+
+# Quality: tests and evals (optional)
+quality:
+  tests:
+    - name: string          # test name (e.g., "unit-tests")
+      command: string       # shell command to run (e.g., "pytest tests/")
+      description: string   # what this test verifies
+  evals:
+    - name: string          # eval name (e.g., "accuracy-eval")
+      path: string          # path to eval definition file
+      description: string   # what this eval measures
+      metrics:
+        - name: string      # metric name (e.g., "accuracy")
+          type: string      # percentage, score, duration_ms, boolean
 ```
 
 ### 3.3 Package Directory Structure
@@ -251,10 +279,113 @@ asvc-auditor-1.0.0.aam
 The archive contains the full package directory. This mirrors the `.skill` format from Codex but is generalized for all artifact types.
 
 **Archive constraints:**
-- Maximum size: **50 MB** (enforced by `aam pack` and registry upload)
+- Maximum size: **50 MB** (enforced by `aam pkg pack` and registry upload)
 - Must contain `aam.yaml` at root
 - No symlinks outside package directory
 - No absolute paths
+
+### 3.5 Dist-Tags
+
+Dist-tags are **named aliases for package versions**, enabling `aam install @org/agent@stable` or org-specific gates like `bank-approved`.
+
+#### Default Tags
+
+| Tag | Behavior |
+|-----|----------|
+| `latest` | Automatically set to the newest published version on each `aam pkg publish` |
+| `stable` | Opt-in; set manually via `aam dist-tag add` or `aam pkg publish --tag stable` |
+
+#### Custom Tags
+
+Organizations can define arbitrary tags (e.g., `staging`, `bank-approved`, `qa-passed`).
+
+**Tag rules:**
+- Lowercase alphanumeric + hyphens only
+- Max 32 characters
+- Cannot be a valid semver string (prevents ambiguity with version specifiers)
+
+#### CLI Commands
+
+```bash
+# Publish and tag in one step
+aam pkg publish --tag beta
+
+# Manage tags after publish
+aam dist-tag add @org/agent@1.2.0 stable
+aam dist-tag rm @org/agent stable
+aam dist-tag ls @org/agent
+
+# Install using a tag
+aam install @org/agent@stable
+```
+
+#### Resolution
+
+When `aam install @org/agent@stable` is invoked:
+
+1. Look up the `stable` tag in the package metadata (either `metadata.yaml` for local registries or the API for HTTP registries)
+2. Resolve the tag to a concrete version (e.g., `1.2.0`)
+3. Proceed with normal version resolution and install
+
+#### Local Registry Support
+
+Dist-tags are stored in `metadata.yaml` per-package (see [Section 6.2](#62-local-registry)). The `aam dist-tag` commands update `metadata.yaml` directly for local registries, or call the API for HTTP registries. This means `aam install @org/agent@stable` works fully offline.
+
+### 3.6 Portable Bundles
+
+A portable bundle is a **self-contained, pre-compiled archive** for a specific target platform. It contains all artifacts already transformed and ready to deploy, with no dependency resolution needed.
+
+**Why bundles exist:** Not everyone will use the registry from day one. Portable bundles enable manual sharing (Slack, email, git) of pre-compiled artifacts — a critical on-ramp for adoption.
+
+**Building bundles:**
+
+```bash
+aam pkg build --target cursor
+# Produces: dist/my-package-1.0.0-cursor.bundle.aam
+
+aam pkg build --target copilot
+# Produces: dist/my-package-1.0.0-copilot.bundle.aam
+
+aam pkg build --target all
+# Produces one bundle per configured platform
+```
+
+**Bundle structure (tar.gz internally):**
+
+```
+my-package-1.0.0-cursor.bundle.aam
+├── bundle.json            # Bundle manifest (target, platform version, checksums)
+├── .cursor/
+│   ├── skills/...         # Pre-compiled platform-specific artifacts
+│   ├── rules/...
+│   └── prompts/...
+└── aam.yaml               # Original manifest for reference
+```
+
+**`bundle.json` schema:**
+
+```json
+{
+  "format": "aam-bundle",
+  "version": "1.0",
+  "package": "@author/my-agent",
+  "package_version": "1.2.0",
+  "target": "cursor",
+  "built_at": "2026-02-07T14:30:00Z",
+  "checksum": "sha256:...",
+  "artifacts": [
+    {"type": "skill", "name": "my-skill", "path": ".cursor/skills/author--my-skill/"},
+    {"type": "agent", "name": "my-agent", "path": ".cursor/rules/agent-author--my-agent.mdc"}
+  ]
+}
+```
+
+**Installing from a bundle:**
+
+```bash
+# Install directly from a bundle file — deploys immediately, no resolution needed
+aam install ./dist/my-package-1.0.0-cursor.bundle.aam
+```
 
 ---
 
@@ -426,60 +557,117 @@ globs: "**/*.py"        # Optional file pattern (used by Cursor rules)
 - Log entries must include: timestamp, user_id, action, resource, result
 ```
 
+### 4.5 Eval
+
+An **eval** is a definition for evaluating an agent or skill's quality. Evals are declared in `aam.yaml` under `quality.evals` and reference eval definition files.
+
+**Eval definition file format (`evals/accuracy.yaml`):**
+
+```yaml
+name: accuracy-eval
+description: "Evaluate agent accuracy on benchmark tasks"
+dataset: evals/benchmark-dataset.jsonl
+model: gpt-4
+judge: evals/judge-prompt.md        # LLM-as-judge prompt
+metrics:
+  - name: accuracy
+    aggregation: mean
+  - name: latency_p95
+    aggregation: percentile_95
+```
+
+**Usage in `aam.yaml`:**
+
+```yaml
+quality:
+  tests:
+    - name: "unit-tests"
+      command: "pytest tests/"
+      description: "Unit tests for agent skills"
+    - name: "lint-check"
+      command: "ruff check ."
+      description: "Code quality check"
+  evals:
+    - name: "accuracy-eval"
+      path: "evals/accuracy.yaml"
+      description: "Measures accuracy against benchmark dataset"
+      metrics:
+        - name: "accuracy"
+          type: "percentage"
+        - name: "latency_p95"
+          type: "duration_ms"
+```
+
+**CLI commands:**
+
+```bash
+# Run all declared tests
+aam test
+
+# Run all declared evals
+aam eval
+
+# Run evals and publish results to the registry
+aam eval --publish
+```
+
+Eval results are stored in the registry (HTTP only) and shown during `aam search` and `aam info` to help consumers judge package quality.
+
 ---
 
 ## 5. CLI Design
 
 ### 5.1 Command Overview
 
+Commands are organized by persona/workflow and displayed in categorized sections
+via `aam --help`.
+
 ```
 aam <command> [options] [arguments]
 
+Getting Started:
+  init                           Set up AAM (platform, default sources)
+
 Package Management:
-  install <package> [version]    Install a package and its dependencies
+  install <package>              Install a package and its dependencies
   uninstall <package>            Remove an installed package
-  update [package]               Update packages to latest compatible version
-  list                           List installed packages
+  upgrade [package]              Upgrade outdated source-installed packages
+  outdated                       Check for outdated packages
+  search <query>                 Search registries and sources
+  list                           List installed packages (--available for sources)
   info <package>                 Show package details
 
-Package Authoring:
-  create-package [path]          Create package from existing project (autodetect + interactive)
-  init                           Initialize a new package (interactive)
-  validate                       Validate current package manifest and artifacts
-  pack                           Build distributable .aam archive
-  publish                        Publish package to registry
+Package Integrity:
+  verify [package|--all]         Verify installed file checksums
+  diff <package>                 Show unified diffs for modified files
 
-Deployment:
-  deploy [--platform <name>]     Deploy installed artifacts to platform
-  undeploy [--platform <name>]   Remove deployed artifacts from platform
+Package Authoring (aam pkg):
+  pkg init <name>                Scaffold a new package from scratch
+  pkg create [path]              Create package from existing project (autodetect)
+  pkg validate                   Validate current package manifest and artifacts
+  pkg pack                       Build distributable .aam archive
+  pkg publish                    Publish package to registry
+  pkg build --target <platform>  Build a portable bundle for a target platform
 
-Registry:
-  search <query>                 Search registry for packages
+Source Management:
+  source add <url>               Add a remote git repository as artifact source
+  source scan <name>             Scan a source for artifacts
+  source update [name|--all]     Fetch upstream changes and detect new artifacts
+  source list                    List configured remote git sources
+  source remove <name>           Remove a configured source
+  source candidates              List unpackaged artifact candidates
+  source enable-defaults         Enable all default community skill sources
+
+Configuration:
+  config set <key> <value>       Set configuration value
+  config get <key>               Get configuration value
   registry add <url>             Add a registry source
   registry list                  List configured registries
   registry remove <name>         Remove a registry source
 
-Authentication (HTTP registry):
-  register                       Create a new registry account
-  login                          Authenticate and save API token
-  logout                         Revoke saved API token
-
-Package Lifecycle:
-  yank <package>@<version>       Mark a version as yanked (unpublish)
-
-Configuration:
-  config set <key> <value>       Set configuration value (dot-notation for nested keys)
-  config get <key>               Get configuration value
-  config list                    List all configuration
-
-# Config key examples:
-#   aam config set default_platform cursor
-#   aam config set security.require_signature true
-#   aam config set registries.aam-central.url https://registry.aam.dev
-
 Utilities:
+  mcp serve                      Start MCP stdio server for IDE integration
   doctor                         Check environment and diagnose issues
-  completion                     Generate shell completion scripts
 ```
 
 ### 5.2 Command Details
@@ -489,14 +677,20 @@ Utilities:
 Installs a package and all transitive dependencies, then deploys artifacts to the active platform.
 
 ```bash
-# Install from registry
+# Install from registry (unscoped)
 aam install asvc-auditor
 
-# Install specific version
+# Install scoped package from registry
+aam install @author/asvc-auditor
+
+# Install specific version (scoped)
+aam install @author/asvc-auditor@1.2.0
+
+# Install specific version (unscoped)
 aam install asvc-auditor@1.2.0
 
 # Install from git URL
-aam install git+https://github.com/spazy/asvc-auditor.git
+aam install git+https://github.com/author/asvc-auditor.git
 
 # Install from local path
 aam install ./my-package/
@@ -505,10 +699,10 @@ aam install ./my-package/
 aam install asvc-auditor-1.0.0.aam
 
 # Install and deploy to specific platform only
-aam install asvc-auditor --platform cursor
+aam install @author/asvc-auditor --platform cursor
 
 # Install without deploying (download + resolve only)
-aam install asvc-auditor --no-deploy
+aam install @author/asvc-auditor --no-deploy
 ```
 
 **Install flow:**
@@ -526,48 +720,48 @@ aam install asvc-auditor --no-deploy
 
 **Example output:**
 ```
-$ aam install asvc-auditor
-Resolving asvc-auditor@1.0.0...
-  + asvc-auditor@1.0.0
-  + generic-auditor@1.2.3 (dependency)
+$ aam install @author/asvc-auditor
+Resolving @author/asvc-auditor@1.0.0...
+  + @author/asvc-auditor@1.0.0
+  + @author/generic-auditor@1.2.3 (dependency)
   + report-templates@2.1.0 (dependency)
 
 Downloading 3 packages...
-  ✓ asvc-auditor@1.0.0
-  ✓ generic-auditor@1.2.3
+  ✓ @author/asvc-auditor@1.0.0
+  ✓ @author/generic-auditor@1.2.3
   ✓ report-templates@2.1.0
 
 Deploying to cursor...
-  → skill: asvc-report        → .cursor/skills/asvc-report/
-  → skill: generic-auditor    → .cursor/skills/generic-auditor/
-  → agent: asvc-audit         → .cursor/rules/agent-asvc-audit.mdc
+  → skill: asvc-report        → .cursor/skills/author--asvc-report/
+  → skill: generic-auditor    → .cursor/skills/author--generic-auditor/
+  → agent: asvc-audit         → .cursor/rules/agent-author--asvc-audit.mdc
   → prompt: audit-finding     → .cursor/prompts/audit-finding.md
   → instruction: asvc-standards → .cursor/rules/asvc-standards.mdc
 
 Installed 3 packages (2 skills, 1 agent, 2 prompts, 1 instruction)
 ```
 
-#### `aam create-package [path]`
+#### `aam pkg create [path]`
 
-Creates a new AAM package from an existing working project that already contains skills, agents, prompts, or instructions that are **not** yet managed by AAM. This is the reverse of `aam init` — instead of scaffolding an empty package, it discovers existing artifacts in a project and packages them.
+Creates a new AAM package from an existing working project that already contains skills, agents, prompts, or instructions that are **not** yet managed by AAM. This is the reverse of `aam pkg init` — instead of scaffolding an empty package, it discovers existing artifacts in a project and packages them.
 
 **Use case:** You have been working in a project and created skills (e.g., `.cursor/skills/my-skill/SKILL.md`) or agents (e.g., `.cursor/rules/my-agent.mdc`) or instructions organically — outside of any AAM package. Now you want to bundle them into a distributable AAM package.
 
 ```bash
 # Auto-detect artifacts in current directory
-$ aam create-package
+$ aam pkg create
 
 # Auto-detect artifacts in a specific directory
-$ aam create-package ./my-project/
+$ aam pkg create ./my-project/
 
 # Skip interactive selection — include everything detected
-$ aam create-package --all
+$ aam pkg create --all
 
 # Only detect specific artifact types
-$ aam create-package --type skills --type agents
+$ aam pkg create --type skills --type agents
 
 # Output manifest to stdout without creating files (preview mode)
-$ aam create-package --dry-run
+$ aam pkg create --dry-run
 ```
 
 **Autodetection flow:**
@@ -612,7 +806,7 @@ Files already declared in an existing `aam.yaml` are excluded from detection res
 **Interactive selection flow:**
 
 ```bash
-$ aam create-package
+$ aam pkg create
 
 Scanning for artifacts not managed by AAM...
 
@@ -660,9 +854,9 @@ Creating package...
   4 artifacts (2 skills, 1 agent, 1 instruction)
 
 Next steps:
-  aam validate    — check that everything is correct
-  aam pack        — build distributable archive
-  aam publish     — publish to registry
+  aam pkg validate    — check that everything is correct
+  aam pkg pack        — build distributable archive
+  aam pkg publish     — publish to registry
 ```
 
 **File organization modes:**
@@ -690,16 +884,16 @@ In addition to autodetection, you can manually specify files to include:
 
 ```bash
 # Include specific files that autodetection missed
-$ aam create-package --include docs/my-guide.md --include-as instruction
+$ aam pkg create --include docs/my-guide.md --include-as instruction
 
 # Include a directory as a skill
-$ aam create-package --include ./my-tools/analyzer/ --include-as skill
+$ aam pkg create --include ./my-tools/analyzer/ --include-as skill
 ```
 
 **Command options:**
 
 ```
-aam create-package [PATH]
+aam pkg create [PATH]
 
 Arguments:
   PATH                       Project directory to scan (default: current directory)
@@ -719,34 +913,45 @@ Options:
   -y, --yes                  Skip confirmation prompts
 ```
 
-#### `aam init [name]`
+#### `aam init`
 
-Interactive package scaffolding. Optionally provide a package name as argument.
+Client setup command. Guides new users through platform detection and default
+source configuration. If called with a `[name]` argument, delegates to
+`aam pkg init` for backward compatibility (with a deprecation warning).
 
 ```bash
-# Interactive mode (prompts for name)
+# Interactive client setup
 $ aam init
-Package name: asvc-auditor
+  Detected platform: cursor
+Choose platform [cursor]:
+Register community artifact sources? [Y/n] y
 
-# Or provide name directly
-$ aam init asvc-auditor
+✓ AAM initialized successfully.
+  Platform:  cursor
+  Config:    ~/.aam/config.yaml
+  Sources:   2 community source(s) added
+
+Next steps:
+  aam search <query>   — Find packages to install
+  aam install <pkg>     — Install a package
+  aam list --available  — Browse source artifacts
+  aam pkg init          — Create a new package
+
+# Non-interactive (use defaults)
+$ aam init --yes
+```
+
+#### `aam pkg init [name]`
+
+Interactive package scaffolding. Creates artifact directories and `aam.yaml`.
+
+```bash
+$ aam pkg init asvc-auditor
 Package name: asvc-auditor
 Version (1.0.0):
 Description: ASVC audit agent with reporting capabilities
 Author: spazy
 License (MIT):
-
-What artifacts will this package contain?
-  ✓ Skills
-  ✓ Agents
-  ✓ Prompts
-  ✗ Instructions
-
-Which platforms should this package support?
-  ✓ Cursor
-  ✓ Claude
-  ✓ GitHub Copilot
-  ✗ Codex
 
 Created asvc-auditor/
   ├── aam.yaml
@@ -773,6 +978,47 @@ aam deploy asvc-auditor --platform cursor
 
 # Dry run — show what would be deployed
 aam deploy --dry-run
+```
+
+#### `aam pkg build`
+
+Builds a portable, pre-compiled bundle for one or more target platforms.
+
+```bash
+# Build for a specific platform
+aam pkg build --target cursor
+# Produces: dist/my-package-1.0.0-cursor.bundle.aam
+
+# Build for all configured platforms
+aam pkg build --target all
+
+# Build with custom output directory
+aam pkg build --target cursor --output ./releases/
+```
+
+**Build flow:**
+```
+1. Parse aam.yaml manifest
+2. Resolve all dependencies (from registries)
+3. For the target platform, run the platform adapter to compile all artifacts
+4. Package compiled artifacts + bundle.json into a .bundle.aam archive
+5. Write to dist/ (or --output directory)
+```
+
+#### `aam registry init [path]`
+
+Creates a new local registry at the specified path. This is a one-time setup command.
+
+```bash
+# Create a new local registry in a specific directory
+aam registry init ~/my-aam-registry
+# Creates registry.yaml + empty index.yaml + packages/ directory
+
+# Initialize in current directory
+aam registry init .
+
+# Initialize and immediately set as the default registry
+aam registry init ~/my-packages --default
 ```
 
 #### `aam list`
@@ -811,6 +1057,486 @@ asvc-auditor@1.0.0
     report-templates ^2.0.0   (installed: 2.1.0)
 ```
 
+### 5.3 MCP Server Mode
+
+AAM exposes its CLI capabilities as an **MCP (Model Context Protocol) server**, allowing AI agents inside IDEs (Cursor, VS Code, Windsurf, etc.) to invoke AAM operations programmatically. The server communicates over **stdio** (JSON-RPC 2.0) — the standard transport for locally-embedded MCP servers.
+
+#### Framework: FastMCP
+
+The MCP server is built with **[FastMCP](https://gofastmcp.com/) 2.0+**, a high-level Python framework for MCP servers.
+
+**Why FastMCP over the low-level `mcp` SDK:**
+
+| Concern | FastMCP | Raw `mcp` SDK |
+|---------|---------|---------------|
+| Tool registration | `@mcp.tool` decorator | Manual handler classes |
+| Resource registration | `@mcp.resource` decorator | Manual handler classes |
+| Input validation | Auto-generated JSON Schema from type hints / Pydantic | Manual schema definition |
+| Safety filtering | Built-in `include_tags` / `exclude_tags` | Custom implementation |
+| Transport | Built-in stdio + HTTP + SSE | Manual transport setup |
+| Testing | `fastmcp.Client` in-memory testing | Manual test harness |
+
+#### Command
+
+```
+aam mcp serve [options]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--transport` | `stdio` | Transport protocol: `stdio` (default) or `http` |
+| `--port` | `8000` | HTTP port (only used with `--transport http`) |
+| `--allow-write` | `false` | Enable mutating tools (install, publish, config set, etc.) |
+| `--log-file <path>` | `None` | Redirect application logs to a file (recommended for stdio mode) |
+| `--log-level` | `INFO` | Log level: DEBUG, INFO, WARNING, ERROR |
+
+> **Note:** In stdio mode, `stdout` is reserved for JSON-RPC messages. All application
+> logging must go to a file (`--log-file`) or `stderr`. FastMCP handles the stdio
+> protocol framing automatically.
+
+#### Server Initialization
+
+```python
+from fastmcp import FastMCP
+
+mcp = FastMCP(
+    name="aam",
+    instructions=(
+        "AAM (Agent Artifact Manager) — package manager for AI agent artifacts. "
+        "Search, install, publish, and manage skills, agents, prompts, and instructions "
+        "across platforms like Cursor, Claude, GitHub Copilot, and Codex."
+    ),
+    version="0.1.0",
+)
+```
+
+When `--allow-write` is **not** passed (default), the server is created with:
+
+```python
+mcp = FastMCP(
+    name="aam",
+    ...,
+    exclude_tags={"write"},   # Only read-tagged tools are exposed
+)
+```
+
+#### Transport
+
+| Transport | Invocation | Use Case |
+|-----------|-----------|----------|
+| **stdio** (default) | `aam mcp serve` | IDE integration — client spawns process, communicates via stdin/stdout |
+| **http** | `aam mcp serve --transport http --port 8000` | Remote access, multi-client — accessible at `http://localhost:8000/mcp` |
+
+#### MCP Tools
+
+CLI commands are exposed as MCP tools via `@mcp.tool` decorators. Each tool is tagged as `read` or `write` to support the safety model.
+
+**Read-only tools** (always available):
+
+| Tool | Maps to CLI | Description |
+|------|------------|-------------|
+| `aam_search` | `aam search` | Search registry for packages |
+| `aam_list` | `aam list` | List installed packages |
+| `aam_info` | `aam info <package>` | Show detailed package metadata |
+| `aam_validate` | `aam pkg validate` | Validate current package manifest and artifacts |
+| `aam_config_get` | `aam config get` | Get configuration value(s) |
+| `aam_registry_list` | `aam registry list` | List configured registries |
+| `aam_doctor` | `aam doctor` | Check environment and diagnose issues |
+
+**Write tools** (require `--allow-write`):
+
+| Tool | Maps to CLI | Description |
+|------|------------|-------------|
+| `aam_install` | `aam install` | Install one or more packages and their dependencies |
+| `aam_uninstall` | `aam uninstall` | Remove an installed package |
+| `aam_publish` | `aam pkg publish` | Publish package to registry |
+| `aam_create_package` | `aam pkg create` | Create AAM package from existing project |
+| `aam_config_set` | `aam config set` | Set a configuration value |
+| `aam_registry_add` | `aam registry add` | Add a new registry source |
+
+> **Tool naming:** All tools are prefixed with `aam_` to avoid collisions when multiple
+> MCP servers are active in an IDE.
+
+#### Tool Definitions
+
+FastMCP auto-generates JSON Schema for tool inputs from Python type hints. Tool handlers wrap the existing CLI core logic (services/functions), **not** Click commands directly — keeping the MCP layer thin and testable.
+
+**Read tool examples:**
+
+```python
+@mcp.tool(tags={"read"})
+def aam_search(
+    query: str,
+    limit: int = 10,
+    package_type: str | None = None,
+) -> list[dict]:
+    """Search the AAM registry for packages matching a query.
+
+    Args:
+        query: Search terms to match against package names and descriptions.
+        limit: Maximum number of results to return (default: 10).
+        package_type: Filter by artifact type (skill, agent, prompt, instruction).
+
+    Returns:
+        List of matching packages with name, version, description, and author.
+    """
+    ...
+
+
+@mcp.tool(tags={"read"})
+def aam_info(package_name: str, version: str | None = None) -> dict:
+    """Show detailed metadata for a specific package.
+
+    Args:
+        package_name: Full package name (e.g. 'asvc-auditor' or '@author/asvc-auditor').
+        version: Specific version to inspect (default: latest).
+
+    Returns:
+        Package metadata including artifacts, dependencies, platforms, and author.
+    """
+    ...
+
+
+@mcp.tool(tags={"read"})
+def aam_list() -> list[dict]:
+    """List all installed AAM packages in the current project.
+
+    Returns:
+        List of installed packages with name, version, and deployment status.
+    """
+    ...
+
+
+@mcp.tool(tags={"read"})
+def aam_validate(path: str = ".") -> dict:
+    """Validate an AAM package manifest and its artifacts.
+
+    Args:
+        path: Path to the package directory (default: current directory).
+
+    Returns:
+        Validation result with status, errors, and warnings.
+    """
+    ...
+
+
+@mcp.tool(tags={"read"})
+def aam_config_get(key: str | None = None) -> dict:
+    """Get AAM configuration value(s).
+
+    Args:
+        key: Dot-notation config key (e.g. 'default_platform'). If None, returns all config.
+
+    Returns:
+        Configuration key-value pair(s).
+    """
+    ...
+
+
+@mcp.tool(tags={"read"})
+def aam_registry_list() -> list[dict]:
+    """List all configured AAM registries.
+
+    Returns:
+        List of registries with name, URL, and default status.
+    """
+    ...
+
+
+@mcp.tool(tags={"read"})
+def aam_doctor() -> dict:
+    """Check the AAM environment and diagnose issues.
+
+    Returns:
+        Diagnostic report with checks for Python version, dependencies, config, and connectivity.
+    """
+    ...
+```
+
+**Write tool examples:**
+
+```python
+@mcp.tool(tags={"write"})
+def aam_install(
+    packages: list[str],
+    dev: bool = False,
+    force: bool = False,
+    platform: str | None = None,
+) -> dict:
+    """Install one or more AAM packages and their dependencies.
+
+    Args:
+        packages: Package specifiers (e.g. ['asvc-auditor', '@author/pkg@1.2.0']).
+        dev: Install as development dependency.
+        force: Force reinstall even if already installed.
+        platform: Deploy to specific platform only (default: all configured).
+
+    Returns:
+        Installation summary with installed packages, versions, and deployment paths.
+    """
+    ...
+
+
+@mcp.tool(tags={"write"})
+def aam_publish(
+    access: str = "public",
+    tag: str = "latest",
+    sign: bool = False,
+) -> dict:
+    """Publish the current package to the registry.
+
+    Args:
+        access: Access level — 'public' or 'private'.
+        tag: Distribution tag (default: 'latest').
+        sign: Sign the package with Sigstore.
+
+    Returns:
+        Publish result with package name, version, and registry URL.
+    """
+    ...
+
+
+@mcp.tool(tags={"write"})
+def aam_create_package(
+    path: str = ".",
+    name: str | None = None,
+    version: str | None = None,
+    description: str | None = None,
+    artifact_types: list[str] | None = None,
+    include_all: bool = False,
+) -> dict:
+    """Create an AAM package from an existing project by detecting artifacts.
+
+    Args:
+        path: Project directory path to scan (default: current directory).
+        name: Package name (auto-detected if not provided).
+        version: Package version (default: '0.1.0').
+        description: Package description.
+        artifact_types: Filter to specific types (skill, agent, prompt, instruction).
+        include_all: Include all detected artifacts without interactive selection.
+
+    Returns:
+        Created package summary with manifest path and included artifacts.
+    """
+    ...
+
+
+@mcp.tool(tags={"write"})
+def aam_config_set(key: str, value: str) -> dict:
+    """Set an AAM configuration value.
+
+    Args:
+        key: Dot-notation config key (e.g. 'default_platform', 'security.require_signature').
+        value: Value to set.
+
+    Returns:
+        Updated configuration entry.
+    """
+    ...
+
+
+@mcp.tool(tags={"write"})
+def aam_uninstall(package_name: str) -> dict:
+    """Remove an installed AAM package.
+
+    Args:
+        package_name: Full package name to uninstall.
+
+    Returns:
+        Uninstall result with removed files and cleaned dependencies.
+    """
+    ...
+
+
+@mcp.tool(tags={"write"})
+def aam_registry_add(name: str, url: str, set_default: bool = False) -> dict:
+    """Add a new AAM registry source.
+
+    Args:
+        name: Registry name (e.g. 'my-registry').
+        url: Registry URL.
+        set_default: Set this registry as the default.
+
+    Returns:
+        Registry entry with name, URL, and default status.
+    """
+    ...
+```
+
+#### MCP Resources
+
+Resources expose read-only data that IDE agents can pull without invoking a tool. Resources are registered via `@mcp.resource` decorators.
+
+| Resource URI | Description |
+|-------------|-------------|
+| `aam://config` | Current AAM configuration (global + project) |
+| `aam://packages/installed` | List of installed packages with versions and platforms |
+| `aam://packages/{name}` | Detailed metadata for a specific installed package (resource template) |
+| `aam://registries` | All configured registries with URLs and auth status |
+| `aam://manifest` | Current project's `aam.yaml` manifest contents (if present) |
+
+**Resource definition examples:**
+
+```python
+@mcp.resource("aam://config")
+def get_config() -> dict:
+    """Current AAM configuration (global merged with project-level)."""
+    ...
+
+
+@mcp.resource("aam://packages/installed")
+def get_installed_packages() -> list[dict]:
+    """List all installed AAM packages with version and platform info."""
+    ...
+
+
+@mcp.resource("aam://packages/{name}")
+def get_package_details(name: str) -> dict:
+    """Detailed metadata for a specific installed package."""
+    ...
+
+
+@mcp.resource("aam://registries")
+def get_registries() -> list[dict]:
+    """All configured AAM registries."""
+    ...
+
+
+@mcp.resource("aam://manifest")
+def get_manifest() -> dict | None:
+    """Current project's aam.yaml manifest contents, or null if not present."""
+    ...
+```
+
+#### Safety Model
+
+The MCP server uses a **read-only-by-default** safety model built on FastMCP's tag-based filtering:
+
+| Mode | Behavior | Flag |
+|------|----------|------|
+| **Read-only** (default) | Only tools tagged `read` are exposed. Write tools are hidden from the IDE agent. Resources are always available. | (none) |
+| **Full access** | All tools (read + write) are exposed. The IDE agent can install, publish, and modify configuration. | `--allow-write` |
+
+Implementation:
+
+```python
+def create_mcp_server(allow_write: bool = False) -> FastMCP:
+    """Create the AAM MCP server with appropriate safety settings."""
+    kwargs = {
+        "name": "aam",
+        "instructions": "...",
+        "version": "0.1.0",
+    }
+
+    if not allow_write:
+        kwargs["exclude_tags"] = {"write"}
+
+    return FastMCP(**kwargs)
+```
+
+#### Protocol Flow
+
+```mermaid
+sequenceDiagram
+    participant IDE as IDE Agent
+    participant Stdio as stdio transport
+    participant FastMCP as FastMCP Server
+    participant Core as CLI Core Logic
+    participant Registry as Registry / Filesystem
+
+    IDE->>Stdio: JSON-RPC request (tools/call)
+    Stdio->>FastMCP: Parsed MCP message
+    FastMCP->>FastMCP: Validate input (Pydantic)
+    FastMCP->>FastMCP: Check tag permissions
+    FastMCP->>Core: Call tool handler
+    Core->>Registry: Execute operation
+    Registry-->>Core: Result
+    Core-->>FastMCP: Return value
+    FastMCP-->>Stdio: JSON-RPC response
+    Stdio-->>IDE: Result displayed to user
+```
+
+#### IDE Integration
+
+**Cursor** — project-level `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "aam": {
+      "command": "aam",
+      "args": ["mcp", "serve"],
+      "env": {}
+    }
+  }
+}
+```
+
+**Cursor** — full access mode:
+
+```json
+{
+  "mcpServers": {
+    "aam": {
+      "command": "aam",
+      "args": ["mcp", "serve", "--allow-write"],
+      "env": {}
+    }
+  }
+}
+```
+
+**Alternative** — using `fastmcp run` (does not require `aam` CLI on PATH):
+
+```json
+{
+  "mcpServers": {
+    "aam": {
+      "command": "fastmcp",
+      "args": ["run", "aam_cli.mcp.server:mcp"],
+      "env": {}
+    }
+  }
+}
+```
+
+**VS Code** — `.vscode/settings.json`:
+
+```json
+{
+  "mcp.servers": {
+    "aam": {
+      "command": "aam",
+      "args": ["mcp", "serve", "--allow-write"]
+    }
+  }
+}
+```
+
+#### Testing
+
+FastMCP provides an in-memory `Client` for testing tools and resources without spawning a process:
+
+```python
+import pytest
+from fastmcp import Client
+from aam_cli.mcp.server import mcp
+
+@pytest.mark.asyncio
+async def test_unit_aam_search():
+    """Verify aam_search tool returns results for a valid query."""
+    async with Client(mcp) as client:
+        result = await client.call_tool("aam_search", {"query": "python"})
+        assert isinstance(result, list)
+
+@pytest.mark.asyncio
+async def test_unit_installed_packages_resource():
+    """Verify the installed packages resource returns a list."""
+    async with Client(mcp) as client:
+        data = await client.read_resource("aam://packages/installed")
+        assert isinstance(data, list)
+```
+
 ---
 
 ## 6. Registry Design
@@ -824,18 +1550,19 @@ The default registry is a Git repository with a defined layout. This follows the
 aam-registry/
 ├── registry.yaml               # Registry metadata
 ├── packages/
-│   ├── asvc-auditor/
-│   │   ├── metadata.yaml       # Package metadata + version index
-│   │   └── versions/
-│   │       ├── 1.0.0.aam       # Archived package
-│   │       └── 1.1.0.aam
-│   ├── generic-auditor/
-│   │   ├── metadata.yaml
-│   │   └── versions/
-│   │       ├── 1.0.0.aam
-│   │       ├── 1.1.0.aam
-│   │       └── 1.2.3.aam
-│   └── report-templates/
+│   ├── @author/                # Scoped packages nested under @scope/
+│   │   ├── asvc-auditor/
+│   │   │   ├── metadata.yaml   # Package metadata + version index
+│   │   │   └── versions/
+│   │   │       ├── 1.0.0.aam   # Archived package
+│   │   │       └── 1.1.0.aam
+│   │   └── generic-auditor/
+│   │       ├── metadata.yaml
+│   │       └── versions/
+│   │           ├── 1.0.0.aam
+│   │           ├── 1.1.0.aam
+│   │           └── 1.2.3.aam
+│   └── report-templates/       # Unscoped packages at top level
 │       ├── metadata.yaml
 │       └── versions/
 │           └── 2.1.0.aam
@@ -850,13 +1577,13 @@ url: https://github.com/aam-packages/registry
 api_version: 1
 ```
 
-**packages/asvc-auditor/metadata.yaml:**
+**packages/@author/asvc-auditor/metadata.yaml:**
 ```yaml
-name: asvc-auditor
+name: "@author/asvc-auditor"
 description: "ASVC audit agent with reporting capabilities"
-author: spazy
-license: MIT
-repository: https://github.com/spazy/asvc-auditor
+author: author
+license: Apache-2.0
+repository: https://github.com/author/asvc-auditor
 keywords: [audit, asvc, compliance]
 
 versions:
@@ -864,13 +1591,13 @@ versions:
     published: 2026-02-10
     checksum: sha256:abc123...
     dependencies:
-      generic-auditor: ">=1.0.0"
+      "@author/generic-auditor": ">=1.0.0"
       report-templates: "^2.0.0"
   - version: 1.0.0
     published: 2026-02-05
     checksum: sha256:def456...
     dependencies:
-      generic-auditor: ">=1.0.0"
+      "@author/generic-auditor": ">=1.0.0"
 
 latest: 1.1.0
 ```
@@ -878,12 +1605,12 @@ latest: 1.1.0
 **index.yaml (flat search index):**
 ```yaml
 packages:
-  - name: asvc-auditor
+  - name: "@author/asvc-auditor"
     description: "ASVC audit agent with reporting capabilities"
     latest: 1.1.0
     keywords: [audit, asvc, compliance]
     artifacts: [agent, skill, prompt]
-  - name: generic-auditor
+  - name: "@author/generic-auditor"
     description: "General-purpose code auditing skill"
     latest: 1.2.3
     keywords: [audit, code-review]
@@ -897,15 +1624,115 @@ packages:
 
 ### 6.2 Local Registry
 
-A local directory that mirrors the git registry structure. Useful for offline development or private packages.
+A local directory that mirrors the git registry structure. Useful for offline development, private packages, or team sharing via a shared filesystem. This is the primary registry type for Phase 1 (MVP) and the recommended starting point.
+
+**Creating a local registry:**
 
 ```bash
-# Add a local registry
-aam registry add local file:///home/spazy/my-packages
+# Create a new local registry (one-time setup)
+aam registry init ~/my-aam-registry
+
+# Add it as a named registry source
+aam registry add local file:///home/spazy/my-aam-registry --default
 
 # Publish to local registry
-aam publish --registry local
+aam pkg publish --registry local
 ```
+
+**Local registry directory structure:**
+
+```
+~/my-aam-registry/
+├── registry.yaml               # Registry metadata
+├── index.yaml                  # Flat search index (rebuilt on publish)
+└── packages/
+    ├── @myorg/                 # Scoped packages nested under @scope/
+    │   └── my-agent/
+    │       ├── metadata.yaml   # Version index + checksums + dist-tags
+    │       └── versions/
+    │           ├── 1.0.0.aam
+    │           └── 1.1.0.aam
+    └── shared-skills/          # Unscoped packages at top level
+        ├── metadata.yaml
+        └── versions/
+            └── 2.0.0.aam
+```
+
+**`registry.yaml` schema:**
+
+```yaml
+name: my-local-registry
+type: local
+description: "Local AAM package registry"
+api_version: 1
+created_at: "2026-02-07T10:00:00Z"
+```
+
+**`index.yaml` schema (flat search index, rebuilt on each publish):**
+
+```yaml
+packages:
+  - name: "@myorg/my-agent"
+    description: "ASVC compliance auditor agent"
+    latest: "1.1.0"
+    keywords: [audit, compliance]
+    artifact_types: [agent, skill, prompt]
+    updated_at: "2026-02-07T14:00:00Z"
+  - name: shared-skills
+    description: "Reusable utility skills"
+    latest: "2.0.0"
+    keywords: [utility]
+    artifact_types: [skill]
+    updated_at: "2026-02-06T10:00:00Z"
+```
+
+**`metadata.yaml` per-package schema:**
+
+```yaml
+name: "@myorg/my-agent"
+description: "ASVC compliance auditor agent"
+author: spazy
+license: Apache-2.0
+repository: https://github.com/myorg/my-agent
+keywords: [audit, compliance]
+
+dist_tags:
+  latest: "1.1.0"
+  stable: "1.0.0"
+
+versions:
+  - version: "1.1.0"
+    published: "2026-02-07T14:00:00Z"
+    checksum: "sha256:abc123..."
+    size: 12847
+    dependencies:
+      "@myorg/generic-auditor": ">=1.0.0"
+  - version: "1.0.0"
+    published: "2026-02-05T10:00:00Z"
+    checksum: "sha256:def456..."
+    size: 11200
+    dependencies:
+      "@myorg/generic-auditor": ">=1.0.0"
+```
+
+**Local registry operations (all pure file I/O — no server, no database):**
+
+| Operation | Implementation |
+|-----------|---------------|
+| `search(query)` | Read `index.yaml`, fuzzy-match on name/description/keywords |
+| `get_metadata(name)` | Read `packages/@scope/name/metadata.yaml` |
+| `get_versions(name)` | Parse `metadata.yaml` versions list |
+| `download(name, ver)` | Copy `.aam` file from `versions/` to destination |
+| `publish(archive)` | Extract manifest from archive, create dirs, copy `.aam`, update `metadata.yaml` + `index.yaml` |
+
+**Sharing a local registry across a team:**
+
+The entire registry is just a directory. Sync it however works for your team:
+
+- **Shared filesystem / NFS:** Mount the same directory on all machines
+- **Git repository:** Commit the registry directory to a git repo and clone it
+- **Cloud storage:** Sync via Dropbox, Google Drive, or S3
+- **USB drive:** For air-gapped environments
 
 ### 6.3 Registry Resolution Order
 
@@ -919,35 +1746,35 @@ When resolving a package, AAM searches registries in order:
 
 ```bash
 $ cd asvc-auditor/
-$ aam validate
+$ aam pkg validate
 ✓ aam.yaml is valid
 ✓ All artifact paths exist
 ✓ All artifact definitions are well-formed
 ✓ Dependencies reference valid packages
 
-$ aam pack
+$ aam pkg pack
 ✓ Built asvc-auditor-1.0.0.aam (12.4 KB)
 
-$ aam publish
+$ aam pkg publish
 Publishing asvc-auditor@1.0.0 to aam-central...
 ✓ Published successfully
   https://github.com/aam-packages/registry/packages/asvc-auditor/
 
 # Publish with signature (HTTP registry)
-$ aam publish --sign
+$ aam pkg publish --sign
 Publishing asvc-auditor@1.0.0 to aam-central...
   Signing with Sigstore (OIDC identity)...
 ✓ Published with signature
   Signature: sigstore bundle attached
 
 # Publish with GPG signature
-$ aam publish --sign --sign-type gpg
+$ aam pkg publish --sign --sign-type gpg
 Publishing asvc-auditor@1.0.0 to aam-central...
   Signing with GPG key: ABC123DEF...
 ✓ Published with GPG signature
 ```
 
-Under the hood, `aam publish` either:
+Under the hood, `aam pkg publish` either:
 - Creates a PR to the git registry (for community registry), or
 - Uploads via HTTP API with optional signature (for HTTP registry), or
 - Copies the `.aam` file to the local/private registry
@@ -1071,7 +1898,7 @@ AAM supports multiple levels of package integrity and authenticity verification.
 ```
 Author                          Registry                         User
    │                               │                               │
-   │  aam publish --sign           │                               │
+   │  aam pkg publish --sign      │                               │
    ├──────────────────────────────►│                               │
    │  1. Calculate SHA-256         │                               │
    │  2. Sign with Sigstore/GPG    │                               │
@@ -1129,6 +1956,75 @@ asvc-auditor@1.0.0
 
 For full signing implementation details, see [HTTP_REGISTRY_SPEC.md](./HTTP_REGISTRY_SPEC.md) section 5.
 
+### 7.6 Governance
+
+Governance controls who can publish, what can be installed, and provides a tamper-evident record of all actions. AAM splits governance into **client-side** (works locally) and **server-side** (requires HTTP registry) features.
+
+#### Policy Gates (Client-Side — Works Locally)
+
+Policy gates are configurable rules in `config.yaml` that the CLI enforces **before** install or publish operations. They run entirely on the client and require no server.
+
+```yaml
+# ~/.aam/config.yaml or .aam/config.yaml
+governance:
+  install_policy:
+    allowed_scopes: ["@myorg", "@trusted-vendor"]  # only allow these scopes
+    require_signature: true                        # require signed packages
+    require_tag: "stable"                          # only install tagged versions
+    blocked_packages: ["@sketchy/*"]               # block specific packages
+  publish_policy:
+    require_approval: true                         # require approval before publish
+    approvers: ["admin@myorg.com"]
+    require_signature: true                        # must sign before publishing
+```
+
+**How policy gates work:**
+
+| Gate | Trigger | Effect |
+|------|---------|--------|
+| `allowed_scopes` | `aam install` | Block install of packages outside listed scopes |
+| `require_signature` | `aam install` | Block install of unsigned packages |
+| `require_tag` | `aam install` | Only install versions tagged with the specified tag |
+| `blocked_packages` | `aam install` | Block specific packages (supports glob patterns) |
+| `require_approval` | `aam pkg publish` | Require at least one approver to sign off |
+| `require_signature` | `aam pkg publish` | Require package signing before publish is allowed |
+
+#### Approval Workflows (Server-Side — HTTP Registry)
+
+When `require_approval: true` is configured and publishing to an HTTP registry, the publish flow becomes:
+
+1. `aam pkg publish` → uploads package with `approval_status: pending`
+2. Approvers receive notification (webhook/email)
+3. Approvers review and run: `aam approve @org/agent@1.2.0` or via API
+4. Once approved, package becomes visible for install
+5. Rejected packages are hidden from search/install
+
+#### Audit Log (Server-Side — HTTP Registry)
+
+Every mutation on the HTTP registry is logged immutably in the `audit_log` table:
+
+```json
+{
+  "event": "package.publish",
+  "actor": "user@myorg.com",
+  "package": "@myorg/agent@1.2.0",
+  "timestamp": "2026-02-07T14:30:00Z",
+  "metadata": {"tag": "latest", "checksum": "sha256:abc..."}
+}
+```
+
+**Audited events:**
+
+| Event | Description |
+|-------|-------------|
+| `package.publish` | New version published |
+| `version.yank` | Version marked as yanked |
+| `tag.set` | Dist-tag added or updated |
+| `tag.remove` | Dist-tag removed |
+| `version.approve` | Version approved by an approver |
+| `version.reject` | Version rejected by an approver |
+| `ownership.transfer` | Package ownership transferred |
+
 ---
 
 ## 8. Platform Adapters
@@ -1148,16 +2044,34 @@ class PlatformAdapter(Protocol):
     def list_deployed(self) -> list[tuple[str, str, Path]]  # (name, type, path)
 ```
 
+### 8.0 Scoped Name Filesystem Mapping
+
+When deploying scoped package artifacts to any platform, the `@scope/name` format must be converted to a filesystem-safe directory/file name. AAM uses the **double-hyphen convention**:
+
+| Package Name | Filesystem Name | Rationale |
+|-------------|-----------------|-----------|
+| `asvc-report` (unscoped) | `asvc-report` | No change needed |
+| `@author/asvc-report` (scoped) | `author--asvc-report` | `--` separates scope from name |
+
+The `--` separator is chosen because:
+- Single hyphens are valid within both scope and name segments
+- Double-hyphens cannot appear at positions 0-1 in a valid name (names must start with `[a-z0-9]`)
+- The mapping is reversible: split on `--` to recover `(scope, name)`
+
+This convention applies to all platforms (Cursor, Copilot, Claude, Codex) and all artifact types.
+
 ### 8.1 Cursor Adapter
 
 **Deployment mapping:**
 
 | Artifact Type | Cursor Location | Format |
 |---------------|----------------|--------|
-| skill | `.cursor/skills/<name>/` or `~/.cursor/skills/<name>/` | SKILL.md (as-is) |
-| agent | `.cursor/rules/agent-<name>.mdc` | Converted to rule with `alwaysApply: true` |
-| prompt | `.cursor/prompts/<name>.md` | Stored as markdown (referenced by skills/agents) |
-| instruction | `.cursor/rules/<name>.mdc` | Converted to `.mdc` rule with appropriate `globs` |
+| skill | `.cursor/skills/<fs-name>/` or `~/.cursor/skills/<fs-name>/` | SKILL.md (as-is) |
+| agent | `.cursor/rules/agent-<fs-name>.mdc` | Converted to rule with `alwaysApply: true` |
+| prompt | `.cursor/prompts/<fs-name>.md` | Stored as markdown (referenced by skills/agents) |
+| instruction | `.cursor/rules/<fs-name>.mdc` | Converted to `.mdc` rule with appropriate `globs` |
+
+> **Note:** `<fs-name>` is the filesystem-safe name. For scoped packages, `@author/asvc-report` becomes `author--asvc-report`. See [Section 8.0](#80-scoped-name-filesystem-mapping) for the mapping convention.
 
 **Agent → Cursor Rule conversion:**
 
@@ -1324,8 +2238,14 @@ security:
 
 # Author defaults (used by aam init)
 author:
-  name: spazy
-  email: spazy@example.com
+  name: author
+  email: author@example.com
+
+# Publishing defaults
+publish:
+  default_scope: ""             # Default scope for aam pkg init / aam pkg publish
+                                # Set to your username or org, e.g. "myorg"
+                                # When set, aam init will default to @scope/name format
 ```
 
 ### 9.2 Project Configuration: `.aam/config.yaml`
@@ -1385,24 +2305,25 @@ my-project/
 │   ├── config.yaml         # Project configuration
 │   ├── aam-lock.yaml       # Lock file (committed to git)
 │   └── packages/           # Installed packages (local state)
-│       ├── asvc-auditor/
-│       │   ├── aam.yaml
-│       │   ├── agents/
-│       │   ├── skills/
-│       │   └── prompts/
-│       ├── generic-auditor/
-│       │   ├── aam.yaml
-│       │   └── skills/
-│       └── report-templates/
+│       ├── @author/        # Scoped packages nested under @scope/
+│       │   ├── asvc-auditor/
+│       │   │   ├── aam.yaml
+│       │   │   ├── agents/
+│       │   │   ├── skills/
+│       │   │   └── prompts/
+│       │   └── generic-auditor/
+│       │       ├── aam.yaml
+│       │       └── skills/
+│       └── report-templates/   # Unscoped packages at top level
 │           ├── aam.yaml
 │           ├── skills/
 │           └── instructions/
 ├── .cursor/                # Deployed Cursor artifacts
 │   ├── skills/
-│   │   ├── asvc-report/
-│   │   └── generic-auditor/
+│   │   ├── author--asvc-report/      # Scoped: scope--name format
+│   │   └── author--generic-auditor/
 │   ├── rules/
-│   │   ├── agent-asvc-audit.mdc
+│   │   ├── agent-author--asvc-audit.mdc
 │   │   └── asvc-coding-standards.mdc
 │   └── prompts/
 │       ├── audit-finding.md
@@ -1438,11 +2359,11 @@ aam/
 ├── cli/
 │   ├── __init__.py
 │   ├── main.py             # Click/Typer CLI app
-│   ├── create_package.py   # aam create-package command (autodetect + interactive)
+│   ├── pkg/               # aam pkg command group (create, validate, pack, publish, build)
 │   ├── install.py          # aam install command
 │   ├── init.py             # aam init command
 │   ├── deploy.py           # aam deploy command
-│   ├── publish.py          # aam publish command
+│   ├── publish.py          # aam pkg publish command
 │   ├── search.py           # aam search command
 │   ├── config.py           # aam config command
 │   ├── register.py         # aam register command (HTTP registry)
@@ -1468,6 +2389,11 @@ aam/
 │   ├── git.py              # Git-based registry
 │   ├── http.py             # HTTP registry client
 │   └── local.py            # Local filesystem registry
+├── mcp/
+│   ├── __init__.py
+│   ├── server.py           # FastMCP server instance and entry point
+│   ├── tools.py            # @mcp.tool definitions (wrapping CLI core logic)
+│   └── resources.py        # @mcp.resource definitions (read-only data providers)
 ├── adapters/
 │   ├── __init__.py
 │   ├── base.py             # Platform adapter interface
@@ -1492,10 +2418,11 @@ aam/
 | Archive format | tar.gz (renamed .aam) | Simple, universal, transparent |
 | Version parsing | packaging library | Standard Python semver implementation |
 | Git operations | subprocess (git CLI) | No heavy dependencies, git is ubiquitous |
-| HTTP | httpx | Modern async HTTP for registry downloads |
+| HTTP | httpx (optional) | Lazily imported only when an HTTP registry is configured |
 | Rich output | rich | Beautiful terminal output, progress bars, trees |
 | Signing | sigstore | Keyless signing via OIDC (Sigstore ecosystem) |
 | GPG | python-gnupg | GPG key-based signing for traditional workflows |
+| MCP server | FastMCP 2.0+ (`fastmcp`) | High-level MCP framework with decorator API, built-in stdio/HTTP transports, Pydantic validation, tag-based filtering, and testing utilities |
 
 ### 11.3 Data Flow: Install
 
@@ -1538,7 +2465,8 @@ class ArtifactRef:
 
 @dataclass
 class PackageManifest:
-    name: str
+    name: str                                    # Full name: "pkg" or "@scope/pkg"
+    scope: str                                   # Scope part: "" for unscoped, "author" for @author/pkg
     version: str
     description: str
     author: str | None
@@ -1546,7 +2474,7 @@ class PackageManifest:
     repository: str | None
     keywords: list[str]
     artifacts: dict[str, list[ArtifactRef]]   # type -> refs
-    dependencies: dict[str, str]               # name -> constraint
+    dependencies: dict[str, str]               # name -> constraint (keys may be scoped)
     platforms: dict[str, dict]                  # platform -> config
 
 
@@ -1589,11 +2517,80 @@ class Registry(Protocol):
     def publish(self, archive_path: Path) -> None: ...
 ```
 
+### 11.5 CLI Registry Abstraction Layer
+
+The CLI contains a registry abstraction layer that decouples commands from any specific registry backend. This enables the local-first architecture: commands like `aam search`, `aam install`, and `aam pkg publish` work identically against local, git, or HTTP registries.
+
+```
+aam_cli/
+├── registry/
+│   ├── __init__.py
+│   ├── base.py        # Registry Protocol/ABC — defines the interface
+│   ├── local.py       # LocalRegistry — pure file I/O, no network
+│   ├── git.py         # GitRegistry — git clone + local structure
+│   ├── http.py        # HTTPRegistry — calls aam-backend REST API
+│   ├── factory.py     # Instantiate registry from config type string
+│   └── resolver.py    # Search registries in configured order
+```
+
+**Registry Protocol (base.py):**
+
+```python
+class Registry(Protocol):
+    """Abstract registry interface — implemented by local, git, and HTTP backends."""
+    name: str
+
+    def search(self, query: str) -> list[PackageMetadata]: ...
+    def get_metadata(self, name: str) -> PackageMetadata: ...
+    def get_versions(self, name: str) -> list[str]: ...
+    def download(self, name: str, version: str, dest: Path) -> Path: ...
+    def publish(self, archive_path: Path) -> None: ...
+```
+
+**Factory (factory.py):**
+
+Instantiates the correct registry class from the `type` field in `config.yaml`:
+
+| Config Type | Class | Dependencies |
+|-------------|-------|-------------|
+| `local` | `LocalRegistry` | None (stdlib only) |
+| `git` | `GitRegistry` | `git` CLI |
+| `http` | `HTTPRegistry` | `httpx` (imported lazily) |
+
 ---
 
 ## 12. Example Walkthrough
 
-### Scenario: Creating and distributing the `asvc-auditor` package
+### Scenario A: Local-Only Workflow (No Server Required)
+
+This scenario demonstrates the full AAM workflow using only local registries — no Docker, no Postgres, no server.
+
+```bash
+# 1. Create a local registry (one-time setup)
+aam registry init ~/my-packages
+aam registry add local file:///home/user/my-packages --default
+
+# 2. Author creates a package
+cd my-project/
+aam pkg create
+aam pkg validate
+aam pkg pack                          # produces my-agent-1.0.0.aam
+
+# 3. Publish to local registry (no server needed)
+aam pkg publish --registry local      # copies .aam, updates metadata.yaml + index.yaml
+
+# 4. Another developer installs it (same machine or shared filesystem)
+cd other-project/
+aam search "audit"                # searches index.yaml locally
+aam install @myorg/my-agent       # copies from local registry, deploys to .cursor/
+
+# 5. Works across a team via shared drive / NFS / git
+# The entire registry is just a directory — sync it however you want
+```
+
+This entire workflow requires only Python and the `aam` CLI. No Docker, no database, no Redis, no server process.
+
+### Scenario B: Creating and distributing the `asvc-auditor` package
 
 #### Step 1: Initialize the package
 
@@ -1676,19 +2673,19 @@ Write `prompts/audit-finding.md` and `prompts/audit-summary.md`.
 In `aam.yaml`, add:
 ```yaml
 dependencies:
-  generic-auditor: ">=1.0.0"
+  "@author/generic-auditor": ">=1.0.0"
 ```
 
 #### Step 6: Validate and publish
 
 ```bash
-$ aam validate
+$ aam pkg validate
 ✓ Package is valid
 
-$ aam pack
+$ aam pkg pack
 ✓ Built asvc-auditor-1.0.0.aam
 
-$ aam publish
+$ aam pkg publish
 ✓ Published asvc-auditor@1.0.0
 ```
 
@@ -1696,16 +2693,16 @@ $ aam publish
 
 ```bash
 $ cd my-project/
-$ aam install asvc-auditor
+$ aam install @author/asvc-auditor
 
-Resolving asvc-auditor@1.0.0...
-  + asvc-auditor@1.0.0
-  + generic-auditor@1.2.3 (dependency)
+Resolving @author/asvc-auditor@1.0.0...
+  + @author/asvc-auditor@1.0.0
+  + @author/generic-auditor@1.2.3 (dependency)
 
 Deploying to cursor...
-  → skill: asvc-report        → .cursor/skills/asvc-report/
-  → skill: generic-auditor    → .cursor/skills/generic-auditor/
-  → agent: asvc-audit         → .cursor/rules/agent-asvc-audit.mdc
+  → skill: asvc-report        → .cursor/skills/author--asvc-report/
+  → skill: generic-auditor    → .cursor/skills/author--generic-auditor/
+  → agent: asvc-audit         → .cursor/rules/agent-author--asvc-audit.mdc
   → prompt: audit-finding     → .cursor/prompts/audit-finding.md
   → prompt: audit-summary     → .cursor/prompts/audit-summary.md
 
@@ -1718,16 +2715,23 @@ Now the user opens Cursor, and the ASVC auditor agent is fully configured with i
 
 ## 13. Roadmap
 
-### Phase 1 — MVP (v0.1.0)
+### Phase 1 — MVP: Local-Only Pipeline (v0.1.0)
+
+Phase 1 ships a **fully working tool with zero infrastructure requirements**. All features work against local file-based registries.
 
 - [ ] Core manifest parsing (`aam.yaml` with pydantic validation)
-- [ ] `aam create-package` — create package from existing project (autodetect + interactive selection)
-- [ ] `aam init` — interactive package scaffolding
-- [ ] `aam validate` — manifest and artifact validation
-- [ ] `aam pack` — build `.aam` archive
-- [ ] `aam install` — install from local `.aam` file or directory
+- [ ] Namespace/scope support (`@author/package-name`) in manifest, CLI, and registry
+- [ ] `aam pkg create` — create package from existing project (autodetect + interactive selection)
+- [ ] `aam init` — interactive package scaffolding (with optional `--scope`)
+- [ ] `aam pkg validate` — manifest and artifact validation
+- [ ] `aam pkg pack` — build `.aam` archive
+- [ ] `aam registry init` — create local registry
+- [ ] `aam pkg publish --registry local` — publish to local registry
+- [ ] `aam search` — search local registry
+- [ ] `aam install` — install from local registry, `.aam` file, or directory
 - [ ] Cursor adapter — deploy skills, agents (as rules), prompts, instructions
-- [ ] Basic dependency resolution (no registry, local paths only)
+- [ ] Dependency resolution (local registries only)
+- [ ] Lock file generation
 
 ### Phase 2 — Registry + More Platforms (v0.2.0)
 
@@ -1735,8 +2739,8 @@ Now the user opens Cursor, and the ASVC auditor agent is fully configured with i
 - [ ] HTTP registry client (`aam/registry/http.py`)
 - [ ] `aam register` — create registry account
 - [ ] `aam login` / `aam logout` — authentication
-- [ ] `aam publish` — publish to registry
-- [ ] `aam publish --sign` — publish with Sigstore/GPG signature
+- [ ] `aam pkg publish` — publish to registry
+- [ ] `aam pkg publish --sign` — publish with Sigstore/GPG signature
 - [ ] `aam search` — search registry index
 - [ ] Package signing and verification (checksum always, Sigstore/GPG optional)
 - [ ] Claude adapter
@@ -1752,10 +2756,17 @@ Now the user opens Cursor, and the ASVC auditor agent is fully configured with i
 - [ ] `aam deploy` / `aam undeploy` — separate deploy lifecycle
 - [ ] Shell completion (bash/zsh/fish)
 - [ ] `aam doctor` — environment diagnostics
+- [ ] FastMCP dependency and `mcp/` module scaffold
+- [ ] MCP stdio server mode (`aam mcp serve`)
+- [ ] MCP tool definitions for core CLI commands (read-only tools first)
+- [ ] MCP tool definitions for write operations (install, publish, config set)
+- [ ] MCP resource providers for config, packages, registries, manifest
+- [ ] Tag-based safety model (read-only default, `--allow-write` opt-in)
+- [ ] IDE integration documentation and example configs (Cursor, VS Code)
+- [ ] MCP server tests using FastMCP's `Client` testing utilities
 
 ### Phase 4 — Advanced (v1.0.0)
 
-- [ ] Namespace/scope support (`@org/package-name`)
 - [ ] `aam yank` — mark version as yanked (HTTP registry only)
 - [ ] Registry attestations (automated trust)
 - [ ] `aam-lock.yaml` integrity verification
@@ -1781,12 +2792,16 @@ Now the user opens Cursor, and the ASVC auditor agent is fully configured with i
 
 | Entity | Convention | Example |
 |--------|-----------|---------|
-| Package name | lowercase, hyphens, max 64 chars | `asvc-auditor` |
+| Package name (unscoped) | lowercase, hyphens, max 64 chars | `asvc-auditor` |
+| Package name (scoped) | `@scope/name`, max 130 chars total | `@author/asvc-auditor` |
+| Scope name | lowercase, hyphens, underscores, max 64 chars | `author`, `my_org` |
 | Artifact name | lowercase, hyphens, max 64 chars | `asvc-report` |
 | Version | Semantic versioning | `1.0.0` |
 | Archive file | `{name}-{version}.aam` | `asvc-auditor-1.0.0.aam` |
-| Cursor rule file | `{type}-{name}.mdc` | `agent-asvc-audit.mdc` |
-| Registry package dir | Same as package name | `packages/asvc-auditor/` |
+| Cursor rule file | `{type}-{fs-name}.mdc` | `agent-author--asvc-audit.mdc` |
+| Filesystem name (scoped) | `scope--name` (double-hyphen) | `author--asvc-report` |
+| Registry package dir (unscoped) | `packages/{name}/` | `packages/asvc-auditor/` |
+| Registry package dir (scoped) | `packages/@{scope}/{name}/` | `packages/@author/asvc-auditor/` |
 
 ## Appendix C: Environment Variables
 

@@ -9,13 +9,19 @@ This guide walks you through creating, publishing, and installing AAM packages w
 
 ## Table of Contents
 
-1. [Quick Start](#1-quick-start)
+1. [Quick Start (Local)](#1-quick-start-local)
 2. [Creating a Package from an Existing Project](#2-creating-a-package-from-an-existing-project)
 3. [Creating a Package from Scratch](#3-creating-a-package-from-scratch)
 4. [Publishing a Package](#4-publishing-a-package)
 5. [Installing a Package](#5-installing-a-package)
 6. [Adding Dependencies](#6-adding-dependencies)
 7. [Complete Example: Building a Code Review Package](#7-complete-example-building-a-code-review-package)
+8. [Dist-Tags](#8-dist-tags)
+9. [Governance & Policy Gates](#9-governance--policy-gates)
+10. [Quality: Tests & Evals](#10-quality-tests--evals)
+11. [Portable Bundles](#11-portable-bundles)
+12. [MCP Server Integration](#12-mcp-server-integration)
+13. [Environment Diagnostics (aam doctor)](#13-environment-diagnostics-aam-doctor)
 
 ---
 
@@ -27,17 +33,17 @@ flowchart LR
         direction TB
         
         subgraph NewPkg["From Scratch"]
-            Init["aam init"]
+            Init["aam pkg init"]
             CreateNew["Create Artifacts<br/>skills/, agents/,<br/>prompts/, instructions/"]
         end
         
         subgraph ExistingPkg["From Existing Project"]
-            CreatePkg["aam create-package<br/><i>autodetect + select</i>"]
+            CreatePkg["aam pkg create<br/><i>autodetect + select</i>"]
         end
         
-        Validate["aam validate"]
-        Pack["aam pack"]
-        Publish["aam publish --sign"]
+        Validate["aam pkg validate"]
+        Pack["aam pkg pack"]
+        Publish["aam pkg publish --sign"]
     end
     
     subgraph Registry["Registry"]
@@ -70,7 +76,9 @@ flowchart LR
 
 ---
 
-## 1. Quick Start
+## 1. Quick Start (Local)
+
+Get up and running in under 5 minutes — **no server, no Docker, no database required**.
 
 ### Prerequisites
 
@@ -82,28 +90,73 @@ pip install aam
 aam --version
 # aam 0.1.0
 
-# Configure default platform
-aam config set default_platform cursor
+# Set up AAM (detects platform, registers default sources)
+aam init
+# or non-interactive: aam init --yes
+```
+
+### Local Workflow (Recommended Starting Path)
+
+```bash
+# 1. Initialize AAM (one-time setup)
+aam init
+
+# 2. Create a local registry
+aam registry init ~/my-packages
+aam registry add local file:///home/user/my-packages --default
+
+# 3. Create a package from an existing project
+aam pkg create
+aam pkg validate
+aam pkg pack
+
+# 4. Publish to local registry (no server needed)
+aam pkg publish --registry local
+
+# 5. Install from local registry
+cd another-project/
+aam search "my-package"
+aam install @author/my-package
+
+# That's it! No Docker, no Postgres, no server process.
 ```
 
 ### TL;DR Commands
 
 ```bash
-# Create a package from an existing project (autodetect skills/agents/etc.)
-aam create-package
+# Set up AAM client (platform, default sources)
+aam init
 
-# Or create a new package from scratch
-aam init my-package
+# Create a package from an existing project (autodetect skills/agents/etc.)
+aam pkg create
+
+# Or create a new package from scratch (unscoped)
+aam pkg init my-package
+
+# Or create a scoped package
+aam pkg init @author/my-package
 
 # Validate before publishing
-aam validate
+aam pkg validate
 
 # Build and publish
-aam pack
-aam publish
+aam pkg pack
+aam pkg publish
 
-# Install a package
+# Install a package (scoped)
+aam install @author/my-package
+
+# Install a package (unscoped)
 aam install my-package
+
+# Check for updates from sources
+aam outdated
+
+# Upgrade outdated packages
+aam upgrade
+
+# Browse available source artifacts
+aam list --available
 ```
 
 ---
@@ -112,7 +165,7 @@ aam install my-package
 
 You have been working on a project and organically created skills, agents, or instructions — perhaps directly in `.cursor/skills/`, `.cursor/rules/`, or other platform-specific locations. Now you want to bundle them into an AAM package so they can be shared, versioned, and installed elsewhere.
 
-The `aam create-package` command handles this workflow.
+The `aam pkg create` command handles this workflow.
 
 ### 2.1 The Problem
 
@@ -143,11 +196,11 @@ These skills and agents are useful, but they're trapped in your local project. T
 
 ### 2.2 Basic Usage
 
-Run `aam create-package` from your project root:
+Run `aam pkg create` from your project root:
 
 ```bash
 $ cd my-project/
-$ aam create-package
+$ aam pkg create
 
 Scanning for artifacts not managed by AAM...
 
@@ -179,7 +232,7 @@ Package name [my-project]: my-toolkit
 Version [1.0.0]:
 Description: Code review and deployment toolkit
 Author [spazy]:
-License [MIT]:
+License [Apache-2.0]:
 
 How should files be organized?
   (c) Copy into AAM package structure
@@ -198,9 +251,9 @@ Creating package...
   5 artifacts (2 skills, 1 agent, 1 instruction, 1 prompt)
 
 Next steps:
-  aam validate    — verify the package is well-formed
-  aam pack        — build distributable .aam archive
-  aam publish     — publish to registry
+  aam pkg validate    — verify the package is well-formed
+  aam pkg pack        — build distributable .aam archive
+  aam pkg publish     — publish to registry
 ```
 
 ### 2.3 What Gets Autodetected
@@ -389,17 +442,17 @@ Would create:
 
 ### 3.1 Initialize a New Package
 
-Use `aam init` to create a new package interactively:
+Use `aam pkg init` to create a new package interactively:
 
 ```bash
 $ mkdir python-best-practices && cd python-best-practices
-$ aam init
+$ aam pkg init
 
-Package name [python-best-practices]: 
+Package name [python-best-practices]: @author/python-best-practices
 Version [1.0.0]: 
 Description: Python coding standards and best practices for AI agents
-Author: your-username
-License [MIT]: 
+Author: author
+License [Apache-2.0]: 
 
 What artifacts will this package contain?
   [x] Skills
@@ -440,12 +493,12 @@ The generated `aam.yaml` is the heart of your package:
 
 ```yaml
 # aam.yaml
-name: python-best-practices
+name: "@author/python-best-practices"   # Scoped package name
 version: 1.0.0
 description: "Python coding standards and best practices for AI agents"
-author: your-username
-license: MIT
-repository: https://github.com/your-username/python-best-practices
+author: author
+license: Apache-2.0
+repository: https://github.com/author/python-best-practices
 
 # Declare what this package provides
 artifacts:
@@ -454,7 +507,7 @@ artifacts:
   prompts: []
   instructions: []
 
-# Dependencies on other AAM packages
+# Dependencies on other AAM packages (both scoped and unscoped supported)
 dependencies: {}
 
 # Platform-specific configuration
@@ -1216,7 +1269,7 @@ name: python-best-practices
 version: 1.0.0
 description: "Python coding standards and best practices for AI agents"
 author: your-username
-license: MIT
+license: Apache-2.0
 repository: https://github.com/your-username/python-best-practices
 
 artifacts:
@@ -1333,7 +1386,7 @@ Token expires: never (revoke with `aam logout`)
 ```bash
 $ aam pack
 
-Building python-best-practices@1.0.0...
+Building @author/python-best-practices@1.0.0...
   Adding aam.yaml
   Adding agents/python-mentor/agent.yaml
   Adding agents/python-mentor/system-prompt.md
@@ -1352,13 +1405,13 @@ Building python-best-practices@1.0.0...
 ```bash
 $ aam publish
 
-Publishing python-best-practices@1.0.0...
+Publishing @author/python-best-practices@1.0.0...
 
 Uploading python-best-practices-1.0.0.aam...
   ████████████████████████████████ 100%
 
-✓ Published python-best-practices@1.0.0
-  URL: https://registry.aam.dev/packages/python-best-practices
+✓ Published @author/python-best-practices@1.0.0
+  URL: https://registry.aam.dev/packages/@author/python-best-practices
   
 ⚠ Package is unsigned. Consider signing with --sign for better security.
 ```
@@ -1368,11 +1421,11 @@ Uploading python-best-practices-1.0.0.aam...
 ```bash
 $ aam publish --sign
 
-Publishing python-best-practices@1.0.0...
+Publishing @author/python-best-practices@1.0.0...
 
 Signing package with Sigstore...
   🔐 Opening browser for authentication...
-  ✓ Authenticated as your-username@github
+  ✓ Authenticated as author@github
   ✓ Package signed
   ✓ Recorded in Rekor transparency log
 
@@ -1414,7 +1467,7 @@ version: 1.1.0
 Then publish:
 
 ```bash
-$ aam validate && aam pack && aam publish --sign
+$ aam pkg validate && aam pkg pack && aam pkg publish --sign
 
 ✓ Package is valid
 ✓ Built python-best-practices-1.1.0.aam (4.5 KB)
@@ -1445,21 +1498,21 @@ Proceed? [y/N] y
 
 ```bash
 $ cd my-project/
-$ aam install python-best-practices
+$ aam install @author/python-best-practices
 
-Resolving python-best-practices@1.1.0...
-  + python-best-practices@1.1.0
+Resolving @author/python-best-practices@1.1.0...
+  + @author/python-best-practices@1.1.0
 
 Downloading 1 package...
-  ✓ python-best-practices@1.1.0 (4.5 KB)
+  ✓ @author/python-best-practices@1.1.0 (4.5 KB)
 
 Verification:
   ✓ Checksum: sha256:a1b2c3d4... matches
-  ✓ Signature: Sigstore (your-username@github)
+  ✓ Signature: Sigstore (author@github)
 
 Deploying to cursor...
-  → agent: python-mentor       → .cursor/rules/agent-python-mentor.mdc
-  → skill: python-reviewer     → .cursor/skills/python-reviewer/
+  → agent: python-mentor       → .cursor/rules/agent-author--python-mentor.mdc
+  → skill: python-reviewer     → .cursor/skills/author--python-reviewer/
   → prompt: refactor-function  → .cursor/prompts/refactor-function.md
   → instruction: python-standards → .cursor/rules/python-standards.mdc
 
@@ -1469,22 +1522,26 @@ Deploying to cursor...
 ### 5.2 Install Specific Version
 
 ```bash
-$ aam install python-best-practices@1.0.0
+# Install scoped package with a specific version
+$ aam install @author/python-best-practices@1.0.0
 
-Resolving python-best-practices@1.0.0...
-  + python-best-practices@1.0.0
+Resolving @author/python-best-practices@1.0.0...
+  + @author/python-best-practices@1.0.0
 
 ...
+
+# Unscoped package with version also works
+$ aam install my-package@1.0.0
 ```
 
 ### 5.3 Install to Specific Platform
 
 ```bash
 # Install only to Claude
-$ aam install python-best-practices --platform claude
+$ aam install @author/python-best-practices --platform claude
 
 Deploying to claude...
-  → skill: python-reviewer     → .claude/skills/python-reviewer/
+  → skill: python-reviewer     → .claude/skills/author--python-reviewer/
   → instruction: python-standards → CLAUDE.md (section added)
 
 ✓ Installed 1 package
@@ -1493,11 +1550,14 @@ Deploying to claude...
 ### 5.4 Install from Different Sources
 
 ```bash
-# From registry (default)
+# From registry — scoped package (default)
+aam install @author/python-best-practices
+
+# From registry — unscoped package
 aam install python-best-practices
 
 # From git repository
-aam install git+https://github.com/user/python-best-practices.git
+aam install git+https://github.com/author/python-best-practices.git
 
 # From local directory
 aam install ./my-local-package/
@@ -1511,12 +1571,12 @@ aam install python-best-practices-1.0.0.aam
 Download and resolve dependencies without deploying artifacts:
 
 ```bash
-$ aam install python-best-practices --no-deploy
+$ aam install @author/python-best-practices --no-deploy
 
-Resolving python-best-practices@1.1.0...
-  + python-best-practices@1.1.0
+Resolving @author/python-best-practices@1.1.0...
+  + @author/python-best-practices@1.1.0
 
-✓ Downloaded to .aam/packages/python-best-practices/
+✓ Downloaded to .aam/packages/@author/python-best-practices/
 
 To deploy later, run: aam deploy
 ```
@@ -1527,11 +1587,16 @@ To deploy later, run: aam deploy
 $ aam list
 
 Installed packages:
-  python-best-practices  1.1.0  4 artifacts (1 agent, 1 skill, 1 prompt, 1 instruction)
+
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Name                  ┃ Version ┃ Source   ┃ Artifacts                                     ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ python-best-practices │ 1.1.0   │ local    │ 4 (1 agent, 1 skill, 1 prompt, 1 instruction) │
+└───────────────────────┴─────────┴──────────┴───────────────────────────────────────────────┘
 
 $ aam list --tree
 
-python-best-practices@1.1.0
+python-best-practices@1.1.0 (local)
   (no dependencies)
 
 $ aam info python-best-practices
@@ -1539,7 +1604,7 @@ $ aam info python-best-practices
 python-best-practices@1.1.0
   Description: Python coding standards and best practices for AI agents
   Author:      your-username
-  License:     MIT
+  License:     Apache-2.0
   Repository:  https://github.com/your-username/python-best-practices
 
   Artifacts:
@@ -1549,6 +1614,7 @@ python-best-practices@1.1.0
     instruction: python-standards — Python coding standards
 
   Dependencies: none
+  Source: local
 
   Deployed to:
     cursor: .cursor/skills/, .cursor/rules/, .cursor/prompts/
@@ -1579,23 +1645,23 @@ Removing deployed artifacts from cursor...
 Suppose you want your package to depend on a `code-analysis` package. Add it to `aam.yaml`:
 
 ```yaml
-name: python-best-practices
+name: "@author/python-best-practices"
 version: 1.2.0
 description: "Python coding standards and best practices for AI agents"
-author: your-username
-license: MIT
+author: author
+license: Apache-2.0
 
 artifacts:
   # ... your artifacts ...
 
 dependencies:
-  # Exact version
-  code-analysis: "1.0.0"
+  # Scoped dependency — exact version
+  "@author/code-analysis": "1.0.0"
   
-  # Minimum version
-  common-prompts: ">=2.0.0"
+  # Scoped dependency — minimum version
+  "@org/common-prompts": ">=2.0.0"
   
-  # Compatible version (>=1.0.0, <2.0.0)
+  # Unscoped dependency — compatible version (>=1.0.0, <2.0.0)
   linting-rules: "^1.0.0"
   
   # Approximate version (>=1.0.0, <1.1.0)
@@ -1720,7 +1786,7 @@ flowchart TD
 ```bash
 $ aam list --tree
 
-python-best-practices@1.2.0
+python-best-practices@1.2.0 (local)
 ├── code-analysis@1.0.0
 ├── common-prompts@2.1.0
 ├── linting-rules@1.3.0
@@ -1783,23 +1849,32 @@ packages:
 
 **Commit this file to git** for reproducible installs across your team.
 
-### 6.7 Update Dependencies
+### 6.7 Check for Outdated & Upgrade
 
 ```bash
-# Update all packages to latest compatible versions
-$ aam update
+# Check which packages have updates available
+$ aam outdated
 
-Resolving updates...
-  python-best-practices: 1.2.0 (unchanged)
-  code-analysis: 1.0.0 → 1.0.1 (patch update)
-  common-prompts: 2.1.0 → 2.2.0 (minor update)
+Package          Current  Latest  Source               Status
+code-analysis    1a2b3c4  9f8e7d6 community-skills     outdated
+common-prompts   5e6f7a8  b1c2d3e awesome-prompts      outdated (modified)
 
-Update 2 packages? [Y/n] y
+2 outdated, 1 up to date, 0 from registry
 
-✓ Updated 2 packages
+# Upgrade all outdated packages
+$ aam upgrade
 
-# Update a specific package
-$ aam update code-analysis
+  ✓ Upgraded code-analysis (1a2b3c4 → 9f8e7d6)
+  ⊘ Skipped common-prompts: Local modifications detected. Use --force to overwrite.
+
+# Force upgrade (overwrite local changes)
+$ aam upgrade common-prompts --force
+
+# Dry-run — preview without making changes
+$ aam upgrade --dry-run
+
+# JSON output for scripting
+$ aam outdated --json
 ```
 
 ---
@@ -1812,14 +1887,14 @@ Let's build a complete package from scratch: a code review toolkit.
 
 ```bash
 mkdir code-review-toolkit && cd code-review-toolkit
-aam init
+aam pkg init
 ```
 
 Fill in:
-- Name: `code-review-toolkit`
+- Name: `@author/code-review-toolkit`
 - Version: `1.0.0`
 - Description: "Comprehensive code review toolkit for multiple languages"
-- Author: your-username
+- Author: author
 
 ### Step 2: Create Directory Structure
 
@@ -2780,12 +2855,12 @@ Apply these security practices when writing or reviewing code:
 `aam.yaml`:
 
 ```yaml
-name: code-review-toolkit
+name: "@author/code-review-toolkit"
 version: 1.0.0
 description: "Comprehensive code review toolkit for security and performance"
-author: your-username
-license: MIT
-repository: https://github.com/your-username/code-review-toolkit
+author: author
+license: Apache-2.0
+repository: https://github.com/author/code-review-toolkit
 
 artifacts:
   agents:
@@ -2834,30 +2909,30 @@ keywords:
 
 ```bash
 # Validate
-$ aam validate
+$ aam pkg validate
 ✓ Package is valid and ready to publish
 
 # Pack
-$ aam pack
+$ aam pkg pack
 ✓ Built code-review-toolkit-1.0.0.aam (8.7 KB)
 
 # Publish with signature
-$ aam publish --sign
-✓ Published code-review-toolkit@1.0.0
+$ aam pkg publish --sign
+✓ Published @author/code-review-toolkit@1.0.0
 ```
 
 ### Step 10: Users Install Your Package
 
 ```bash
-$ aam install code-review-toolkit
+$ aam install @author/code-review-toolkit
 
-Resolving code-review-toolkit@1.0.0...
-  + code-review-toolkit@1.0.0
+Resolving @author/code-review-toolkit@1.0.0...
+  + @author/code-review-toolkit@1.0.0
 
 Deploying to cursor...
-  → agent: security-reviewer   → .cursor/rules/agent-security-reviewer.mdc
-  → skill: security-scan       → .cursor/skills/security-scan/
-  → skill: performance-check   → .cursor/skills/performance-check/
+  → agent: security-reviewer   → .cursor/rules/agent-author--security-reviewer.mdc
+  → skill: security-scan       → .cursor/skills/author--security-scan/
+  → skill: performance-check   → .cursor/skills/author--performance-check/
   → prompt: security-report    → .cursor/prompts/security-report.md
   → instruction: secure-coding → .cursor/rules/secure-coding.mdc
 
@@ -2866,22 +2941,630 @@ Deploying to cursor...
 
 ---
 
+## 8. Dist-Tags
+
+Dist-tags let you assign named aliases to specific versions. They're useful for marking "stable" releases, "beta" versions, or org-specific approval gates.
+
+### 8.1 Publish with a Tag
+
+```bash
+# Publish and tag the version as "beta"
+aam publish --tag beta
+
+# The "latest" tag is always set automatically on publish
+```
+
+### 8.2 Manage Tags After Publish
+
+```bash
+# Tag a specific version as "stable"
+aam dist-tag add @author/my-agent@1.2.0 stable
+
+# List all tags for a package
+aam dist-tag ls @author/my-agent
+#   latest: 1.3.0
+#   stable: 1.2.0
+#   beta:   1.3.0-rc.1
+
+# Remove a tag
+aam dist-tag rm @author/my-agent beta
+```
+
+### 8.3 Install Using a Tag
+
+```bash
+# Install the "stable" version (whatever version "stable" points to)
+aam install @author/my-agent@stable
+
+# Install the "latest" version (default behavior)
+aam install @author/my-agent
+```
+
+Dist-tags work with both local and HTTP registries. For local registries, tags are stored in the `metadata.yaml` file.
+
+---
+
+## 9. Governance & Policy Gates
+
+Governance controls help organizations manage what packages can be installed and who can publish.
+
+### 9.1 Policy Gates (Client-Side)
+
+Policy gates run locally in the CLI — no server required. Configure them in your project or global config:
+
+```yaml
+# .aam/config.yaml or ~/.aam/config.yaml
+governance:
+  install_policy:
+    allowed_scopes: ["@myorg", "@trusted-vendor"]
+    require_signature: true
+    require_tag: "stable"
+    blocked_packages: ["@sketchy/*"]
+  publish_policy:
+    require_signature: true
+```
+
+**Example: Only allow approved packages:**
+
+```bash
+# With require_tag: "stable" configured, this will fail:
+$ aam install @unknown/sketchy-tool
+ERROR: Package '@unknown/sketchy-tool' blocked by install policy:
+  scope '@unknown' is not in allowed_scopes
+
+# But this works:
+$ aam install @myorg/approved-tool@stable
+✓ Installed @myorg/approved-tool@1.2.0
+```
+
+### 9.2 Approval Workflows (Server-Side)
+
+When using an HTTP registry with `require_approval: true`:
+
+```bash
+# Author publishes — package is in "pending" state
+$ aam publish
+✓ Published @myorg/agent@1.2.0 (pending approval)
+
+# Approver reviews and approves
+$ aam approve @myorg/agent@1.2.0 --comment "Reviewed for production"
+✓ Approved @myorg/agent@1.2.0
+
+# Now it can be installed
+$ aam install @myorg/agent@1.2.0
+```
+
+### 9.3 Audit Log (Server-Side)
+
+Every action on the HTTP registry is logged. View the audit log via the API:
+
+```bash
+# View recent audit events (requires admin token)
+curl -H "Authorization: Bearer $TOKEN" \
+  https://registry.aam.dev/api/v1/audit-log?limit=10
+```
+
+---
+
+## 10. Quality: Tests & Evals
+
+Packages can declare tests and evaluations in `aam.yaml`. Eval results are stored in the registry and help consumers judge package quality.
+
+### 10.1 Declaring Tests and Evals
+
+```yaml
+# aam.yaml
+quality:
+  tests:
+    - name: "unit-tests"
+      command: "pytest tests/"
+      description: "Unit tests for agent skills"
+    - name: "lint-check"
+      command: "ruff check ."
+      description: "Code quality check"
+  evals:
+    - name: "accuracy-eval"
+      path: "evals/accuracy.yaml"
+      description: "Measures accuracy against benchmark dataset"
+      metrics:
+        - name: "accuracy"
+          type: "percentage"
+        - name: "latency_p95"
+          type: "duration_ms"
+```
+
+### 10.2 Running Tests and Evals
+
+```bash
+# Run all declared tests
+$ aam test
+Running unit-tests... ✓ passed
+Running lint-check... ✓ passed
+
+# Run all declared evals
+$ aam eval
+Running accuracy-eval...
+  accuracy: 94.2%
+  latency_p95: 1200ms
+  Status: passed
+
+# Run evals and publish results to the registry
+$ aam eval --publish
+✓ Eval results published for @author/my-agent@1.2.0
+```
+
+### 10.3 Viewing Eval Results
+
+Eval results appear in `aam info` and `aam search` output:
+
+```bash
+$ aam info @author/my-agent
+@author/my-agent@1.2.0
+  ...
+  Eval Results:
+    accuracy-eval: passed (accuracy: 94.2%, latency_p95: 1200ms)
+```
+
+---
+
+## 11. Portable Bundles
+
+Portable bundles are pre-compiled, self-contained archives for a specific platform. They're great for sharing via Slack, email, or git without requiring access to a registry.
+
+### 11.1 Building a Bundle
+
+```bash
+# Build a bundle for Cursor
+$ aam build --target cursor
+Building @author/my-agent@1.0.0 for cursor...
+  Resolving dependencies...
+  Compiling artifacts for cursor...
+✓ Built dist/my-agent-1.0.0-cursor.bundle.aam
+
+# Build for all configured platforms
+$ aam build --target all
+✓ Built dist/my-agent-1.0.0-cursor.bundle.aam
+✓ Built dist/my-agent-1.0.0-copilot.bundle.aam
+✓ Built dist/my-agent-1.0.0-claude.bundle.aam
+```
+
+### 11.2 Installing from a Bundle
+
+```bash
+# Install directly from a bundle file — no registry needed
+$ aam install ./dist/my-agent-1.0.0-cursor.bundle.aam
+
+Deploying to cursor...
+  → skill: my-skill        → .cursor/skills/author--my-skill/
+  → agent: my-agent        → .cursor/rules/agent-author--my-agent.mdc
+
+✓ Installed from bundle (1 agent, 1 skill)
+```
+
+### 11.3 Sharing Bundles
+
+Bundles are regular files — share them however works for your team:
+
+- **Slack/Teams:** Drop the `.bundle.aam` file in a channel
+- **Email:** Attach to an email
+- **Git:** Commit to a shared repository
+- **Cloud storage:** Upload to Google Drive, Dropbox, etc.
+
+The recipient just runs `aam install ./path-to-bundle.aam` and they're ready to go.
+
+---
+
 ## Summary
 
 | Task | Command |
 |------|---------|
-| Create package from existing project | `aam create-package` |
-| Create package from scratch | `aam init` |
-| Validate package | `aam validate` |
-| Build archive | `aam pack` |
-| Publish to registry | `aam publish [--sign]` |
-| Install package | `aam install <name>` |
-| Install specific version | `aam install <name>@<version>` |
-| List installed | `aam list` |
-| Show package info | `aam info <name>` |
-| Update packages | `aam update` |
+| **Getting Started** | |
+| Set up AAM (platform, sources) | `aam init` |
+| **Package Management** | |
+| Install package (scoped) | `aam install @author/name` |
+| Install package (unscoped) | `aam install name` |
+| Install specific version | `aam install @author/name@version` |
+| Install from specific source | `aam install source-name/artifact` (e.g., `anthropics/skills/skill-creator`) |
 | Uninstall package | `aam uninstall <name>` |
-| Search registry | `aam search <query>` |
+| Upgrade outdated packages | `aam upgrade [name]` |
+| Check for outdated packages | `aam outdated [--json]` |
+| Search registry + sources | `aam search <query>` |
+| List installed | `aam list` |
+| Browse available artifacts | `aam list --available` |
+| Show package info | `aam info <name>` |
+| **Package Authoring** | |
+| Create package from existing project | `aam pkg create` |
+| Create package from scratch | `aam pkg init <name>` |
+| Validate package | `aam pkg validate` |
+| Build archive | `aam pkg pack` |
+| Publish to registry | `aam pkg publish [--sign]` |
+| Build portable bundle | `aam pkg build --target <platform>` |
+| **Source Management** | |
+| Add git source | `aam source add <url>` |
+| Scan source | `aam source scan <name>` |
+| Update sources | `aam source update [--all]` |
+| List sources | `aam source list` |
+| Remove source | `aam source remove <name>` |
+| List candidates | `aam source candidates` |
+| Enable default sources | `aam source enable-defaults` |
+| **Package Integrity** | |
+| Verify package | `aam verify <name>` |
+| Diff package | `aam diff <name>` |
+| **Configuration** | |
+| Create local registry | `aam registry init <path>` |
+| Manage dist-tags | `aam dist-tag add/rm/ls` |
+| **Utilities** | |
+| Start MCP server | `aam mcp serve [--transport] [--allow-write]` |
+| Run diagnostics | `aam doctor` |
+| Run tests | `aam test` |
+| Run evals | `aam eval [--publish]` |
+
+---
+
+## 12. Remote Git Sources
+
+AAM can discover and package artifacts directly from remote git repositories. This lets you browse community skill collections (like `openai/skills`) and create AAM packages from them without manually downloading files.
+
+### 12.1 Adding a Source
+
+```bash
+# GitHub shorthand
+aam source add openai/skills
+
+# HTTPS URL with subdirectory
+aam source add https://github.com/openai/skills --path skills/.curated
+
+# Track a specific branch
+aam source add openai/skills --ref v2
+```
+
+AAM clones the repository, scans for artifacts, and saves the source in your configuration.
+
+### 12.2 Scanning and Discovering Artifacts
+
+```bash
+# See what's in a source
+aam source scan openai/skills
+
+# Filter by type
+aam source scan openai/skills --type skill
+
+# List unpackaged candidates across all sources
+aam source candidates
+```
+
+### 12.3 Installing Directly from a Source
+
+You can install artifacts directly from git sources without creating a package first. Use the **qualified name** format `source-name/artifact` as a single argument:
+
+```bash
+# Install skill-creator from anthropics/skills (source name from aam source list)
+aam install anthropics/skills/skill-creator
+
+# For sources with a scan path (e.g., openai/skills:.curated)
+aam install openai/skills:.curated/code-review
+```
+
+**Note:** There is no `-s` or `--source` option for `aam install`. The source is specified in the package argument. If you add `anthropics/skills` and `anthropics/skills:skills` as separate sources (with different paths), use the source name that appears in `aam list --available` or the Source column of `aam search`. Run `aam info source/artifact` to see the exact install command for any uninstalled artifact.
+
+### 12.4 Creating Packages from Sources (Authoring Workflow)
+
+```bash
+# Package specific artifacts from a source
+aam create-package --from-source openai/skills --artifacts code-review,code-gen
+
+# Package all artifacts from a source
+aam create-package --from-source openai/skills --all
+```
+
+Packages created from sources include provenance metadata that records where the content originated.
+
+### 12.5 Keeping Sources Updated
+
+```bash
+# Fetch upstream changes
+aam source update openai/skills
+
+# Update all sources
+aam source update --all
+
+# Preview changes without fetching
+aam source update openai/skills --dry-run
+```
+
+### 12.6 Managing Sources
+
+```bash
+# List all configured sources
+aam source list
+
+# Remove a source
+aam source remove openai/skills
+
+# Remove and purge cached clone
+aam source remove openai/skills --purge-cache
+```
+
+### 12.7 Package Integrity
+
+AAM tracks per-file SHA-256 checksums for installed packages. You can verify that installed files haven't been modified:
+
+```bash
+# Check if files are modified
+aam verify my-package
+
+# Verify all installed packages
+aam verify --all
+
+# See exact changes
+aam diff my-package
+```
+
+When upgrading a package with local modifications, AAM warns you and offers options to backup, skip, view differences, or force the upgrade.
+
+### 12.8 Default Sources
+
+AAM ships with 4 curated community skill sources:
+
+- `github/awesome-copilot` - GitHub Copilot skills
+- `openai/skills:.curated` - OpenAI curated skills
+- `cursor/community-skills` - Cursor community skills
+- `anthropic/claude-prompts` - Anthropic Claude prompts
+
+These are registered automatically when you run `aam init`. You can also enable them at any time:
+
+```bash
+# Enable all 4 default sources
+aam source enable-defaults
+
+# Clone and scan the sources
+aam source update --all
+```
+
+If you previously removed a default source, `aam source enable-defaults` re-enables it by clearing it from the `removed_defaults` list. Sources that are already configured are skipped.
+
+---
+
+## 13. MCP Server Integration
+
+The AAM MCP (Model Context Protocol) server allows AI agents inside IDEs to manage packages programmatically. Instead of running CLI commands manually, your IDE agent can search registries, install packages, validate manifests, manage remote sources, and verify package integrity through MCP tools.
+
+### 13.1 What is the MCP Server?
+
+The MCP server exposes AAM's capabilities as structured tools and resources that IDE agents (Cursor, VS Code, Claude Desktop, Windsurf) can invoke over a standard protocol. This means your AI assistant can:
+
+- Search for and discover packages across registries
+- Install, uninstall, and manage packages
+- Validate package manifests
+- Discover artifacts from remote git sources
+- Verify package integrity and view file differences
+- Read project context (installed packages, configuration, sources)
+- Diagnose environment issues
+- **Recommend skills** based on repository analysis (frontend, backend, LLM usage)
+
+### 13.2 Starting the Server
+
+```bash
+# Start with stdio transport (default, for IDE integration)
+aam mcp serve
+
+# Start with HTTP transport on a custom port
+aam mcp serve --transport http --port 9000
+
+# Enable write tools for full package management
+aam mcp serve --allow-write
+
+# Log to a file at DEBUG level
+aam mcp serve --log-file /tmp/aam-mcp.log --log-level DEBUG
+```
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--transport` | `stdio` | Transport protocol: `stdio` or `http` |
+| `--port` | `8000` | HTTP port (only used with `--transport http`) |
+| `--allow-write` | `false` | Enable mutating tools (install, publish, etc.) |
+| `--log-file` | `None` | Redirect logs to a file (recommended for stdio) |
+| `--log-level` | `INFO` | Log level: DEBUG, INFO, WARNING, ERROR |
+
+> **Safety Model:** By default, only read-only tools are exposed (17 tools including source scanning, verify, diff, and skill recommendation). Write tools (install, uninstall, publish, config set, registry add, source add/remove/update) require the `--allow-write` flag. This prevents accidental modifications by AI agents.
+
+### 13.3 IDE Configuration
+
+#### Cursor
+
+Add to `.cursor/mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "aam": {
+      "command": "aam",
+      "args": ["mcp", "serve", "--allow-write"],
+      "env": {}
+    }
+  }
+}
+```
+
+#### VS Code
+
+Add to `.vscode/settings.json`:
+
+```json
+{
+  "mcp.servers": {
+    "aam": {
+      "command": "aam",
+      "args": ["mcp", "serve", "--allow-write"]
+    }
+  }
+}
+```
+
+#### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
+
+```json
+{
+  "mcpServers": {
+    "aam": {
+      "command": "aam",
+      "args": ["mcp", "serve", "--allow-write"]
+    }
+  }
+}
+```
+
+### 13.4 Available Tools
+
+**Read-only tools** (always available, 17 tools):
+
+| Tool | Description |
+|------|-------------|
+| `aam_search` | Search registries for packages by query |
+| `aam_list` | List all installed packages |
+| `aam_info` | Show detailed metadata for an installed package |
+| `aam_validate` | Validate a package manifest and artifacts |
+| `aam_config_get` | Get configuration value(s) |
+| `aam_registry_list` | List configured registries |
+| `aam_doctor` | Run environment diagnostics |
+| `aam_source_list` | List all configured remote git sources |
+| `aam_source_scan` | Scan a source for artifacts (with optional type filter) |
+| `aam_source_candidates` | List unpackaged artifact candidates across sources |
+| `aam_source_diff` | Preview upstream changes for a source (dry-run update) |
+| `aam_verify` | Verify integrity of installed package files |
+| `aam_diff` | Show unified diff of modified files in installed packages |
+| `aam_outdated` | Check for outdated source-installed packages |
+| `aam_available` | List all available artifacts from configured sources |
+| `aam_recommend_skills` | Recommend skills based on repository analysis |
+| `aam_init_info` | Get client initialization status and detected platform |
+
+**Write tools** (require `--allow-write`, 10 tools):
+
+| Tool | Description |
+|------|-------------|
+| `aam_install` | Install packages from registries or local sources |
+| `aam_uninstall` | Remove an installed package |
+| `aam_publish` | Publish a package to a registry |
+| `aam_create_package` | Create a package from a project or remote source (`from_source` parameter) |
+| `aam_config_set` | Set a configuration value |
+| `aam_registry_add` | Add a new registry source |
+| `aam_init_package` | Scaffold a brand-new package with directories and manifest |
+| `aam_source_add` | Add a remote git repository as an artifact source |
+| `aam_source_remove` | Remove a configured source (with optional cache purge) |
+| `aam_source_update` | Fetch upstream changes for one or all sources |
+
+**Skill recommendation (`aam_recommend_skills`):**
+
+When you ask "what skills should I use for this repo?" or "find skills for my React + Python LLM app," the agent can call `aam_recommend_skills(path=None, limit=15)`. The tool analyzes the project (package.json, pyproject.toml, structure) to detect frontend (React, Vue), backend (Python, FastAPI), LLM usage, and docs, then returns ranked skill recommendations from configured sources with rationale.
+
+**Source operation error codes:**
+
+| Error Code | Condition |
+|---|---|
+| `AAM_SOURCE_NOT_FOUND` | Named source not in config |
+| `AAM_SOURCE_ALREADY_EXISTS` | Duplicate source name on add |
+| `AAM_SOURCE_URL_INVALID` | URL failed validation |
+| `AAM_GIT_CLONE_FAILED` | Git clone failed after retries |
+| `AAM_PACKAGE_NOT_INSTALLED` | Package not found for verify/diff |
+
+### 13.5 Available Resources
+
+Resources provide passive data access — agents can read them without invoking tools.
+
+| Resource URI | Description |
+|-------------|-------------|
+| `aam://config` | Full merged AAM configuration |
+| `aam://packages/installed` | List of installed packages |
+| `aam://packages/{name}` | Detailed metadata for a specific package |
+| `aam://registries` | List of configured registries |
+| `aam://manifest` | Parsed `aam.yaml` from the current directory |
+| `aam://sources` | List of all configured remote git sources |
+| `aam://sources/{id}` | Source details with artifact list (use `--` for `/` in names) |
+| `aam://sources/{id}/candidates` | Unpackaged candidates from a source |
+
+### 13.6 Example Agent Conversations
+
+**Searching for packages:**
+> "Search for code review skills in the AAM registry."
+> → Agent calls `aam_search(query="code review", package_type="skill")`
+
+**Installing a package:**
+> "Install the asvc-auditor package."
+> → Agent calls `aam_install(packages=["asvc-auditor"])`
+
+**Discovering skills from a git source:**
+> "Add the openai/skills repository and show me what's available."
+> → Agent calls `aam_source_add(source="openai/skills")`, then `aam_source_scan(source_name="openai/skills")`
+
+**Checking package integrity:**
+> "Has anyone modified the installed code-review package?"
+> → Agent calls `aam_verify(package_name="code-review")`, then `aam_diff(package_name="code-review")` if changes found
+
+**Checking project health:**
+> "Run diagnostics on my AAM setup."
+> → Agent calls `aam_doctor()`
+
+### 13.7 Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Server not starting | Check `aam mcp serve --help` for options. Ensure `fastmcp` is installed. |
+| Tools not showing in IDE | Verify the MCP config file path and `command` value. |
+| Write tools not available | Add `--allow-write` to the server args in your IDE config. |
+| No output in stdio mode | Logs go to stderr by default. Use `--log-file` to capture them. |
+
+---
+
+## 14. Environment Diagnostics (aam doctor)
+
+The `aam doctor` command runs comprehensive diagnostics to identify issues with your AAM setup.
+
+### 14.1 Running Diagnostics
+
+```bash
+aam doctor
+```
+
+### 13.2 What Gets Checked
+
+| Check | Description |
+|-------|-------------|
+| **Python version** | Verifies Python >= 3.11 |
+| **Configuration** | Loads and validates `~/.aam/config.yaml` and `.aam/config.yaml` |
+| **Registries** | Checks each configured registry is accessible |
+| **Package integrity** | Verifies installed package manifests are valid |
+| **Incomplete installs** | Detects leftover staging directories from interrupted installs |
+
+### 13.3 Example Output
+
+```
+AAM Environment Diagnostics
+
+  ✓ Python 3.12.1
+  ✓ Configuration loaded (2 registries configured)
+  ✓ Registry 'local' accessible at /home/user/my-registry
+  ⚠ Registry 'team' path not found: /shared/packages
+      Run 'aam registry init /shared/packages' to create it, or 'aam registry remove team' to remove it.
+  ✓ Package 'asvc-auditor@1.0.0' — manifest valid, 3 artifacts
+  ✓ No incomplete installations detected
+
+5/6 checks passed, 1 warnings
+```
+
+### 13.4 Fixing Common Issues
+
+| Issue | Fix |
+|-------|-----|
+| Registry path not found | `aam registry init <path>` or `aam registry remove <name>` |
+| Package manifest error | `aam install <package> --force` to reinstall |
+| Incomplete installation | Remove `.aam/.tmp/` directory, then re-run the install |
+| Configuration error | Check `~/.aam/config.yaml` for syntax errors |
+
+---
 
 For more details, see:
 - [DESIGN.md](./DESIGN.md) — Architecture and concepts

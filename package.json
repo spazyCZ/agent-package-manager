@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Agent Package Manager - Nx Monorepo",
+  "license": "Apache-2.0",
   "scripts": {
     "cli": "nx run aam-cli:run",
     "cli:build": "nx run aam-cli:build",
@@ -24,7 +25,12 @@
     "graph": "nx graph",
     "affected": "nx affected",
     "affected:build": "nx affected -t build",
-    "affected:test": "nx affected -t test"
+    "affected:test": "nx affected -t test",
+    "docs": "nx run aam-docs:serve",
+    "docs:build": "nx run aam-docs:build",
+    "docs:deploy": "nx run aam-docs:deploy",
+    "docs:deploy:gcp": "nx run aam-docs:deploy:gcp",
+    "docs:install": "nx run aam-docs:install"
   },
   "devDependencies": {
     "@nx/eslint": "^20.0.0",
@@ -39,10 +45,11 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
     "eslint": "^9.0.0",
-    "eslint-config-prettier": "^9.1.0",
+    "eslint-config-prettier": "^10.0.0",
     "nx": "^20.0.0",
     "prettier": "^3.3.0",
     "typescript": "^5.6.0",
+    "typescript-eslint": "^8.54.0",
     "vite": "^6.0.0"
   },
   "dependencies": {

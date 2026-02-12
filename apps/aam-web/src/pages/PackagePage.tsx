@@ -12,6 +12,9 @@ interface PackageDetails {
   downloads: number;
   readme: string;
   versions: string[];
+  source: string;
+  sourceCommit: string;
+  artifactType: string;
 }
 
 function PackagePage() {
@@ -28,12 +31,15 @@ function PackagePage() {
         description: 'An AI agent package for automating tasks',
         version: version || '1.0.0',
         author: 'aam-team',
-        license: 'MIT',
+        license: 'Apache-2.0',
         homepage: 'https://example.com',
         repository: 'https://github.com/example/repo',
         downloads: 12345,
         readme: `# ${name}\n\nA powerful AI agent package.\n\n## Installation\n\n\`\`\`bash\naam install ${name}\n\`\`\`\n\n## Usage\n\nImport and use the agent in your project.`,
         versions: ['1.0.0', '0.9.0', '0.8.0', '0.7.0'],
+        source: 'google-gemini/gemini-skills',
+        sourceCommit: 'e151a3b4c5d6',
+        artifactType: 'agent',
       });
       setLoading(false);
     }, 500);
@@ -108,6 +114,28 @@ function PackagePage() {
                 <dt className="text-slate-600">Author</dt>
                 <dd className="font-medium">{pkg.author}</dd>
               </div>
+              {pkg.source && (
+                <div className="flex justify-between">
+                  <dt className="text-slate-600">Source</dt>
+                  <dd className="font-medium text-purple-600">{pkg.source}</dd>
+                </div>
+              )}
+              {pkg.artifactType && (
+                <div className="flex justify-between">
+                  <dt className="text-slate-600">Type</dt>
+                  <dd>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                      {pkg.artifactType}
+                    </span>
+                  </dd>
+                </div>
+              )}
+              {pkg.sourceCommit && (
+                <div className="flex justify-between">
+                  <dt className="text-slate-600">Commit</dt>
+                  <dd className="font-mono text-xs">{pkg.sourceCommit}</dd>
+                </div>
+              )}
             </dl>
           </div>
 

@@ -419,7 +419,7 @@ class CopilotAdapter:
             from aam_cli.utils.yaml_utils import load_yaml
 
             agent_data = load_yaml(agent_yaml_path)
-            prompt_file = agent_data.get("system_prompt", "system-prompt.md")
+            prompt_file: str = agent_data.get("system_prompt", "system-prompt.md")
             alt_path = agent_path / prompt_file
             if alt_path.is_file():
                 return alt_path.read_text(encoding="utf-8")

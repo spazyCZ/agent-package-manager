@@ -12,6 +12,7 @@ Tests cover:
 ################################################################################
 
 import logging
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -30,9 +31,6 @@ from aam_cli.services.search_service import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-import time
 
 ################################################################################
 #                                                                              #

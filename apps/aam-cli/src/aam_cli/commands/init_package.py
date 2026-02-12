@@ -11,6 +11,7 @@ Scaffolds a brand-new AAM package interactively using Rich prompts.
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
@@ -113,7 +114,7 @@ def init_package(ctx: click.Context, name: str | None) -> None:
     # -----
     # Step 5: Generate aam.yaml
     # -----
-    manifest_data: dict = {
+    manifest_data: dict[str, Any] = {
         "name": pkg_name,
         "version": version,
         "description": description,
@@ -128,7 +129,7 @@ def init_package(ctx: click.Context, name: str | None) -> None:
 
     manifest_data["dependencies"] = {}
 
-    platforms_config: dict = {}
+    platforms_config: dict[str, Any] = {}
     if "cursor" in selected_platforms:
         platforms_config["cursor"] = {
             "skill_scope": "project",

@@ -20,6 +20,7 @@ Reference: contracts/cli-commands.md
 
 import json
 import logging
+from typing import Any
 
 import click
 from rich.console import Console
@@ -566,7 +567,7 @@ def candidates(
     # -----
     # Group by source
     # -----
-    by_source: dict[str, list[dict]] = {}
+    by_source: dict[str, list[dict[str, Any]]] = {}
     for c in candidates_list:
         src = c.get("source_name", "unknown")
         by_source.setdefault(src, []).append(c)

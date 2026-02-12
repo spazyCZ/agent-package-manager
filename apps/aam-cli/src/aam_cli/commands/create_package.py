@@ -22,6 +22,7 @@ import logging
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
@@ -291,9 +292,9 @@ def _generate_manifest_dict(
     license_str: str,
     artifacts: list[DetectedArtifact],
     organize: str,
-) -> dict:
+) -> dict[str, Any]:
     """Generate the aam.yaml manifest data as a dict."""
-    grouped: dict[str, list[dict]] = {
+    grouped: dict[str, list[dict[str, str]]] = {
         "agents": [],
         "skills": [],
         "prompts": [],
@@ -309,7 +310,7 @@ def _generate_manifest_dict(
         }
         grouped[art.type + "s"].append(ref)
 
-    data: dict = {
+    data: dict[str, Any] = {
         "name": name,
         "version": version,
         "description": description,
@@ -559,7 +560,7 @@ def _create_from_source(
     # -----
     # Step 7: Generate manifest with provenance
     # -----
-    grouped: dict[str, list[dict]] = {
+    grouped: dict[str, list[dict[str, str]]] = {
         "agents": [],
         "skills": [],
         "prompts": [],
@@ -580,7 +581,7 @@ def _create_from_source(
             "description": art.get("description") or f"{art_type.capitalize()} {art['name']}",
         })
 
-    manifest_data: dict = {
+    manifest_data: dict[str, Any] = {
         "name": name,
         "version": version,
         "description": description,

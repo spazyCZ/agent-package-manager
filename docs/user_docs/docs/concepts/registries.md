@@ -139,7 +139,7 @@ Each package has a `metadata.yaml` that tracks all versions:
 name: "@myorg/my-agent"
 description: "ASVC compliance auditor agent"
 author: spazy
-license: MIT
+license: Apache-2.0
 repository: https://github.com/myorg/my-agent
 keywords: [audit, compliance]
 
@@ -317,7 +317,7 @@ cat > packages/@myorg/my-package/metadata.yaml <<EOF
 name: "@myorg/my-package"
 description: "My awesome package"
 author: myorg
-license: MIT
+license: Apache-2.0
 keywords: [example]
 dist_tags:
   latest: "1.0.0"

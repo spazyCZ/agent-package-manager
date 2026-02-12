@@ -2,6 +2,7 @@
 
 **Input**: Design documents from `/specs/001-cli-local-repository/`
 **Prerequisites**: plan.md (required), spec.md (required), research.md, data-model.md, contracts/cli-commands.md
+**Scope**: Local registries only — remote/HTTP registries are out of scope.
 
 **Tests**: Not explicitly requested in spec — test tasks are **excluded**. Tests should be written alongside implementation per the quickstart.md guidance.
 

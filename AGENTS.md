@@ -12,7 +12,7 @@ Think of it as `pip` or `npm`, but for AI agent configurations.
 
 - **Repository:** `agent-package-manager`
 - **Version:** 0.1.0 (early development)
-- **License:** MIT
+- **License:** Apache-2.0
 
 ---
 

@@ -59,7 +59,7 @@ def init_package(
     version: str = "1.0.0",
     description: str | None = None,
     author: str | None = None,
-    license_name: str = "MIT",
+    license_name: str = "Apache-2.0",
     artifact_types: list[str] | None = None,
     platforms: list[str] | None = None,
 ) -> dict[str, Any]:
@@ -79,7 +79,7 @@ def init_package(
         version: Semantic version string. Defaults to "1.0.0".
         description: One-line package description.
         author: Package author or organisation.
-        license_name: SPDX licence identifier. Defaults to "MIT".
+        license_name: SPDX licence identifier. Defaults to "Apache-2.0".
         artifact_types: Which artifact directories to scaffold.
             Defaults to all four: skills, agents, prompts, instructions.
             Invalid types are rejected.

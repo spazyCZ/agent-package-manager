@@ -49,7 +49,7 @@ my-package@1.0.0
   Status:      Installed
   Description: A sample package with skills and agents
   Author:      John Doe
-  License:     MIT
+  License:     Apache-2.0
   Repository:  https://github.com/johndoe/my-package
 
   Artifacts:
@@ -64,6 +64,15 @@ my-package@1.0.0
 
   Source: registry
   Checksum: sha256:a1b2c3d4e5f6...
+```
+
+When a package is installed from a git source, the Source field
+shows the actual source name and commit instead of the generic
+`source` label:
+
+```
+  Source: google-gemini/gemini-skills
+  Commit: e151a3b4c5d6
 ```
 
 ### Example 2: Uninstalled source package

@@ -104,7 +104,7 @@ Resources are **always available** regardless of the `--allow-write` flag (they 
   "version": "1.0.0",
   "description": "Example scoped package",
   "author": "scope",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": null,
   "homepage": null,
   "keywords": ["cursor", "skill"],
@@ -178,7 +178,7 @@ Resources are **always available** regardless of the `--allow-write` flag (they 
   "version": "1.0.0",
   "description": "My AAM package",
   "author": "John Doe",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "artifacts": {
     "skills": [
       {"name": "my-skill", "path": "skills/my-skill/", "description": "A helpful skill"}

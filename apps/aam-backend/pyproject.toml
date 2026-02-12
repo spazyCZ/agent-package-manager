@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Agent Package Manager Backend - FastAPI registry server"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 authors = [
     { name = "AAM Team" }
 ]
@@ -13,7 +13,7 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Framework :: FastAPI",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -55,9 +55,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/aam/agent-package-manager"
-Documentation = "https://github.com/aam/agent-package-manager/docs"
-Repository = "https://github.com/aam/agent-package-manager"
+Homepage = "https://github.com/spazyCZ/agent-package-manager"
+Documentation = "https://github.com/spazyCZ/agent-package-manager/docs"
+Repository = "https://github.com/spazyCZ/agent-package-manager"
 
 [build-system]
 requires = ["hatchling"]

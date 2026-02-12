@@ -76,7 +76,7 @@ def init_package(ctx: click.Context, name: str | None) -> None:
     version = Prompt.ask("Version", default="1.0.0")
     description = Prompt.ask("Description", default="")
     author = Prompt.ask("Author", default="")
-    license_str = Prompt.ask("License", default="MIT")
+    license_str = Prompt.ask("License", default="Apache-2.0")
 
     # -----
     # Step 2: Select artifact types

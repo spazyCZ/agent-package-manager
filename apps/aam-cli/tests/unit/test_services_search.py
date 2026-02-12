@@ -22,6 +22,7 @@ from aam_cli.services.search_service import (
     SCORE_KEYWORD_MATCH,
     SCORE_NAME_CONTAINS,
     SCORE_NAME_PREFIX,
+    SOURCES_REGISTRY_NAME,
     SearchResponse,
     SearchResult,
     compute_relevance_score,
@@ -276,12 +277,12 @@ class TestSearchPackagesExisting:
         assert response.results[0].name == "skill-pkg"
 
     def test_unit_search_invalid_limit(self) -> None:
-        """Limit outside [1, 50] raises ValueError."""
+        """Limit outside [1, 255] raises ValueError."""
         config = _make_config(sources=[_make_source("src1")])
         with pytest.raises(ValueError, match="AAM_INVALID_ARGUMENT"):
             search_packages("test", config, limit=0)
         with pytest.raises(ValueError, match="AAM_INVALID_ARGUMENT"):
-            search_packages("test", config, limit=51)
+            search_packages("test", config, limit=256)
 
 
 ################################################################################
@@ -930,6 +931,41 @@ class TestSearchPackagesNew:
         assert response.total_count == 1
         assert response.results[0].name == "test-pkg"
 
+    def test_unit_search_result_installed_default_false(self) -> None:
+        """SearchResult.installed defaults to False."""
+        result = SearchResult(
+            name="some-pkg",
+            version="1.0.0",
+        )
+        assert result.installed is False
+
+    def test_unit_search_result_installed_serialization(self) -> None:
+        """SearchResult.installed appears in JSON serialization."""
+        result_not_installed = SearchResult(
+            name="pkg-a",
+            version="1.0.0",
+            installed=False,
+        )
+        result_installed = SearchResult(
+            name="pkg-b",
+            version="2.0.0",
+            installed=True,
+        )
+
+        # -----
+        # Verify not-installed serialization
+        # -----
+        data_a = result_not_installed.model_dump(mode="json")
+        assert "installed" in data_a
+        assert data_a["installed"] is False
+
+        # -----
+        # Verify installed serialization
+        # -----
+        data_b = result_installed.model_dump(mode="json")
+        assert "installed" in data_b
+        assert data_b["installed"] is True
+
     # -----
     # Edge cases (EC-005, F7, F8, F9)
     # -----
@@ -992,7 +1028,7 @@ class TestSearchPackagesNew:
         mock_build_index: MagicMock,
     ) -> None:
         """limit=100 with only 5 results returns all 5, no error."""
-        # limit max is 50, so use 50
+        # limit max is 255, so use 50 (within range)
         entries = [
             _make_registry_entry(f"pkg-{i}") for i in range(5)
         ]
@@ -1005,10 +1041,200 @@ class TestSearchPackagesNew:
         mock_build_index.return_value = mock_index
 
         config = _make_config(registries=[_make_source("local")])
-        response = search_packages("", config, limit=50)
+        response = search_packages("", config, limit=100)
 
         assert len(response.results) == 5
         assert response.total_count == 5
+
+    # -----
+    # Source origin display (no [source] prefix)
+    # -----
+
+    @patch("aam_cli.services.search_service.build_source_index")
+    def test_unit_search_source_origin_is_plain_name(
+        self, mock_build_index: MagicMock
+    ) -> None:
+        """Source results show the source name without [source] prefix."""
+        vp = _make_virtual_package(
+            "docs-writer",
+            source_name="google-gemini/gemini-skills",
+            description="Write docs",
+        )
+        mock_index = MagicMock()
+        mock_index.by_qualified_name = {
+            "google-gemini/gemini-skills/docs-writer": vp,
+        }
+        mock_build_index.return_value = mock_index
+
+        config = _make_config(
+            registries=[],
+            sources=[_make_source("google-gemini/gemini-skills")],
+        )
+        response = search_packages("docs", config)
+
+        assert len(response.results) == 1
+        result = response.results[0]
+
+        # -----
+        # Origin must be the plain source name (no [source] prefix)
+        # The origin_type field already discriminates registry vs source
+        # -----
+        assert result.origin == "google-gemini/gemini-skills"
+        assert result.origin_type == "source"
+        assert "[source]" not in result.origin
+
+    # -----
+    # Deduplication: aam-sources registry skipped when sources searched
+    # -----
+
+    @patch("aam_cli.services.search_service.build_source_index")
+    @patch("aam_cli.services.search_service.create_registry")
+    def test_unit_search_skips_aam_sources_registry_when_sources_active(
+        self,
+        mock_create_reg: MagicMock,
+        mock_build_index: MagicMock,
+    ) -> None:
+        """aam-sources registry is skipped in general search to avoid dupes.
+
+        When both registries and sources are searched (no filters), the
+        auto-generated ``aam-sources`` registry is skipped because the
+        source index (Step 7) provides the same artifacts with richer
+        metadata (real source name, commit SHA).
+        """
+        # -----
+        # Set up aam-sources registry with a materialized entry
+        # -----
+        reg_entry = _make_registry_entry(
+            "docs-writer", description="Write docs", latest="0.0.0"
+        )
+        mock_reg = MagicMock()
+        mock_reg.search.return_value = [reg_entry]
+        mock_create_reg.return_value = mock_reg
+
+        # -----
+        # Set up source index with the same artifact (richer metadata)
+        # -----
+        vp = _make_virtual_package(
+            "docs-writer",
+            source_name="google-gemini/gemini-skills",
+            description="Write docs",
+        )
+        mock_index = MagicMock()
+        mock_index.by_qualified_name = {
+            "google-gemini/gemini-skills/docs-writer": vp,
+        }
+        mock_build_index.return_value = mock_index
+
+        config = _make_config(
+            registries=[_make_source(SOURCES_REGISTRY_NAME)],
+            sources=[_make_source("google-gemini/gemini-skills")],
+        )
+        response = search_packages("docs", config)
+
+        # -----
+        # Only ONE result should appear (from source, not aam-sources)
+        # -----
+        assert len(response.results) == 1
+        assert response.results[0].origin == "google-gemini/gemini-skills"
+        assert response.results[0].origin_type == "source"
+
+        # -----
+        # create_registry should NOT be called for aam-sources
+        # -----
+        mock_create_reg.assert_not_called()
+
+    @patch("aam_cli.services.search_service.build_source_index")
+    @patch("aam_cli.services.search_service.create_registry")
+    def test_unit_search_aam_sources_shown_with_explicit_registry_filter(
+        self,
+        mock_create_reg: MagicMock,
+        mock_build_index: MagicMock,
+    ) -> None:
+        """aam-sources is NOT skipped when explicitly filtered via --registry.
+
+        If the user requests ``--registry aam-sources``, the sources
+        registry should be searched (sources step is skipped by the
+        registry_filter logic).
+        """
+        # -----
+        # Set up aam-sources registry
+        # -----
+        reg_entry = _make_registry_entry(
+            "docs-writer", description="Write docs", latest="0.0.0"
+        )
+        mock_reg = MagicMock()
+        mock_reg.search.return_value = [reg_entry]
+        mock_create_reg.return_value = mock_reg
+
+        config = _make_config(
+            registries=[_make_source(SOURCES_REGISTRY_NAME)],
+            sources=[_make_source("google-gemini/gemini-skills")],
+        )
+        response = search_packages(
+            "docs", config, registry_filter=SOURCES_REGISTRY_NAME
+        )
+
+        # -----
+        # With explicit registry filter, aam-sources IS searched
+        # (sources are skipped because registry_filter is set)
+        # -----
+        assert len(response.results) == 1
+        assert response.results[0].origin == SOURCES_REGISTRY_NAME
+        assert response.results[0].origin_type == "registry"
+        mock_create_reg.assert_called_once()
+
+    @patch("aam_cli.services.search_service.build_source_index")
+    @patch("aam_cli.services.search_service.create_registry")
+    def test_unit_search_same_name_multiple_sources_both_shown(
+        self,
+        mock_create_reg: MagicMock,
+        mock_build_index: MagicMock,
+    ) -> None:
+        """Same skill name from different sources produces multiple rows.
+
+        This is the expected UX when the same artifact exists in
+        multiple repositories — the user can see both and pick one
+        to install using the qualified name.
+        """
+        vp1 = _make_virtual_package(
+            "docs-writer",
+            source_name="google-gemini/gemini-skills",
+            description="Write docs (Gemini)",
+            commit_sha="abc1234def5678",
+        )
+        vp2 = _make_virtual_package(
+            "docs-writer",
+            source_name="cursor/community-skills",
+            description="Write docs (Cursor)",
+            commit_sha="fff9999aaa1111",
+        )
+        mock_index = MagicMock()
+        mock_index.by_qualified_name = {
+            "google-gemini/gemini-skills/docs-writer": vp1,
+            "cursor/community-skills/docs-writer": vp2,
+        }
+        mock_build_index.return_value = mock_index
+
+        config = _make_config(
+            registries=[],
+            sources=[
+                _make_source("google-gemini/gemini-skills"),
+                _make_source("cursor/community-skills"),
+            ],
+        )
+        response = search_packages("docs", config)
+
+        # -----
+        # Both should appear, each with its own source name
+        # -----
+        assert len(response.results) == 2
+        origins = {r.origin for r in response.results}
+        assert "google-gemini/gemini-skills" in origins
+        assert "cursor/community-skills" in origins
+
+        # Both should have distinct version hashes
+        versions = {r.version for r in response.results}
+        assert len(versions) == 2
 
 
 ################################################################################

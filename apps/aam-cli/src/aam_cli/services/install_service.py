@@ -21,7 +21,10 @@ from typing import Any
 
 from aam_cli.adapters.factory import create_adapter, is_supported_platform
 from aam_cli.core.config import AamConfig
-from aam_cli.core.installer import install_packages as core_install_packages
+from aam_cli.core.installer import (
+    _deploy_package,
+    install_packages as core_install_packages,
+)
 from aam_cli.core.resolver import resolve_dependencies
 from aam_cli.core.workspace import (
     FileChecksums,
@@ -358,8 +361,16 @@ def install_from_source(
         # -----
         # Step 3: Copy artifact files from source cache
         # -----
+        # Build full path: cache_dir / scan_path / artifact_path
+        # The scan_path is the source subdirectory scope; artifact path
+        # is relative to the scan root.
         cache_dir = Path(virtual_package.cache_dir)
-        source_path = cache_dir / virtual_package.path
+        scan_root = (
+            cache_dir / virtual_package.scan_path
+            if virtual_package.scan_path
+            else cache_dir
+        )
+        source_path = scan_root / virtual_package.path
 
         if source_path.is_dir():
             # -----
@@ -439,15 +450,7 @@ def install_from_source(
         # -----
         if not no_deploy and is_supported_platform(platform_name):
             adapter = create_adapter(platform_name, project_dir)
-            from aam_cli.core.manifest import load_manifest
-
-            manifest = load_manifest(final_dir)
-            for artifact_type, ref in manifest.all_artifacts:
-                adapter.deploy(
-                    ref.name,
-                    artifact_type,
-                    final_dir / ref.path,
-                )
+            _deploy_package(final_dir, adapter)
             logger.info(f"Deployed artifacts for '{pkg_name}' to {platform_name}")
 
         # -----

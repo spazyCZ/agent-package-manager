@@ -2,8 +2,21 @@
 
 **Feature Branch**: `001-cli-local-repository`  
 **Created**: 2026-02-08  
-**Status**: Draft  
+**Status**: Implemented (local only)  
 **Input**: User description: "Implement aam-cli for local usage with local file repository"
+
+## Implementation Status
+
+**Only the local workflow is implemented.** Remote/HTTP registries are not supported.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Local file-based registry (`registry init`, `registry add`) | ✅ Implemented | `file://` URLs only |
+| Package authoring (`pkg create`, `pkg init`, `pkg validate`, `pkg pack`) | ✅ Implemented | From existing project or scratch |
+| Publish to local registry (`pkg publish`) | ✅ Implemented | Writes to local `packages/` |
+| Search | ✅ Implemented | Local registry + git sources (materialized to local) |
+| Install | ✅ Implemented | From local registry, local path, or `.aam` archive |
+| HTTP/remote registry (e.g. test.aamregistry.io) | ❌ Not implemented | Out of scope for this spec; CLI factory supports `local` type only |
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -243,5 +256,5 @@ A practitioner wants to remove an installed package and its deployed artifacts.
 - Package signing and verification are out of scope for this feature — only SHA-256 checksum verification is required.
 - User authentication (`aam register`, `aam login`) is not needed for local registries and is out of scope.
 - The MCP server mode (`aam mcp serve`) is out of scope for this feature.
-- Git-based and HTTP-based registries are out of scope — only local file-based registries are supported.
+- **Git-based and HTTP-based registries are out of scope** — only local file-based registries are supported. Skills from remote git repos are handled via a separate mechanism (spec 003/004: `aam source add` / sources), which materializes them into a local `~/.aam/sources-registry/`.
 - Interactive selection in `aam create-package` will use Rich for the terminal UI (checkboxes, prompts).

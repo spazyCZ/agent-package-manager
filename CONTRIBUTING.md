@@ -43,7 +43,7 @@ agent-package-manager/
 
 ```bash
 # Clone the repository
-git clone https://github.com/aam/agent-package-manager.git
+git clone https://github.com/spazyCZ/agent-package-manager.git
 cd agent-package-manager
 
 # Install Node.js dependencies
@@ -121,20 +121,21 @@ npm run graph
 
 ## Docker Development
 
-Start local services (PostgreSQL, Redis, MinIO) for development:
+Start local services (PostgreSQL, Redis, MinIO) for development. From the repo root:
 
 ```bash
-cd deploy
-
 # Copy environment template
-cp .env.example .env
+cp deploy/local/.env.example deploy/local/.env
 
 # Start infrastructure services only
-docker-compose up -d postgres redis minio
+docker compose -f deploy/local/docker-compose.yml up -d postgres redis minio
 
-# Or start everything in development mode
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Or start everything in development mode (with hot reload)
+docker compose -f deploy/local/docker-compose.yml \
+  -f deploy/local/docker-compose.dev.yml up -d
 ```
+
+See [deploy/local/README.md](deploy/local/README.md) for details.
 
 ### Service Ports
 
@@ -286,23 +287,21 @@ refactor: simplify manifest parser
 ### Production Docker Deployment
 
 ```bash
-cd deploy
-
-# Configure environment
-cp .env.example .env
-# Edit .env with production values
+# Configure environment (from repo root)
+cp deploy/local/.env.example deploy/local/.env
+# Edit deploy/local/.env with production values
 
 # Build and start
-docker-compose up -d --build
+docker compose -f deploy/local/docker-compose.yml up -d --build
 
 # Run migrations
-docker-compose exec backend alembic upgrade head
+docker compose -f deploy/local/docker-compose.yml exec backend alembic upgrade head
 
 # View logs
-docker-compose logs -f
+docker compose -f deploy/local/docker-compose.yml logs -f
 ```
 
-See [deploy/README.md](deploy/README.md) for detailed deployment instructions.
+See [deploy/local/README.md](deploy/local/README.md) for detailed deployment instructions.
 
 ---
 
@@ -322,12 +321,12 @@ See [deploy/README.md](deploy/README.md) for detailed deployment instructions.
 
 ## Getting Help
 
-- Open an [issue](https://github.com/aam/agent-package-manager/issues) for bugs
-- Start a [discussion](https://github.com/aam/agent-package-manager/discussions) for questions
+- Open an [issue](https://github.com/spazyCZ/agent-package-manager/issues) for bugs
+- Start a [discussion](https://github.com/spazyCZ/agent-package-manager/discussions) for questions
 - Check existing issues before creating new ones
 
 ---
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing, you agree that your contributions will be licensed under the Apache License 2.0.

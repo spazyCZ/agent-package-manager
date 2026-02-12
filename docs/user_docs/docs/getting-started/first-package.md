@@ -743,7 +743,7 @@ name: "@yourname/python-best-practices"
 version: 1.0.0
 description: "Python coding standards and best practices for AI agents"
 author: Your Name
-license: MIT
+license: Apache-2.0
 repository: https://github.com/yourname/python-best-practices
 
 artifacts:

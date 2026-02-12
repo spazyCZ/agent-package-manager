@@ -37,7 +37,7 @@ Package name [current-directory]: my-package
 Version [1.0.0]: 1.0.0
 Description []: A sample package for demonstrations
 Author []: John Doe
-License [MIT]: MIT
+License [Apache-2.0]: Apache-2.0
 
 What artifacts will this package contain?
   Skills [Y/n]: y

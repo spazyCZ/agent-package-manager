@@ -225,7 +225,8 @@ def _resolve_from_index(
 ) -> VirtualPackage | None:
     """Try to find a package in the source index by name.
 
-    Attempts qualified name lookup first, then unqualified.
+    Attempts qualified name lookup first, then fuzzy fallback for
+    qualified names (in case source name format differs), then unqualified.
 
     Args:
         name: Package name (qualified ``source/name`` or plain).
@@ -241,6 +242,22 @@ def _resolve_from_index(
         vp = index.by_qualified_name.get(name)
         if vp:
             return vp
+
+        # -----
+        # Fallback: exact qualified key may differ (e.g. source named
+        # "gemini-skills" vs "google-gemini/gemini-skills"). Try matching
+        # by artifact name and source-part containment in qualified_name.
+        # -----
+        parts = name.rsplit("/", 1)
+        if len(parts) == 2:
+            source_part, artifact_part = parts
+            matches = index.by_name.get(artifact_part)
+            if matches:
+                source_terms = [t.lower() for t in source_part.split("/") if t]
+                for m in matches:
+                    qn_lower = m.qualified_name.lower()
+                    if any(term in qn_lower for term in source_terms):
+                        return m
 
     # -----
     # Unqualified name
@@ -332,7 +349,15 @@ def _show_installed_package(
     # -----
     # Source info
     # -----
-    console.print(f"\n  [bold]Source:[/bold] {locked.source}")
+    if locked.source_name:
+        # -----
+        # Git source install: show actual source name and commit
+        # -----
+        console.print(f"\n  [bold]Source:[/bold] {locked.source_name}")
+        if locked.source_commit:
+            console.print(f"  [bold]Commit:[/bold] {locked.source_commit[:12]}")
+    else:
+        console.print(f"\n  [bold]Source:[/bold] {locked.source}")
     if locked.checksum:
         console.print(f"  [bold]Checksum:[/bold] {locked.checksum}")
 
@@ -479,7 +504,13 @@ def show_package(ctx: click.Context, package: str) -> None:
         f"[red]Error:[/red] '{package}' is not installed and was not "
         f"found in any configured source."
     )
-    console.print(
-        f"\n  [dim]Try:[/dim]  aam search {package}"
-    )
+    if "/" in package:
+        artifact_part = package.rsplit("/", 1)[-1]
+        console.print(
+            f"\n  [dim]Try:[/dim]  aam search {artifact_part}  "
+            f"(to see the exact Source value, then use "
+            f"aam info <Source>/{artifact_part})"
+        )
+    else:
+        console.print(f"\n  [dim]Try:[/dim]  aam search {package}")
     ctx.exit(1)

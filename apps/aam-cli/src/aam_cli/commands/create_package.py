@@ -520,7 +520,7 @@ def _create_from_source(
         version = pkg_version or "1.0.0"
         description = pkg_description or ""
         author = pkg_author or ""
-        license_str = "MIT"
+        license_str = "Apache-2.0"
     else:
         default_name = source_name.replace("/", "-")
         if pkg_scope:
@@ -541,7 +541,7 @@ def _create_from_source(
         version = Prompt.ask("Version", default=pkg_version or "1.0.0")
         description = Prompt.ask("Description", default=pkg_description or "")
         author = Prompt.ask("Author", default=pkg_author or "")
-        license_str = Prompt.ask("License", default="MIT")
+        license_str = Prompt.ask("License", default="Apache-2.0")
 
     # -----
     # Step 6: Build provenance metadata from scan result
@@ -963,7 +963,7 @@ def create_package(
         version = pkg_version or "1.0.0"
         description = pkg_description or ""
         author = pkg_author or ""
-        license_str = "MIT"
+        license_str = "Apache-2.0"
     else:
         # Interactive prompts
         default_name = project_path.resolve().name
@@ -984,7 +984,7 @@ def create_package(
         version = Prompt.ask("Version", default=pkg_version or "1.0.0")
         description = Prompt.ask("Description", default=pkg_description or "")
         author = Prompt.ask("Author", default=pkg_author or "")
-        license_str = Prompt.ask("License", default="MIT")
+        license_str = Prompt.ask("License", default="Apache-2.0")
 
     # -----
     # Step 4: Generate manifest

@@ -94,6 +94,24 @@ def list_packages(ctx: click.Context, tree: bool, available: bool, is_global: bo
         _show_table(console, lock, project_dir)
 
 
+def _format_source(locked: "LockedPackage") -> str:  # noqa: F821
+    """Build a human-readable source label from a locked package.
+
+    Prefers the git source name (for example, ``google-gemini/gemini-skills``)
+    when available, otherwise falls back to the generic source field
+    (``registry``, ``local``, ``source``).
+
+    Args:
+        locked: Locked package entry from the lock file.
+
+    Returns:
+        Display string for the Source column.
+    """
+    if locked.source_name:
+        return locked.source_name
+    return locked.source
+
+
 def _show_table(
     console: Console,
     lock: "LockFile",  # noqa: F821
@@ -105,6 +123,7 @@ def _show_table(
     table = Table(show_header=True, header_style="bold")
     table.add_column("Name", style="cyan")
     table.add_column("Version", style="green")
+    table.add_column("Source", style="magenta")
     table.add_column("Artifacts")
 
     packages_dir = get_packages_dir(project_dir)
@@ -130,7 +149,12 @@ def _show_table(
             except Exception:
                 artifact_info = "?"
 
-        table.add_row(pkg_name, locked.version, artifact_info)
+        table.add_row(
+            pkg_name,
+            locked.version,
+            _format_source(locked),
+            artifact_info,
+        )
 
     console.print(table)
 
@@ -152,7 +176,11 @@ def _show_tree(
 
     for root_name in roots:
         locked = lock.packages[root_name]
-        tree = Tree(f"{root_name}@{locked.version}")
+        source_label = _format_source(locked)
+        tree = Tree(
+            f"{root_name}@{locked.version}"
+            f" [dim]({source_label})[/dim]"
+        )
 
         _add_deps_to_tree(tree, locked, lock)
         console.print(tree)
@@ -216,13 +244,13 @@ def _show_available(console: Console) -> None:
         table = Table(show_header=True, header_style="bold", padding=(0, 2))
         table.add_column("Name", style="cyan")
         table.add_column("Type")
-        table.add_column("Description", max_width=50)
+        table.add_column("Description", max_width=255)
 
         for vp in sorted(artifacts, key=lambda a: a.name):
             table.add_row(
                 vp.name,
                 vp.type,
-                (vp.description or "")[:50],
+                (vp.description or "")[:255],
             )
 
         console.print(table)

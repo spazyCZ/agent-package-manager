@@ -49,10 +49,10 @@ function HomePage() {
               </div>
               <div className="bg-slate-900 rounded-lg p-6 text-white font-mono h-full">
                 <div className="text-slate-400 mb-2"># 1. Add a source repository</div>
-                <div className="text-green-400 mb-4">$ aam source add openai/skills</div>
+                <div className="text-green-400 mb-4">$ aam source add https://github.com/openai/skills</div>
 
                 <div className="text-slate-400 mb-2"># 2. List available packages</div>
-                <div className="text-green-400 mb-4">$ aam source list openai/skills</div>
+                <div className="text-green-400 mb-4">$ aam source list https://github.com/openai/skills</div>
 
                 <div className="text-slate-400 mb-2"># 3. Install the skill you need</div>
                 <div className="text-green-400">$ aam install spreadsheet</div>
@@ -72,7 +72,7 @@ function HomePage() {
                 <div className="text-violet-400 mb-4">$ aam mcp serve</div>
 
                 <div className="text-slate-400 mb-2"># Then ask your AI agent:</div>
-                <div className="text-slate-300 italic">"Add the openai/skills source,</div>
+                <div className="text-slate-300 italic">"Add the https://github.com/openai/skills source,</div>
                 <div className="text-slate-300 italic">&nbsp;show me what's available,</div>
                 <div className="text-slate-300 italic">&nbsp;and install the spreadsheet skill"</div>
               </div>
@@ -274,15 +274,19 @@ function HomePage() {
               <div className="bg-slate-950 rounded p-4 font-mono text-sm space-y-3">
                 <div>
                   <div className="text-slate-500"># Anthropic's official Claude skills</div>
-                  <div className="text-emerald-400">$ aam source add anthropic/claude-skills</div>
+                  <div className="text-emerald-400">$ aam source add https://github.com/anthropics/skills</div>
                 </div>
                 <div>
                   <div className="text-slate-500"># OpenAI curated Codex skills</div>
-                  <div className="text-emerald-400">$ aam source add openai/skills --path skills/.curated</div>
+                  <div className="text-emerald-400">$ aam source add https://github.com/openai/skills --path skills/.curated</div>
+                </div>
+                <div>
+                  <div className="text-slate-500"># Microsoft Azure SDK skills</div>
+                  <div className="text-emerald-400">$ aam source add https://github.com/microsoft/skills</div>
                 </div>
                 <div>
                   <div className="text-slate-500"># GitHub Copilot community skills</div>
-                  <div className="text-emerald-400">$ aam source add github/awesome-copilot</div>
+                  <div className="text-emerald-400">$ aam source add https://github.com/github/awesome-copilot</div>
                 </div>
               </div>
             </div>
@@ -305,13 +309,13 @@ function HomePage() {
                   <div className="text-blue-400">$ aam source update --all</div>
                 </div>
                 <div className="border-l-2 border-l-emerald-400 pl-4 ml-4 space-y-2">
-                  <div className="text-slate-300">anthropic/claude-skills</div>
+                  <div className="text-slate-300">anthropics/skills</div>
                   <div className="text-emerald-400">  + 3 new skills</div>
                   <div className="text-amber-400">  ~ 1 modified</div>
                   <div className="text-slate-500">  = 12 unchanged</div>
                 </div>
                 <div className="border-l-2 border-l-blue-400 pl-4 ml-4 space-y-2">
-                  <div className="text-slate-300">openai/skills:.curated</div>
+                  <div className="text-slate-300">https://github.com/openai/skills</div>
                   <div className="text-emerald-400">  + 1 new skill</div>
                   <div className="text-red-400">  - 1 removed</div>
                   <div className="text-slate-500">  = 8 unchanged</div>
@@ -335,7 +339,7 @@ function HomePage() {
                 <div>
                   <div className="text-slate-500"># Create a package from a source</div>
                   <div className="text-amber-400">$ aam pkg create \</div>
-                  <div className="text-amber-400">    --from-source anthropic/claude-skills \</div>
+                  <div className="text-amber-400">    --from-source anthropics/skills \</div>
                   <div className="text-amber-400">    --artifacts code-review,refactor-py</div>
                 </div>
                 <div>
@@ -361,35 +365,42 @@ function HomePage() {
                   <span className="text-3xl">🤖</span>
                 </div>
                 <span className="text-slate-300 text-sm font-medium">OpenAI</span>
-                <span className="text-slate-500 text-xs font-mono">openai/skills</span>
+                <a href="https://github.com/openai/skills" className="text-blue-400 hover:text-blue-300 text-xs font-mono" target="_blank" rel="noopener noreferrer">github.com/openai/skills</a>
               </div>
               <div className="flex flex-col items-center gap-2">
                 <div className="w-16 h-16 bg-slate-800\/80 rounded-lg flex items-center justify-center border border-slate-700\/50">
                   <span className="text-3xl">🧠</span>
                 </div>
                 <span className="text-slate-300 text-sm font-medium">Anthropic</span>
-                <span className="text-slate-500 text-xs font-mono">anthropic/claude-skills</span>
+                <a href="https://github.com/anthropics/skills" className="text-blue-400 hover:text-blue-300 text-xs font-mono" target="_blank" rel="noopener noreferrer">github.com/anthropics/skills</a>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-16 h-16 bg-slate-800\/80 rounded-lg flex items-center justify-center border border-slate-700\/50">
+                  <span className="text-3xl">Ⓜ️</span>
+                </div>
+                <span className="text-slate-300 text-sm font-medium">Microsoft</span>
+                <a href="https://github.com/microsoft/skills" className="text-blue-400 hover:text-blue-300 text-xs font-mono" target="_blank" rel="noopener noreferrer">github.com/microsoft/skills</a>
               </div>
               <div className="flex flex-col items-center gap-2">
                 <div className="w-16 h-16 bg-slate-800\/80 rounded-lg flex items-center justify-center border border-slate-700\/50">
                   <span className="text-3xl">🐙</span>
                 </div>
                 <span className="text-slate-300 text-sm font-medium">GitHub Copilot</span>
-                <span className="text-slate-500 text-xs font-mono">github/awesome-copilot</span>
+                <a href="https://github.com/github/awesome-copilot" className="text-blue-400 hover:text-blue-300 text-xs font-mono" target="_blank" rel="noopener noreferrer">github.com/github/awesome-copilot</a>
               </div>
               <div className="flex flex-col items-center gap-2">
                 <div className="w-16 h-16 bg-slate-800\/80 rounded-lg flex items-center justify-center border border-slate-700\/50">
                   <span className="text-3xl">🦊</span>
                 </div>
                 <span className="text-slate-300 text-sm font-medium">GitLab</span>
-                <span className="text-slate-500 text-xs font-mono">team/custom-skills</span>
+                <span className="text-slate-500 text-xs font-mono">your-gitlab.com/team/skills</span>
               </div>
               <div className="flex flex-col items-center gap-2">
                 <div className="w-16 h-16 bg-slate-800\/80 rounded-lg flex items-center justify-center border border-slate-700\/50">
                   <span className="text-3xl">🔧</span>
                 </div>
                 <span className="text-slate-300 text-sm font-medium">Any Git Repo</span>
-                <span className="text-slate-500 text-xs font-mono">your-org/skills</span>
+                <span className="text-slate-500 text-xs font-mono">any-git-host.com/org/skills</span>
               </div>
             </div>
           </div>
@@ -413,27 +424,28 @@ function HomePage() {
                   <div className="text-white">$ <span className="text-cyan-400">aam</span> init</div>
                   <div className="text-slate-400 mt-1">
                     Initialized AAM workspace in ~/my-project<br />
-                    Added default source: <span className="text-emerald-400">openai/skills:.curated</span> (8 skills)<br />
-                    Added default source: <span className="text-emerald-400">github/awesome-copilot</span> (15 skills)
+                    Added default source: <span className="text-emerald-400">https://github.com/openai/skills</span> (8 skills)<br />
+                    Added default source: <span className="text-emerald-400">https://github.com/microsoft/skills</span> (131 skills)<br />
+                    Added default source: <span className="text-emerald-400">https://github.com/github/awesome-copilot</span> (15 skills)
                   </div>
                 </div>
 
                 <div>
                   <div className="text-slate-500"># Add Anthropic's Claude skills repository</div>
-                  <div className="text-white">$ <span className="text-cyan-400">aam</span> source add anthropic/claude-skills</div>
+                  <div className="text-white">$ <span className="text-cyan-400">aam</span> source add https://github.com/anthropics/skills</div>
                   <div className="text-slate-400 mt-1">
-                    Cloning <span className="text-blue-400">https://github.com/anthropic/claude-skills</span> (shallow)...<br />
+                    Cloning <span className="text-blue-400">https://github.com/anthropics/skills</span> (shallow)...<br />
                     Scanning for artifacts...<br />
                     <span className="text-emerald-400">Found 16 skills, 3 agents, 2 prompts</span><br />
-                    Source <span className="text-white">anthropic/claude-skills</span> added to config
+                    Source <span className="text-white">anthropics/skills</span> added to config
                   </div>
                 </div>
 
                 <div>
                   <div className="text-slate-500"># Browse what's available — see candidates not yet packaged</div>
-                  <div className="text-white">$ <span className="text-cyan-400">aam</span> source candidates --source anthropic/claude-skills --type skill</div>
+                  <div className="text-white">$ <span className="text-cyan-400">aam</span> source candidates --source anthropics/skills --type skill</div>
                   <div className="text-slate-400 mt-1">
-                    <span className="text-white">anthropic/claude-skills</span> (16 candidates)<br />
+                    <span className="text-white">anthropics/skills</span> (16 candidates)<br />
                     <span className="text-violet-400">  skill</span>  code-review &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Code review with Claude best practices<br />
                     <span className="text-violet-400">  skill</span>  refactor-py &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Python refactoring patterns<br />
                     <span className="text-violet-400">  skill</span>  test-gen &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Automated test generation<br />
@@ -444,10 +456,10 @@ function HomePage() {
 
                 <div>
                   <div className="text-slate-500"># Package two skills for your project</div>
-                  <div className="text-white">$ <span className="text-cyan-400">aam</span> create-package --from-source anthropic/claude-skills --artifacts code-review,test-gen</div>
+                  <div className="text-white">$ <span className="text-cyan-400">aam</span> create-package --from-source anthropics/skills --artifacts code-review,test-gen</div>
                   <div className="text-slate-400 mt-1">
                     Created <span className="text-emerald-400">@anthropic/code-review-skills</span> (aam.yaml + 5 files)<br />
-                    Provenance: anthropic/claude-skills @ <span className="text-yellow-400">a3f7c2d</span><br />
+                    Provenance: anthropics/skills @ <span className="text-yellow-400">a3f7c2d</span><br />
                     Checksums: SHA-256 for all artifact files<br />
                     <span className="text-emerald-400">Package ready.</span> Run <span className="text-cyan-400">aam pkg pack</span> to create archive.
                   </div>
@@ -457,13 +469,13 @@ function HomePage() {
                   <div className="text-slate-500"># Later... check for upstream changes</div>
                   <div className="text-white">$ <span className="text-cyan-400">aam</span> source update --all</div>
                   <div className="text-slate-400 mt-1">
-                    Fetching <span className="text-white">anthropic/claude-skills</span>...<br />
+                    Fetching <span className="text-white">anthropics/skills</span>...<br />
                     <span className="text-emerald-400">  + 2 new</span> &nbsp;
                     <span className="text-amber-400">~ 1 modified</span> &nbsp;
                     <span className="text-slate-500">= 16 unchanged</span><br />
-                    Fetching <span className="text-white">openai/skills:.curated</span>...<br />
+                    Fetching <span className="text-white">https://github.com/openai/skills</span>...<br />
                     <span className="text-slate-500">  No changes (up to date)</span><br />
-                    Fetching <span className="text-white">github/awesome-copilot</span>...<br />
+                    Fetching <span className="text-white">https://github.com/github/awesome-copilot</span>...<br />
                     <span className="text-emerald-400">  + 5 new</span> &nbsp;
                     <span className="text-red-400">- 1 removed</span> &nbsp;
                     <span className="text-slate-500">= 14 unchanged</span>
@@ -554,29 +566,6 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="py-16">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl font-bold text-blue-600">1,000+</div>
-              <div className="text-slate-600">Packages</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-blue-600">500+</div>
-              <div className="text-slate-600">Publishers</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-blue-600">50K+</div>
-              <div className="text-slate-600">Downloads</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-blue-600">100%</div>
-              <div className="text-slate-600">Open Source</div>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

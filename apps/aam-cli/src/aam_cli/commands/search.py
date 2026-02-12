@@ -21,7 +21,9 @@ from rich.console import Console
 from rich.table import Table
 
 from aam_cli.core.config import load_config
+from aam_cli.core.workspace import read_lock_file
 from aam_cli.services.search_service import search_packages
+from aam_cli.utils.paths import resolve_project_dir
 from aam_cli.utils.text_match import find_similar_names
 
 ################################################################################
@@ -34,6 +36,40 @@ logger = logging.getLogger(__name__)
 
 ################################################################################
 #                                                                              #
+# HELPERS                                                                      #
+#                                                                              #
+################################################################################
+
+
+def _collect_installed_names() -> set[str]:
+    """Return the set of package names installed in local and global workspaces.
+
+    Reads both the project-local lock file (``.aam/aam-lock.yaml``) and the
+    global lock file (``~/.aam/aam-lock.yaml``).  If either file is missing or
+    empty the corresponding set is simply empty — no error is raised.
+
+    Returns:
+        A set of installed package names (union of local and global).
+    """
+    local_lock = read_lock_file(resolve_project_dir(is_global=False))
+    global_lock = read_lock_file(resolve_project_dir(is_global=True))
+
+    installed = set(local_lock.packages.keys()) | set(
+        global_lock.packages.keys()
+    )
+
+    logger.debug(
+        f"Collected installed names: "
+        f"local={len(local_lock.packages)}, "
+        f"global={len(global_lock.packages)}, "
+        f"union={len(installed)}"
+    )
+
+    return installed
+
+
+################################################################################
+#                                                                              #
 # COMMAND                                                                      #
 #                                                                              #
 ################################################################################
@@ -41,7 +77,7 @@ logger = logging.getLogger(__name__)
 
 @click.command()
 @click.argument("query", default="")
-@click.option("--limit", "-l", default=10, help="Maximum number of results (1-50)")
+@click.option("--limit", "-l", default=255, help="Maximum number of results (1-255)")
 @click.option(
     "--type",
     "-t",
@@ -129,6 +165,23 @@ def search(
         return
 
     # ------------------------------------------------------------------
+    # Mark installed packages
+    # ------------------------------------------------------------------
+    # Cross-reference results against both local and global lock files
+    # so the user can see at a glance which packages are already present.
+    # ------------------------------------------------------------------
+    installed_names = _collect_installed_names()
+
+    for result in response.results:
+        if result.name in installed_names:
+            result.installed = True
+
+    logger.debug(
+        f"Installed check: {len(installed_names)} installed packages, "
+        f"{sum(1 for r in response.results if r.installed)} matches"
+    )
+
+    # ------------------------------------------------------------------
     # Display warnings
     # ------------------------------------------------------------------
     for warning in response.warnings:
@@ -184,19 +237,23 @@ def search(
 
     table = Table(title=title, show_lines=False, pad_edge=False)
     table.add_column("Name", style="cyan bold", no_wrap=True)
-    table.add_column("Version", style="dim", max_width=12, no_wrap=True)
-    table.add_column("Type", max_width=16)
-    table.add_column("Source", style="magenta", max_width=20)
-    table.add_column("Description", style="dim")
+    table.add_column("Version", style="dim", no_wrap=True)
+    table.add_column("Type", no_wrap=True)
+    table.add_column("Source", style="magenta", no_wrap=True)
+    table.add_column("Installed", justify="center", no_wrap=True)
+    table.add_column("Description", style="dim", max_width=255)
 
     for result in response.results:
         types_str = ", ".join(result.artifact_types)
+        installed_marker = "[green]✓[/green]" if result.installed else ""
+        desc = (result.description or "")[:255]
         table.add_row(
             result.name,
             result.version,
             types_str,
             result.origin,
-            result.description,
+            installed_marker,
+            desc,
         )
 
     console.print(table)

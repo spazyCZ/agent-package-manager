@@ -124,4 +124,4 @@ Ready to get started? Pick your path:
 - **Ready to build?** Go to [Your First Package](first-package.md) to create a complete package
 
 !!! tip "Join the Community"
-    Have questions? Found a bug? Want to share your packages? Visit the [GitHub repository](https://github.com/spazy/agent-package-manager) to file issues, contribute, or join discussions.
+    Have questions? Found a bug? Want to share your packages? Visit the [GitHub repository](https://github.com/spazyCZ/agent-package-manager) to file issues, contribute, or join discussions.

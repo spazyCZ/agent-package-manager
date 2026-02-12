@@ -35,7 +35,7 @@ description: "ASVC audit agent with reporting skill and prompts"
 
 # Metadata (all optional)
 author: author                      # Package author
-license: MIT                        # SPDX license identifier
+license: Apache-2.0                 # SPDX license identifier
 repository: https://github.com/author/asvc-auditor  # Source code URL
 homepage: https://asvc-auditor.dev  # Project homepage (docs, demo, etc.)
 keywords:                           # Search keywords
@@ -464,7 +464,7 @@ Here's a complete, real-world package structure:
 @author/asvc-auditor/
 ├── aam.yaml                          # Manifest
 ├── README.md                         # Package documentation
-├── LICENSE                           # MIT license
+├── LICENSE                           # Apache-2.0 license
 ├── agents/
 │   └── asvc-audit/
 │       ├── agent.yaml                # Agent definition
@@ -497,7 +497,7 @@ name: "@author/asvc-auditor"
 version: 1.0.0
 description: "ASVC audit agent with reporting skill and prompts"
 author: author
-license: MIT
+license: Apache-2.0
 repository: https://github.com/author/asvc-auditor
 keywords: [audit, asvc, compliance, reporting]
 

@@ -7,11 +7,12 @@ and AAM scans the repo to find them.
 
 ## How it works
 
-The git source workflow has three stages:
+The git source workflow supports both installing directly and creating packages:
 
 1. **Add** a source with `aam source add`, which clones the repository
 2. **Scan** the source with `aam source scan` to discover artifacts
-3. **Package** selected artifacts with `aam pkg create --from-source`
+3. **Install** directly with `aam install source-name/artifact` (e.g., `anthropics/skills/skill-creator`)
+4. **Package** selected artifacts with `aam pkg create --from-source` (authoring workflow)
 
 ```mermaid
 graph LR
@@ -126,6 +127,24 @@ in the lock file during installation. You can use `aam verify` and
 
 When upgrading a package that has local modifications, AAM warns you and
 offers options to backup, skip, view differences, or force the upgrade.
+
+## Installing from a specific source
+
+When multiple sources provide artifacts with the same name, use the
+**qualified name** format to install from a specific source:
+
+```bash
+# Format: source-name/artifact (one argument)
+aam install anthropics/skills/skill-creator
+
+# For sources with a scan path (e.g., openai/skills:.curated)
+aam install openai/skills:.curated/code-review
+```
+
+There is no `-s` or `--source` option for `aam install` — the source is
+specified in the package argument. Discover qualified names via `aam search`
+(Source column) or `aam list --available` (source name = group header, artifact name
+= row). Use `aam info source/artifact` to see the exact install command.
 
 ## MCP tool integration
 

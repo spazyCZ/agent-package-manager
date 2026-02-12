@@ -45,6 +45,18 @@ Removing deployed artifacts from cursor...
 ✓ Uninstalled my-package
 ```
 
+When the package was installed from a git source, the source name
+is shown in the confirmation:
+
+```
+Uninstalling docs-writer@0.0.0 from google-gemini/gemini-skills...
+
+Removing deployed artifacts from cursor...
+  ✓ Removed skill: docs-writer
+
+✓ Uninstalled docs-writer
+```
+
 ### Example 2: Uninstall Scoped Package
 
 ```bash

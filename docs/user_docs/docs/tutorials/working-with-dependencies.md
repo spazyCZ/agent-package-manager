@@ -64,7 +64,7 @@ name: "@myorg/code-analyzer"
 version: 1.0.0
 description: "Comprehensive code analysis toolkit"
 author: your-username
-license: MIT
+license: Apache-2.0
 
 artifacts:
   # ... your artifacts ...
@@ -686,7 +686,7 @@ name: "@myteam/api-toolkit"
 version: 2.0.0
 description: "REST API development toolkit"
 author: myteam
-license: MIT
+license: Apache-2.0
 
 artifacts:
   # ... artifacts ...

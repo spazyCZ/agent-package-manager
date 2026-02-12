@@ -131,7 +131,7 @@ name: "@author/asvc-auditor"        # Scoped package name (@scope/name format)
 version: 1.0.0
 description: "ASVC audit agent with reporting skill and prompts"
 author: author
-license: MIT
+license: Apache-2.0
 repository: https://github.com/spazy/asvc-auditor
 
 # Artifact declarations — what this package provides
@@ -1582,7 +1582,7 @@ api_version: 1
 name: "@author/asvc-auditor"
 description: "ASVC audit agent with reporting capabilities"
 author: author
-license: MIT
+license: Apache-2.0
 repository: https://github.com/author/asvc-auditor
 keywords: [audit, asvc, compliance]
 
@@ -1692,7 +1692,7 @@ packages:
 name: "@myorg/my-agent"
 description: "ASVC compliance auditor agent"
 author: spazy
-license: MIT
+license: Apache-2.0
 repository: https://github.com/myorg/my-agent
 keywords: [audit, compliance]
 

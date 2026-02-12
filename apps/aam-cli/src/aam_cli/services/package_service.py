@@ -95,6 +95,8 @@ def list_installed_packages(
                 "name": pkg_name,
                 "version": locked.version,
                 "source": locked.source,
+                "source_name": locked.source_name,
+                "source_commit": locked.source_commit,
                 "artifact_count": artifact_count,
                 "artifacts": artifact_counts,
                 "checksum": locked.checksum or None,
@@ -189,6 +191,9 @@ def get_package_info(
         "platforms": getattr(manifest, "platforms", {}),
         "installed": True,
         "installed_version": locked.version,
+        "source": locked.source,
+        "source_name": locked.source_name,
+        "source_commit": locked.source_commit,
     }
 
 

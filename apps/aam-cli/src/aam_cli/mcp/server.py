@@ -44,7 +44,7 @@ git sources.
 Read-only tools are always available. These include package operations
 (search, list, info, validate), configuration (config get, doctor),
 source discovery (source list, source scan, source candidates, source diff),
-and integrity (verify, diff).
+integrity (verify, diff), and skill recommendation (aam_recommend_skills).
 
 Write tools (install, uninstall, publish, config set, registry add,
 source add, source remove, source update) are only available when the
@@ -52,6 +52,21 @@ server is started with --allow-write.
 
 Resources provide passive data access for project context without
 requiring tool calls.
+
+## Skill recommendation (aam_recommend_skills)
+
+When the user asks to find relevant skills for their repository, or which
+skills to use for a project (e.g., "what skills fit my React + Python LLM
+app?"), call aam_recommend_skills first. It analyzes the project structure
+and dependencies to recommend skills from configured sources.
+
+Optimal usage:
+1. Use default path (current directory) when the user is in the project root.
+2. Pass an explicit path if the user points to a specific project.
+3. Present the top recommendations with score and rationale.
+4. Suggest installing with: aam install <qualified_name>
+5. If sources are empty, suggest: aam source enable-defaults; aam source update --all
+6. Combine with aam_install (write) if --allow-write to install recommended skills.
 """
 
 ################################################################################
@@ -103,9 +118,9 @@ def create_mcp_server(allow_write: bool = False) -> FastMCP:
     register_write_tools(mcp)
     register_resources(mcp)
 
-    # Read-only: 7 (spec 002) + 6 (spec 003) = 13
-    # Full access: 13 read + 7 (spec 002 write) + 3 (spec 003 write) = 23
-    tool_count = 13 if not allow_write else 23
+    # Read-only: 17 (includes aam_recommend_skills)
+    # Full access: 17 read + 12 write = 29
+    tool_count = 17 if not allow_write else 29
     logger.info(
         f"MCP server created: tools={tool_count}, resources=8, "
         f"allow_write={allow_write}"

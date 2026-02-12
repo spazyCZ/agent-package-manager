@@ -27,6 +27,7 @@ from aam_cli.services.package_service import (
     list_installed_packages,
 )
 from aam_cli.services.registry_service import list_registries
+from aam_cli.services.recommend_service import recommend_skills_for_repo
 from aam_cli.services.search_service import search_packages
 from aam_cli.services.source_service import (
     list_candidates,
@@ -61,7 +62,7 @@ def register_read_tools(mcp: FastMCP) -> None:
     @mcp.tool(tags={"read"})
     def aam_search(
         query: str,
-        limit: int = 10,
+        limit: int = 255,
         package_types: list[str] | None = None,
         source_filter: str | None = None,
         registry_filter: str | None = None,
@@ -74,7 +75,7 @@ def register_read_tools(mcp: FastMCP) -> None:
 
         Args:
             query: Search query (case-insensitive). Empty string for browse mode.
-            limit: Maximum results to return (1-50, default 10).
+            limit: Maximum results to return (1-255, default 255).
             package_types: Filter by artifact types (OR logic).
                 Valid: skill, agent, prompt, instruction.
             source_filter: Limit to a specific git source name.
@@ -451,6 +452,38 @@ def register_read_tools(mcp: FastMCP) -> None:
 
     ############################################################################
     #                                                                          #
+    # RECOMMEND SKILLS TOOL                                                    #
+    #                                                                          #
+    ############################################################################
+
+    @mcp.tool(tags={"read"})
+    def aam_recommend_skills(
+        path: str | None = None,
+        limit: int = 15,
+    ) -> dict[str, Any]:
+        """Recommend AAM skills based on repository analysis.
+
+        Analyzes the project (package.json, pyproject.toml, structure)
+        to detect frontend (React, Vue), backend (Python, FastAPI), LLM
+        usage, docs, and tests. Returns a ranked list of skills from
+        configured sources that match the repository needs.
+
+        Best used when the user wants to find relevant skills for their
+        project or asks "what skills should I use for this repo?"
+
+        Args:
+            path: Project root to analyze. Defaults to current directory.
+            limit: Maximum number of recommendations (default 15).
+
+        Returns:
+            Dict with repo_context, recommendations (qualified_name,
+            score, rationale), and install_hint.
+        """
+        logger.info(f"MCP tool aam_recommend_skills: path={path}, limit={limit}")
+        return recommend_skills_for_repo(path=path, limit=limit)
+
+    ############################################################################
+    #                                                                          #
     # CLIENT INIT INFO TOOL (spec 004)                                         #
     #                                                                          #
     ############################################################################
@@ -484,4 +517,4 @@ def register_read_tools(mcp: FastMCP) -> None:
             "recommended_platform": detected or "cursor",
         }
 
-    logger.info("Registered 16 read-only MCP tools")
+    logger.info("Registered 17 read-only MCP tools")

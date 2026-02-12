@@ -30,7 +30,7 @@ Use this command to discover packages before installation.
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--limit` | `-l` | 10 | Maximum results to display (1--50) |
+| `--limit` | `-l` | 255 | Maximum results to display (1--255) |
 | `--type` | `-t` | all | Filter by artifact type. Repeatable for OR logic. |
 | `--source` | `-s` | all | Limit results to a specific git source name |
 | `--registry` | `-r` | all | Limit results to a specific registry name |
@@ -82,7 +82,8 @@ aam search doc --source google-gemini
 ```
 
 Only results from the `google-gemini` git source are shown.
-Registry results are excluded.
+Registry results are excluded. To install a result from a specific source,
+use the qualified name `source/artifact` (e.g., `google-gemini/gemini-skills/doc-writer`) — see [`aam install`](install.md) (qualified name format: `source/artifact`).
 
 ### Sort alphabetically
 
@@ -229,12 +230,14 @@ up to the limit, each with equal relevance score. This provides a
 
 ### Origin display
 
-Every result shows its origin:
+Every result shows its origin in the Source column:
 
 - **Registry packages** display the registry name (for example,
   `local`).
-- **Source artifacts** display the source label (for example,
-  `[source] google-gemini`).
+- **Source artifacts** display the git source name (for example,
+  `google-gemini/gemini-skills`). The version column shows
+  `source@<sha>` to indicate it comes from a git commit rather
+  than a numbered release.
 
 ### Warning display
 

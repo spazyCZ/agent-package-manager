@@ -103,7 +103,18 @@ def uninstall(ctx: click.Context, package: str, is_global: bool) -> None:
             console.print("[yellow]Aborted.[/yellow]")
             return
 
-    console.print(f"Uninstalling [bold]{package}@{locked.version}[/bold]...")
+    # -----
+    # Build source label for the confirmation message
+    # -----
+    source_label = (
+        f" from [magenta]{locked.source_name}[/magenta]"
+        if locked.source_name
+        else ""
+    )
+    console.print(
+        f"Uninstalling [bold]{package}@{locked.version}[/bold]"
+        f"{source_label}..."
+    )
 
     # -----
     # Step 3: Undeploy artifacts from platform

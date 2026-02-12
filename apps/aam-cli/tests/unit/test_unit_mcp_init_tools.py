@@ -214,6 +214,46 @@ class TestAamInitInfoReadTool:
 
 ################################################################################
 #                                                                              #
+# READ TOOL TESTS — aam_recommend_skills                                       #
+#                                                                              #
+################################################################################
+
+
+class TestAamRecommendSkillsReadTool:
+    """Tests for the aam_recommend_skills MCP read tool."""
+
+    def _register(self, mcp: MagicMock) -> None:
+        """Helper to register read tools on mock MCP."""
+        from aam_cli.mcp.tools_read import register_read_tools
+
+        register_read_tools(mcp)
+
+    def test_unit_recommend_skills_returns_structure(
+        self, mock_mcp: MagicMock, tmp_path
+    ) -> None:
+        """aam_recommend_skills returns repo_context and recommendations."""
+        (tmp_path / "package.json").write_text('{"dependencies": {"react": "18"}}')
+        self._register(mock_mcp)
+        tool_fn = mock_mcp._tools["aam_recommend_skills"]
+
+        with patch(
+            "aam_cli.mcp.tools_read.recommend_skills_for_repo",
+            return_value={
+                "repo_context": {"frontend_frameworks": ["react"], "keywords": ["react"]},
+                "recommendations": [{"qualified_name": "src/code-review", "score": 50}],
+                "install_hint": "aam install <qualified_name>",
+            },
+        ):
+            result = tool_fn(path=str(tmp_path), limit=5)
+
+        assert "repo_context" in result
+        assert "recommendations" in result
+        assert "install_hint" in result
+        assert result["repo_context"]["frontend_frameworks"] == ["react"]
+
+
+################################################################################
+#                                                                              #
 # RESOURCE TESTS — aam://init_status                                           #
 #                                                                              #
 ################################################################################

@@ -265,10 +265,10 @@ Author [your-username]:
 Enter your name or username.
 
 ```
-License [MIT]:
+License [Apache-2.0]:
 ```
 
-Press **Enter** to accept MIT license.
+Press **Enter** to accept Apache-2.0 license.
 
 ---
 
@@ -463,7 +463,7 @@ name: my-python-toolkit
 version: 1.0.0
 description: Python development toolkit with code review and deployment helpers
 author: your-username
-license: MIT
+license: Apache-2.0
 
 artifacts:
   skills:

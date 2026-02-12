@@ -7,6 +7,8 @@ interface Package {
   version: string;
   downloads: number;
   author: string;
+  source: string;
+  artifactType: string;
 }
 
 function SearchPage() {
@@ -27,6 +29,8 @@ function SearchPage() {
             version: '1.0.0',
             downloads: 1234,
             author: 'aam-team',
+            source: 'aam-registry',
+            artifactType: 'agent',
           },
           {
             name: `${query}-skill`,
@@ -34,6 +38,8 @@ function SearchPage() {
             version: '0.5.0',
             downloads: 567,
             author: 'community',
+            source: 'google-gemini/gemini-skills',
+            artifactType: 'skill',
           },
         ]);
         setLoading(false);
@@ -81,11 +87,17 @@ function SearchPage() {
             >
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-xl font-semibold text-blue-600">{pkg.name}</h2>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-semibold text-blue-600">{pkg.name}</h2>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                      {pkg.artifactType}
+                    </span>
+                  </div>
                   <p className="text-slate-600 mt-1">{pkg.description}</p>
                   <div className="flex items-center gap-4 mt-3 text-sm text-slate-500">
                     <span>v{pkg.version}</span>
                     <span>by {pkg.author}</span>
+                    <span className="text-purple-600" title="Source">{pkg.source}</span>
                   </div>
                 </div>
                 <div className="text-right">

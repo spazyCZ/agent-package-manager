@@ -792,7 +792,7 @@ name: "@author/code-review-toolkit"
 version: 1.0.0
 description: "Comprehensive security and performance code review toolkit"
 author: your-username
-license: MIT
+license: Apache-2.0
 repository: https://github.com/your-username/code-review-toolkit
 
 artifacts:

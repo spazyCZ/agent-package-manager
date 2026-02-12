@@ -36,6 +36,7 @@ from aam_cli.utils.archive import extract_archive
 from aam_cli.utils.checksum import calculate_sha256
 from aam_cli.utils.naming import parse_package_name, parse_package_spec, to_filesystem_name
 from aam_cli.utils.paths import resolve_project_dir
+from aam_cli.utils.text_match import find_similar_names
 from aam_cli.utils.yaml_utils import load_yaml_optional
 
 ################################################################################
@@ -345,6 +346,87 @@ def install(
 
 ################################################################################
 #                                                                              #
+# SUGGESTION HELPERS                                                           #
+#                                                                              #
+################################################################################
+
+
+def _collect_available_names(config: "AamConfig") -> list[str]:  # noqa: F821
+    """Collect all known package names from registries and sources.
+
+    Used for "Did you mean?" suggestions when the user supplies an
+    invalid or unrecognised package name.  Silently returns an empty
+    list if any data source fails.
+
+    Args:
+        config: AAM configuration with registries and sources.
+
+    Returns:
+        A de-duplicated list of available package names.
+    """
+    names: list[str] = []
+
+    # -----
+    # Gather names from registries
+    # -----
+    for reg_source in config.registries:
+        try:
+            reg = create_registry(reg_source)
+            entries = reg.search("")  # browse mode — return all
+            for entry in entries:
+                names.append(entry.name)
+        except (ValueError, OSError, KeyError) as exc:
+            logger.debug(
+                f"Could not list registry '{reg_source.name}' for "
+                f"suggestions: {exc}"
+            )
+
+    # -----
+    # Gather names from sources
+    # -----
+    if config.sources:
+        try:
+            from aam_cli.services.source_service import build_source_index
+
+            index = build_source_index(config)
+            for vp in index.by_qualified_name.values():
+                names.append(vp.name)
+        except (ValueError, OSError) as exc:
+            logger.debug(f"Could not build source index for suggestions: {exc}")
+
+    # -----
+    # De-duplicate while preserving order
+    # -----
+    return list(dict.fromkeys(names))
+
+
+def _show_name_suggestions(
+    console: Console,
+    invalid_input: str,
+    config: "AamConfig",  # noqa: F821
+) -> None:
+    """Show "Did you mean?" suggestions for an invalid package name.
+
+    Collects all known package names and uses fuzzy matching to find
+    the closest matches to the user's input.
+
+    Args:
+        console: Rich console for output.
+        invalid_input: The invalid package name the user typed.
+        config: AAM configuration.
+    """
+    available_names = _collect_available_names(config)
+    if not available_names:
+        return
+
+    suggestions = find_similar_names(invalid_input.lower(), available_names)
+    if suggestions:
+        suggestion_str = ", ".join(suggestions)
+        console.print(f"\n[dim]Did you mean:[/dim] {suggestion_str}")
+
+
+################################################################################
+#                                                                              #
 # INSTALL FROM REGISTRY                                                        #
 #                                                                              #
 ################################################################################
@@ -369,12 +451,34 @@ def _install_from_registry_or_source(
       3. Source fallback (unqualified): try source artifact index
     """
     # -----
-    # Step 1: Parse package spec
+    # Step 1: Qualified name (contains "/") — try source index first
+    # -----
+    # Do this BEFORE parse_package_spec, since qualified names like
+    # "anthropics/skills/skill-creator" are not valid package names
+    # and would fail validation.
+    if "/" in package_spec and "@" not in package_spec:
+        try:
+            _try_install_from_source(
+                ctx, console, package_spec, project_dir,
+                config, platform_name, no_deploy, force, dry_run,
+            )
+            return
+        except ValueError as exc:
+            # Qualified names are never valid package specs — show source
+            # error and exit, do not fall through to parse_package_spec
+            console.print(f"[red]Error:[/red] {exc}")
+            _show_name_suggestions(console, package_spec, config)
+            ctx.exit(1)
+            return
+
+    # -----
+    # Step 2: Parse package spec for registry-based install
     # -----
     try:
         pkg_name, pkg_version = parse_package_spec(package_spec)
     except ValueError as exc:
         console.print(f"[red]Error:[/red] {exc}")
+        _show_name_suggestions(console, package_spec, config)
         ctx.exit(1)
         return
 
@@ -392,19 +496,6 @@ def _install_from_registry_or_source(
             return
 
     # -----
-    # Step 2: Try qualified name in source index (if contains "/")
-    # -----
-    if "/" in package_spec and not pkg_version:
-        try:
-            _try_install_from_source(
-                ctx, console, package_spec, project_dir,
-                config, platform_name, no_deploy, force, dry_run,
-            )
-            return
-        except ValueError:
-            pass  # Fall through to registry
-
-    # -----
     # Step 3: Try registry resolution
     # -----
     registry_resolved = False
@@ -415,62 +506,93 @@ def _install_from_registry_or_source(
 
         registries = []
         for reg_source in config.registries:
-            registries.append(create_registry(reg_source))
-
-        try:
-            resolved = resolve_dependencies(
-                [(pkg_name, constraint)],
-                registries,
-            )
-
-            for pkg in resolved:
-                console.print(f"  + {pkg.name}@{pkg.version}")
-
-            if dry_run:
-                console.print(
-                    "\n[yellow]\\[Dry run — no packages installed][/yellow]"
+            try:
+                registries.append(create_registry(reg_source))
+            except ValueError as exc:
+                # -----
+                # Skip unsupported registry types with a warning
+                # -----
+                logger.warning(
+                    f"Skipping registry '{reg_source.name}': {exc}"
                 )
-                return
+                console.print(
+                    f"[yellow]Warning:[/yellow] Skipping registry "
+                    f"'{reg_source.name}' — {exc}"
+                )
 
-            adapter = None
-            if not no_deploy:
-                if not is_supported_platform(platform_name):
-                    console.print(
-                        f"[red]Error:[/red] Unsupported platform "
-                        f"'{platform_name}'. "
-                        "Supported: cursor, copilot, claude, codex"
-                    )
-                    ctx.exit(1)
-                    return
-                adapter = create_adapter(platform_name, project_dir)
-
-            installed = install_packages(
-                resolved,
-                adapter,
-                config,
-                project_dir,
-                no_deploy=no_deploy,
-                force=force,
-            )
-
-            console.print(
-                f"\n[green]✓[/green] Installed {len(installed)} packages"
-            )
-            registry_resolved = True
-
-        except ValueError:
+        if not registries:
             # -----
-            # Registry resolution failed — fall through to source
+            # All registries were unsupported — skip to source fallback
             # -----
             logger.debug(
-                f"Registry resolution failed for '{pkg_name}', "
-                f"trying source fallback"
+                "No usable registries after filtering, "
+                "falling through to source"
             )
+        else:
+            try:
+                resolved = resolve_dependencies(
+                    [(pkg_name, constraint)],
+                    registries,
+                )
+
+                for pkg in resolved:
+                    console.print(f"  + {pkg.name}@{pkg.version}")
+
+                if dry_run:
+                    console.print(
+                        "\n[yellow]\\[Dry run — no packages installed][/yellow]"
+                    )
+                    return
+
+                adapter = None
+                if not no_deploy:
+                    if not is_supported_platform(platform_name):
+                        console.print(
+                            f"[red]Error:[/red] Unsupported platform "
+                            f"'{platform_name}'. "
+                            "Supported: cursor, copilot, claude, codex"
+                        )
+                        ctx.exit(1)
+                        return
+                    adapter = create_adapter(platform_name, project_dir)
+
+                installed = install_packages(
+                    resolved,
+                    adapter,
+                    config,
+                    project_dir,
+                    no_deploy=no_deploy,
+                    force=force,
+                )
+
+                console.print(
+                    f"\n[green]✓[/green] Installed {len(installed)} packages"
+                )
+                registry_resolved = True
+
+            except ValueError:
+                # -----
+                # Registry resolution failed — fall through to source
+                # -----
+                logger.debug(
+                    f"Registry resolution failed for '{pkg_name}', "
+                    f"trying source fallback"
+                )
 
     # -----
     # Step 4: Source fallback for unqualified names
     # -----
     if not registry_resolved:
+        # When neither registries nor sources are configured, show clear error
+        if not config.registries and not config.sources:
+            console.print(
+                "[red]Error:[/red] No registries configured. "
+                "Run 'aam registry init' to create one, then "
+                "'aam registry add' to register it."
+            )
+            ctx.exit(1)
+            return
+
         try:
             _try_install_from_source(
                 ctx, console, pkg_name, project_dir,
@@ -478,6 +600,7 @@ def _install_from_registry_or_source(
             )
         except ValueError as exc:
             console.print(f"[red]Error:[/red] {exc}")
+            _show_name_suggestions(console, pkg_name, config)
             ctx.exit(1)
 
 

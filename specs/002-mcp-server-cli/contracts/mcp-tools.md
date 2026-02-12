@@ -110,7 +110,7 @@ These tools are always available regardless of `--allow-write` flag.
   "version": "1.0.0",
   "description": "Example package",
   "author": "author",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "artifacts": {
     "skills": [{"name": "my-skill", "path": "skills/my-skill/", "description": "A skill"}]
   },

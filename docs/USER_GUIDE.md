@@ -232,7 +232,7 @@ Package name [my-project]: my-toolkit
 Version [1.0.0]:
 Description: Code review and deployment toolkit
 Author [spazy]:
-License [MIT]:
+License [Apache-2.0]:
 
 How should files be organized?
   (c) Copy into AAM package structure
@@ -452,7 +452,7 @@ Package name [python-best-practices]: @author/python-best-practices
 Version [1.0.0]: 
 Description: Python coding standards and best practices for AI agents
 Author: author
-License [MIT]: 
+License [Apache-2.0]: 
 
 What artifacts will this package contain?
   [x] Skills
@@ -497,7 +497,7 @@ name: "@author/python-best-practices"   # Scoped package name
 version: 1.0.0
 description: "Python coding standards and best practices for AI agents"
 author: author
-license: MIT
+license: Apache-2.0
 repository: https://github.com/author/python-best-practices
 
 # Declare what this package provides
@@ -1269,7 +1269,7 @@ name: python-best-practices
 version: 1.0.0
 description: "Python coding standards and best practices for AI agents"
 author: your-username
-license: MIT
+license: Apache-2.0
 repository: https://github.com/your-username/python-best-practices
 
 artifacts:
@@ -1587,11 +1587,16 @@ To deploy later, run: aam deploy
 $ aam list
 
 Installed packages:
-  python-best-practices  1.1.0  4 artifacts (1 agent, 1 skill, 1 prompt, 1 instruction)
+
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Name                  ┃ Version ┃ Source   ┃ Artifacts                                     ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ python-best-practices │ 1.1.0   │ local    │ 4 (1 agent, 1 skill, 1 prompt, 1 instruction) │
+└───────────────────────┴─────────┴──────────┴───────────────────────────────────────────────┘
 
 $ aam list --tree
 
-python-best-practices@1.1.0
+python-best-practices@1.1.0 (local)
   (no dependencies)
 
 $ aam info python-best-practices
@@ -1599,7 +1604,7 @@ $ aam info python-best-practices
 python-best-practices@1.1.0
   Description: Python coding standards and best practices for AI agents
   Author:      your-username
-  License:     MIT
+  License:     Apache-2.0
   Repository:  https://github.com/your-username/python-best-practices
 
   Artifacts:
@@ -1609,6 +1614,7 @@ python-best-practices@1.1.0
     instruction: python-standards — Python coding standards
 
   Dependencies: none
+  Source: local
 
   Deployed to:
     cursor: .cursor/skills/, .cursor/rules/, .cursor/prompts/
@@ -1643,7 +1649,7 @@ name: "@author/python-best-practices"
 version: 1.2.0
 description: "Python coding standards and best practices for AI agents"
 author: author
-license: MIT
+license: Apache-2.0
 
 artifacts:
   # ... your artifacts ...
@@ -1780,7 +1786,7 @@ flowchart TD
 ```bash
 $ aam list --tree
 
-python-best-practices@1.2.0
+python-best-practices@1.2.0 (local)
 ├── code-analysis@1.0.0
 ├── common-prompts@2.1.0
 ├── linting-rules@1.3.0
@@ -2853,7 +2859,7 @@ name: "@author/code-review-toolkit"
 version: 1.0.0
 description: "Comprehensive code review toolkit for security and performance"
 author: author
-license: MIT
+license: Apache-2.0
 repository: https://github.com/author/code-review-toolkit
 
 artifacts:
@@ -3158,7 +3164,7 @@ The recipient just runs `aam install ./path-to-bundle.aam` and they're ready to 
 | Install package (scoped) | `aam install @author/name` |
 | Install package (unscoped) | `aam install name` |
 | Install specific version | `aam install @author/name@version` |
-| Install from source | `aam install source-name/artifact` |
+| Install from specific source | `aam install source-name/artifact` (e.g., `anthropics/skills/skill-creator`) |
 | Uninstall package | `aam uninstall <name>` |
 | Upgrade outdated packages | `aam upgrade [name]` |
 | Check for outdated packages | `aam outdated [--json]` |
@@ -3227,7 +3233,21 @@ aam source scan openai/skills --type skill
 aam source candidates
 ```
 
-### 12.3 Creating Packages from Sources
+### 12.3 Installing Directly from a Source
+
+You can install artifacts directly from git sources without creating a package first. Use the **qualified name** format `source-name/artifact` as a single argument:
+
+```bash
+# Install skill-creator from anthropics/skills (source name from aam source list)
+aam install anthropics/skills/skill-creator
+
+# For sources with a scan path (e.g., openai/skills:.curated)
+aam install openai/skills:.curated/code-review
+```
+
+**Note:** There is no `-s` or `--source` option for `aam install`. The source is specified in the package argument. If you add `anthropics/skills` and `anthropics/skills:skills` as separate sources (with different paths), use the source name that appears in `aam list --available` or the Source column of `aam search`. Run `aam info source/artifact` to see the exact install command for any uninstalled artifact.
+
+### 12.4 Creating Packages from Sources (Authoring Workflow)
 
 ```bash
 # Package specific artifacts from a source
@@ -3239,7 +3259,7 @@ aam create-package --from-source openai/skills --all
 
 Packages created from sources include provenance metadata that records where the content originated.
 
-### 12.4 Keeping Sources Updated
+### 12.5 Keeping Sources Updated
 
 ```bash
 # Fetch upstream changes
@@ -3252,7 +3272,7 @@ aam source update --all
 aam source update openai/skills --dry-run
 ```
 
-### 12.5 Managing Sources
+### 12.6 Managing Sources
 
 ```bash
 # List all configured sources
@@ -3265,7 +3285,7 @@ aam source remove openai/skills
 aam source remove openai/skills --purge-cache
 ```
 
-### 12.6 Package Integrity
+### 12.7 Package Integrity
 
 AAM tracks per-file SHA-256 checksums for installed packages. You can verify that installed files haven't been modified:
 
@@ -3282,7 +3302,7 @@ aam diff my-package
 
 When upgrading a package with local modifications, AAM warns you and offers options to backup, skip, view differences, or force the upgrade.
 
-### 12.7 Default Sources
+### 12.8 Default Sources
 
 AAM ships with 4 curated community skill sources:
 
@@ -3320,6 +3340,7 @@ The MCP server exposes AAM's capabilities as structured tools and resources that
 - Verify package integrity and view file differences
 - Read project context (installed packages, configuration, sources)
 - Diagnose environment issues
+- **Recommend skills** based on repository analysis (frontend, backend, LLM usage)
 
 ### 13.2 Starting the Server
 
@@ -3347,7 +3368,7 @@ aam mcp serve --log-file /tmp/aam-mcp.log --log-level DEBUG
 | `--log-file` | `None` | Redirect logs to a file (recommended for stdio) |
 | `--log-level` | `INFO` | Log level: DEBUG, INFO, WARNING, ERROR |
 
-> **Safety Model:** By default, only read-only tools are exposed (13 tools including source scanning, verify, and diff). Write tools (install, uninstall, publish, config set, registry add, source add/remove/update) require the `--allow-write` flag. This prevents accidental modifications by AI agents.
+> **Safety Model:** By default, only read-only tools are exposed (17 tools including source scanning, verify, diff, and skill recommendation). Write tools (install, uninstall, publish, config set, registry add, source add/remove/update) require the `--allow-write` flag. This prevents accidental modifications by AI agents.
 
 ### 13.3 IDE Configuration
 
@@ -3399,7 +3420,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 
 ### 13.4 Available Tools
 
-**Read-only tools** (always available, 13 tools):
+**Read-only tools** (always available, 17 tools):
 
 | Tool | Description |
 |------|-------------|
@@ -3416,6 +3437,10 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 | `aam_source_diff` | Preview upstream changes for a source (dry-run update) |
 | `aam_verify` | Verify integrity of installed package files |
 | `aam_diff` | Show unified diff of modified files in installed packages |
+| `aam_outdated` | Check for outdated source-installed packages |
+| `aam_available` | List all available artifacts from configured sources |
+| `aam_recommend_skills` | Recommend skills based on repository analysis |
+| `aam_init_info` | Get client initialization status and detected platform |
 
 **Write tools** (require `--allow-write`, 10 tools):
 
@@ -3431,6 +3456,10 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 | `aam_source_add` | Add a remote git repository as an artifact source |
 | `aam_source_remove` | Remove a configured source (with optional cache purge) |
 | `aam_source_update` | Fetch upstream changes for one or all sources |
+
+**Skill recommendation (`aam_recommend_skills`):**
+
+When you ask "what skills should I use for this repo?" or "find skills for my React + Python LLM app," the agent can call `aam_recommend_skills(path=None, limit=15)`. The tool analyzes the project (package.json, pyproject.toml, structure) to detect frontend (React, Vue), backend (Python, FastAPI), LLM usage, and docs, then returns ranked skill recommendations from configured sources with rationale.
 
 **Source operation error codes:**
 

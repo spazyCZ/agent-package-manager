@@ -257,7 +257,7 @@ def register_write_tools(mcp: FastMCP) -> None:
         version: str = "1.0.0",
         description: str | None = None,
         author: str | None = None,
-        license_name: str = "MIT",
+        license_name: str = "Apache-2.0",
         artifact_types: list[str] | None = None,
         platforms: list[str] | None = None,
     ) -> dict[str, Any]:
@@ -275,7 +275,7 @@ def register_write_tools(mcp: FastMCP) -> None:
             version: Semantic version string (default: "1.0.0").
             description: One-line package description.
             author: Package author or organisation.
-            license_name: SPDX licence identifier (default: "MIT").
+            license_name: SPDX licence identifier (default: "Apache-2.0").
             artifact_types: Artifact directories to scaffold. Choices:
                 skills, agents, prompts, instructions. Default: all four.
             platforms: Target platforms to configure. Choices:

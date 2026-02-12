@@ -207,7 +207,7 @@ name: code-reviewer
 version: 1.0.0
 description: "A simple code review skill for Python"
 author: Your Name
-license: MIT
+license: Apache-2.0
 
 artifacts:
   skills:

@@ -2,6 +2,7 @@
 
 **Branch**: `001-cli-local-repository` | **Date**: 2026-02-08 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/001-cli-local-repository/spec.md`
+**Implementation**: Local only — HTTP/remote registries are not supported.
 
 ## Summary
 

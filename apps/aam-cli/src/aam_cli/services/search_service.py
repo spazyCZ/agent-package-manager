@@ -37,8 +37,8 @@ logger = logging.getLogger(__name__)
 
 # --- Limit validation ---
 MIN_SEARCH_LIMIT: int = 1
-MAX_SEARCH_LIMIT: int = 50
-DEFAULT_SEARCH_LIMIT: int = 10
+MAX_SEARCH_LIMIT: int = 255
+DEFAULT_SEARCH_LIMIT: int = 255
 
 # --- Relevance scoring tiers (highest-tier-wins) ---
 SCORE_EXACT_NAME: int = 100
@@ -50,6 +50,13 @@ SCORE_DESCRIPTION_CONTAINS: int = 30
 # --- Validation constants ---
 VALID_ARTIFACT_TYPES: list[str] = ["skill", "agent", "prompt", "instruction"]
 VALID_SORT_OPTIONS: list[str] = ["relevance", "name", "recent"]
+
+# --- Auto-generated registry name ---
+# The sources-registry is auto-populated by ``materialize_source_packages()``
+# after ``aam source update``.  During search, we skip this registry when
+# sources are also being queried to avoid duplicate results (the source
+# index provides richer metadata — commit SHA, real source name, etc.).
+SOURCES_REGISTRY_NAME: str = "aam-sources"
 
 ################################################################################
 #                                                                              #
@@ -70,10 +77,15 @@ class SearchResult(BaseModel):
         keywords: Package keywords (empty list for sources).
         artifact_types: Types such as ``skill``, ``agent``, ``prompt``,
             ``instruction``.
-        origin: Origin label — registry name or ``[source] <qualified>``.
+        origin: Origin label — registry name for registry results,
+            or source display name (e.g. ``google-gemini/gemini-skills``)
+            for source results.
         origin_type: Discriminator: ``registry`` or ``source``.
         score: Relevance score 0–100.
         updated_at: ISO 8601 timestamp (empty string if unknown).
+        installed: Whether the package is currently installed in the
+            local or global workspace.  Populated by the presentation
+            layer (search command), not by the search service itself.
     """
 
     name: str
@@ -85,6 +97,7 @@ class SearchResult(BaseModel):
     origin_type: str = "registry"
     score: int = Field(default=0, ge=0, le=100)
     updated_at: str = ""
+    installed: bool = False
 
 
 class SearchResponse(BaseModel):
@@ -299,12 +312,31 @@ def search_packages(
     # ------------------------------------------------------------------
     # Step 6: Search registries (skip when source_filter is set)
     # ------------------------------------------------------------------
+    # When sources are also being searched (i.e. registry_filter is not
+    # set), skip the auto-generated ``aam-sources`` registry to avoid
+    # duplicate results.  Source artifacts already appear via the source
+    # index (Step 7) with richer metadata (commit SHA, real source name).
+    # ------------------------------------------------------------------
     if not source_filter:
         for reg_source in config.registries:
             # -----
             # If a registry_filter is set, skip non-matching registries
             # -----
             if registry_filter and reg_source.name != registry_filter:
+                continue
+
+            # -----
+            # Skip sources-registry when sources will also be searched
+            # (no registry_filter means Step 7 will run too).
+            # -----
+            if (
+                reg_source.name == SOURCES_REGISTRY_NAME
+                and not registry_filter
+            ):
+                logger.debug(
+                    "Skipping '%s' registry (sources searched in Step 7)",
+                    SOURCES_REGISTRY_NAME,
+                )
                 continue
 
             try:
@@ -356,41 +388,70 @@ def search_packages(
         try:
             index = build_source_index(config)
 
-            for vp in index.by_qualified_name.values():
-                # -----
-                # If a source_filter is set, skip non-matching sources
-                # -----
-                if source_filter and vp.source_name != source_filter:
-                    continue
-
-                score = compute_relevance_score(
-                    query_lower=query_lower,
-                    name_lower=vp.name.lower(),
-                    description_lower=(vp.description or "").lower(),
-                    keywords_lower=[],  # sources have no keywords
-                )
-
-                # -----
-                # Always collect name for "Did you mean?" before filtering
-                # -----
-                all_names.append(vp.name)
-
-                if score == 0 and query_lower:
-                    continue  # no match
-
-                all_results.append(
-                    SearchResult(
-                        name=vp.name,
-                        version=f"source@{vp.commit_sha[:7]}",
-                        description=vp.description or "",
-                        keywords=[],
-                        artifact_types=[vp.type],
-                        origin=f"[source] {vp.source_name}",
-                        origin_type="source",
-                        score=score,
-                        updated_at="",
+            # -----
+            # Qualified-name direct lookup: when query is "source/artifact",
+            # score-based search would match 0 (name is just "artifact").
+            # Do exact lookup first.
+            # -----
+            has_qualified_match = False
+            if "/" in query:
+                vp = index.by_qualified_name.get(query)
+                if vp and (not source_filter or vp.source_name == source_filter):
+                    all_results.append(
+                        SearchResult(
+                            name=vp.name,
+                            version=f"source@{vp.commit_sha[:7]}",
+                            description=vp.description or f"{vp.type} {vp.name}",
+                            keywords=[],
+                            artifact_types=[vp.type],
+                            origin=vp.source_name,
+                            origin_type="source",
+                            score=SCORE_EXACT_NAME,
+                            updated_at="",
+                        )
                     )
-                )
+                    all_names.append(vp.name)
+                    has_qualified_match = True
+
+            # -----
+            # Relevance-based search (skip when we already have qualified match)
+            # -----
+            if not has_qualified_match:
+                for vp in index.by_qualified_name.values():
+                    # -----
+                    # If a source_filter is set, skip non-matching sources
+                    # -----
+                    if source_filter and vp.source_name != source_filter:
+                        continue
+
+                    score = compute_relevance_score(
+                        query_lower=query_lower,
+                        name_lower=vp.name.lower(),
+                        description_lower=(vp.description or "").lower(),
+                        keywords_lower=[],  # sources have no keywords
+                    )
+
+                    # -----
+                    # Always collect name for "Did you mean?" before filtering
+                    # -----
+                    all_names.append(vp.name)
+
+                    if score == 0 and query_lower:
+                        continue  # no match
+
+                    all_results.append(
+                        SearchResult(
+                            name=vp.name,
+                            version=f"source@{vp.commit_sha[:7]}",
+                            description=vp.description or f"{vp.type} {vp.name}",
+                            keywords=[],
+                            artifact_types=[vp.type],
+                            origin=vp.source_name,
+                            origin_type="source",
+                            score=score,
+                            updated_at="",
+                        )
+                    )
 
         except (ValueError, OSError) as exc:
             warning_msg = f"Could not search sources: {exc}"

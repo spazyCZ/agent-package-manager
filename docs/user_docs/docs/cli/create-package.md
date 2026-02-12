@@ -78,7 +78,7 @@ Package name [current-directory]: my-package
 Version [1.0.0]: 1.0.0
 Description []: Package with existing artifacts
 Author []: John Doe
-License [MIT]: MIT
+License [Apache-2.0]: Apache-2.0
 
 Creating package...
   ✓ Created aam.yaml

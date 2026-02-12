@@ -196,7 +196,7 @@ author: "Jane Smith <jane@example.com>"
 SPDX license identifier.
 
 ```yaml
-license: MIT
+license: Apache-2.0
 ```
 
 **Common licenses:**
@@ -734,7 +734,7 @@ name: "@myorg/asvc-auditor"
 version: 2.1.0
 description: "ASVC audit agent with reporting skills and compliance prompts"
 author: "Jane Smith <jane@myorg.com>"
-license: MIT
+license: Apache-2.0
 repository: https://github.com/myorg/asvc-auditor
 homepage: https://myorg.com/packages/asvc-auditor
 keywords:

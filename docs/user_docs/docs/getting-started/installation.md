@@ -67,7 +67,7 @@ pip install aam
 For development or to get the latest unreleased features:
 
 ```bash
-git clone https://github.com/spazy/agent-package-manager.git
+git clone https://github.com/spazyCZ/agent-package-manager.git
 cd agent-package-manager
 pip install -e .
 ```
@@ -328,7 +328,7 @@ Check the changelog for breaking changes:
 aam changelog
 ```
 
-Or visit the [GitHub releases page](https://github.com/spazy/agent-package-manager/releases).
+Or visit the [GitHub releases page](https://github.com/spazyCZ/agent-package-manager/releases).
 
 ---
 

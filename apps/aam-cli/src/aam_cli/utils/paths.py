@@ -44,6 +44,9 @@ LOCK_FILE_NAME: str = "aam-lock.yaml"
 # Packages directory within workspace
 PACKAGES_DIR_NAME: str = "packages"
 
+# Sources registry directory name (auto-created by `aam source update`)
+SOURCES_REGISTRY_DIR_NAME: str = "sources-registry"
+
 ################################################################################
 #                                                                              #
 # FUNCTIONS                                                                    #
@@ -165,6 +168,20 @@ def ensure_project_workspace(project_dir: Path | None = None) -> Path:
     workspace.mkdir(parents=True, exist_ok=True)
     logger.debug(f"Ensured project workspace exists: path='{workspace}'")
     return workspace
+
+
+def get_sources_registry_dir() -> Path:
+    """Return the sources registry directory (``~/.aam/sources-registry/``).
+
+    This directory contains a local registry auto-populated by
+    ``aam source update`` with packages materialized from git sources.
+
+    Returns:
+        Absolute path to the sources registry directory.
+    """
+    sources_dir = get_global_aam_dir() / SOURCES_REGISTRY_DIR_NAME
+    logger.debug(f"Sources registry directory: path='{sources_dir}'")
+    return sources_dir
 
 
 def parse_file_url(url: str) -> Path:

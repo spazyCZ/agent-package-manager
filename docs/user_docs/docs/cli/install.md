@@ -26,8 +26,11 @@ Use this command to add new packages to your project or reinstall existing packa
 - `name@version` - Install specific version (e.g., `my-agent@1.0.0`)
 - `@scope/name` - Scoped package from registry (e.g., `@author/my-agent`)
 - `@scope/name@version` - Scoped package with version (e.g., `@author/my-agent@1.2.0`)
+- `source-name/artifact` - Install from a specific git source (e.g., `anthropics/skills/skill-creator`)
 - `./path/` - Install from local directory
 - `file.aam` - Install from archive file
+
+**Installing from a specific source:** Use the qualified name `source-name/artifact` as a single argument. The source name appears in `aam search` (Source column) and `aam list --available` (group header). For sources with a scan path, the format is `owner/repo:path/artifact` (e.g., `openai/skills:.curated/code-review`). There is no `-s` or `--source` option for `aam install` — the source is specified in the package argument.
 
 ## Options
 
@@ -96,7 +99,29 @@ Installing from archive: my-package-1.0.0.aam...
 ✓ Installed my-package@1.0.0
 ```
 
-### Example 5: Install Without Deployment
+### Example 5: Install from a Specific Git Source
+
+When multiple sources provide an artifact with the same name, use the qualified name to pick a specific source. The format is `source-name/artifact` (one argument).
+
+```bash
+# Install skill-creator from the anthropics/skills source
+aam install anthropics/skills/skill-creator
+
+# For sources with a scan path (e.g., openai/skills:.curated)
+aam install openai/skills:.curated/code-review
+```
+
+**Output:**
+```
+Searching sources for 'anthropics/skills/skill-creator'...
+  Found skill-creator (skill) in source anthropics/skills
+
+✓ Installed skill-creator from source anthropics/skills @ abc1234
+```
+
+To discover qualified names: run `aam search <query>` and note the Source column, or `aam list --available` and combine the source name (group header) with the artifact name. Use `aam info source/artifact` to see the exact install command.
+
+### Example 6: Install Without Deployment
 
 ```bash
 aam install my-agent --no-deploy
@@ -104,7 +129,7 @@ aam install my-agent --no-deploy
 
 Downloads and extracts the package but does not deploy artifacts to any platform. Useful for pre-downloading packages or inspecting contents.
 
-### Example 6: Force Reinstall
+### Example 7: Force Reinstall
 
 ```bash
 aam install my-agent --force
@@ -116,7 +141,7 @@ Reinstalls the package even if it's already installed. Useful for:
 - Updating deployment after manual changes
 - Testing installation process
 
-### Example 7: Preview Installation
+### Example 8: Preview Installation
 
 ```bash
 aam install my-agent --dry-run
@@ -133,7 +158,7 @@ Resolving my-agent@*...
 [Dry run — no packages installed]
 ```
 
-### Example 8: Install to Specific Platform
+### Example 9: Install to Specific Platform
 
 ```bash
 aam install my-agent --platform cursor
@@ -141,7 +166,7 @@ aam install my-agent --platform cursor
 
 Deploys artifacts only to Cursor, ignoring other configured platforms.
 
-### Example 9: Global Install
+### Example 10: Global Install
 
 ```bash
 aam install my-agent -g

@@ -233,14 +233,15 @@ def scan(
     table.add_column("Name", style="cyan")
     table.add_column("Type")
     table.add_column("Path")
-    table.add_column("Description", max_width=50)
+    table.add_column("Description", max_width=255)
 
     for artifact in artifacts:
+        desc = (artifact.get("description") or "")[:255]
         table.add_row(
             artifact["name"],
             artifact["type"],
             artifact["path"],
-            artifact.get("description", "") or "",
+            desc,
         )
 
     console.print(table)
@@ -358,6 +359,22 @@ def update(
     console.print(
         f"  Sources updated: {result['sources_updated']}"
     )
+
+    # -----
+    # Show materialization results
+    # -----
+    mat = result.get("materialization", {})
+    if mat:
+        pkg_count = mat.get("packages_created", 0)
+        mat_errors = mat.get("errors", [])
+        if pkg_count > 0:
+            console.print(
+                f"  [green]✓[/green] Materialized {pkg_count} "
+                f"installable packages"
+            )
+        for err in mat_errors:
+            console.print(f"  [yellow]⚠[/yellow] {err}")
+
     console.print()
 
 
@@ -588,7 +605,7 @@ def candidates(
 def enable_defaults(ctx: click.Context, output_json: bool) -> None:
     """Enable all default community skill sources.
 
-    Registers the 4 curated default skill sources shipped with AAM.
+    Registers the 5 curated default skill sources shipped with AAM.
     If any were previously removed, they are re-enabled.
     Sources that are already configured are skipped.
 

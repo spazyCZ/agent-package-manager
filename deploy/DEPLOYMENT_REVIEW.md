@@ -187,7 +187,7 @@ self.api_uptime_check = gcp.monitoring.UptimeCheckConfig(
 notification_channel = gcp.monitoring.NotificationChannel(
     f"{name}-email",
     type="email",
-    labels={"email_address": "ops@aamregistry.io"},
+    labels={"email_address": "ops@example.com"},  # Replace with your alerting email
 )
 alert_policy = gcp.monitoring.AlertPolicy(
     f"{name}-uptime-alert",

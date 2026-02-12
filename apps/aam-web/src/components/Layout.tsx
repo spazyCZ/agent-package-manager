@@ -35,15 +35,6 @@ function Layout() {
               <Link to="/search" className="text-slate-300 hover:text-white">
                 Browse
               </Link>
-              <Link to="/login" className="text-slate-300 hover:text-white">
-                Login
-              </Link>
-              <Link
-                to="/register"
-                className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium"
-              >
-                Sign Up
-              </Link>
             </nav>
           </div>
         </div>
@@ -63,11 +54,9 @@ function Layout() {
               <a href="https://storage.googleapis.com/aam-docs-test/index.html" className="hover:text-white" target="_blank" rel="noopener noreferrer">
                 Documentation
               </a>
-              <a href="/api/docs" className="hover:text-white">
-                API
-              </a>
+
               <a
-                href="https://github.com/aam/agent-package-manager"
+                href="https://github.com/spazyCZ/agent-package-manager"
                 className="hover:text-white"
                 target="_blank"
                 rel="noopener noreferrer"

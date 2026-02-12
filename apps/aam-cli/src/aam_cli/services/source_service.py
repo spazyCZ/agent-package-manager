@@ -163,6 +163,7 @@ class VirtualPackage:
     path: str
     commit_sha: str
     cache_dir: str
+    scan_path: str = ""  # Source scan scope (subdirectory within repo)
     description: str | None = None
     has_vendor_agent: bool = False
     vendor_agent_file: str | None = None
@@ -218,10 +219,16 @@ DEFAULT_SOURCES: list[dict[str, str]] = [
         "path": "skills",
     },
     {
-        "name": "anthropic/claude-prompts",
-        "url": "https://github.com/anthropic/claude-prompts.git",
+        "name": "anthropics/skills",
+        "url": "https://github.com/anthropics/skills.git",
         "ref": "main",
-        "path": "prompts",
+        "path": "skills",
+    },
+    {
+        "name": "microsoft/skills",
+        "url": "https://github.com/microsoft/skills.git",
+        "ref": "main",
+        "path": ".github/skills",
     },
 ]
 
@@ -336,7 +343,8 @@ def _scan_cached_source(
 def _extract_skill_description(skill_md_path: Path) -> str | None:
     """Extract a description from the first meaningful line of SKILL.md.
 
-    Skips markdown heading markers (``#``) and empty lines.
+    Skips markdown heading markers (``#``), empty lines, YAML frontmatter
+    delimiters (``---``), and lines inside frontmatter blocks.
 
     Args:
         skill_md_path: Path to the SKILL.md file.
@@ -346,9 +354,18 @@ def _extract_skill_description(skill_md_path: Path) -> str | None:
     """
     try:
         with skill_md_path.open("r", encoding="utf-8") as f:
+            in_frontmatter = False
             for line in f:
                 stripped = line.strip()
                 if not stripped:
+                    continue
+                # -----
+                # Skip YAML frontmatter delimiters and content inside --- blocks
+                # -----
+                if stripped == "---":
+                    in_frontmatter = not in_frontmatter
+                    continue
+                if in_frontmatter:
                     continue
                 # -----
                 # Remove heading markers for the description
@@ -649,9 +666,19 @@ def update_source(
     if not dry_run:
         save_global_config(config)
 
+    # -----
+    # Materialize source artifacts as local registry packages
+    # -----
+    materialization: dict[str, Any] = {}
+    if not dry_run:
+        materialization = materialize_source_packages(config)
+        # Persist config again (may have added sources-registry)
+        save_global_config(config)
+
     return {
         "reports": reports,
         "sources_updated": len(reports),
+        "materialization": materialization,
     }
 
 
@@ -1077,6 +1104,253 @@ def enable_default_sources() -> dict[str, Any]:
 
 ################################################################################
 #                                                                              #
+# SOURCE MATERIALIZATION (create local installable packages)                   #
+#                                                                              #
+################################################################################
+
+
+def materialize_source_packages(
+    config: AamConfig,
+) -> dict[str, Any]:
+    """Materialize source artifacts as local registry packages.
+
+    Scans all configured sources and creates proper ``.aam`` archives
+    in the sources-registry at ``~/.aam/sources-registry/``.  This
+    makes every discovered artifact installable via ``aam install``.
+
+    Called automatically after ``aam source update``.
+
+    Args:
+        config: AAM configuration with source entries.
+
+    Returns:
+        Dict with ``packages_created``, ``errors``, ``registry_path``.
+    """
+    import shutil
+    import tempfile
+
+    from aam_cli.registry.local import LocalRegistry
+    from aam_cli.utils.archive import create_archive
+    from aam_cli.utils.paths import get_sources_registry_dir, to_file_url
+    from aam_cli.utils.yaml_utils import dump_yaml
+
+    logger.info("Materializing source artifacts into local registry")
+
+    registry_dir = get_sources_registry_dir()
+
+    # -----
+    # Step 1: Rebuild the sources-registry from scratch
+    # -----
+    # Wipe and recreate to ensure it reflects the current state
+    # of all sources without stale entries.
+    if registry_dir.exists():
+        shutil.rmtree(registry_dir)
+
+    registry = LocalRegistry.init_registry(registry_dir, force=True)
+
+    # -----
+    # Step 2: Build the source index (scans all cached sources)
+    # -----
+    index = build_source_index(config)
+
+    if index.total_count == 0:
+        logger.info("No source artifacts found; sources-registry is empty")
+        return {
+            "packages_created": 0,
+            "errors": [],
+            "registry_path": str(registry_dir),
+        }
+
+    # -----
+    # Step 3: Package and publish each artifact
+    # -----
+    packages_created = 0
+    errors: list[str] = []
+
+    for vp in index.by_qualified_name.values():
+        try:
+            _publish_virtual_package_to_registry(
+                registry, vp, registry_dir,
+            )
+            packages_created += 1
+        except (ValueError, OSError, FileNotFoundError) as exc:
+            msg = f"Failed to materialize '{vp.name}': {exc}"
+            logger.warning(msg)
+            errors.append(msg)
+
+    # -----
+    # Step 4: Ensure the sources-registry is registered in config
+    # -----
+    _ensure_sources_registry_configured(config, registry_dir)
+
+    logger.info(
+        f"Materialization complete: packages={packages_created}, "
+        f"errors={len(errors)}"
+    )
+
+    return {
+        "packages_created": packages_created,
+        "errors": errors,
+        "registry_path": str(registry_dir),
+    }
+
+
+def _publish_virtual_package_to_registry(
+    registry: "LocalRegistry",
+    vp: VirtualPackage,
+    registry_dir: Path,
+) -> None:
+    """Create an .aam archive from a VirtualPackage and publish it.
+
+    Stages the artifact files in a temp directory, writes an
+    ``aam.yaml`` manifest, creates a ``.aam`` archive, and publishes
+    it to the given local registry.
+
+    Args:
+        registry: Target local registry instance.
+        vp: Virtual package with cached artifact data.
+        registry_dir: Path to the registry root.
+
+    Raises:
+        ValueError: If the artifact cannot be packaged.
+        FileNotFoundError: If the source path does not exist.
+    """
+    import tempfile
+
+    from aam_cli.utils.archive import create_archive
+    from aam_cli.utils.yaml_utils import dump_yaml
+
+    logger.debug(f"Publishing virtual package: name='{vp.name}', type='{vp.type}'")
+
+    cache_dir = Path(vp.cache_dir)
+    # -----
+    # Build full path: cache_dir / scan_path / artifact_path
+    # The scan_path is the source subdirectory scope; artifact path
+    # is relative to the scan root.
+    # -----
+    scan_root = cache_dir / vp.scan_path if vp.scan_path else cache_dir
+    source_path = scan_root / vp.path
+
+    if not source_path.exists():
+        raise FileNotFoundError(
+            f"Source path not found in cache: {source_path}"
+        )
+
+    with tempfile.TemporaryDirectory() as tmp_str:
+        tmp_dir = Path(tmp_str)
+        pkg_dir = tmp_dir / "package"
+        pkg_dir.mkdir()
+
+        # -----
+        # Copy artifact files into the package structure
+        # -----
+        type_plural = vp.type + "s"
+        if source_path.is_dir():
+            dest = pkg_dir / type_plural / vp.name
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            import shutil
+            shutil.copytree(source_path, dest)
+            artifact_path = f"{type_plural}/{vp.name}/"
+        else:
+            dest = pkg_dir / type_plural
+            dest.mkdir(parents=True, exist_ok=True)
+            import shutil
+            shutil.copy2(source_path, dest / source_path.name)
+            artifact_path = f"{type_plural}/{source_path.name}"
+
+        # -----
+        # Build description (truncate to 256 chars for validation)
+        # -----
+        description = vp.description or f"{vp.type} {vp.name}"
+        description = description[:256].strip() or f"{vp.type} {vp.name}"
+
+        # -----
+        # Write aam.yaml manifest
+        # -----
+        manifest_data: dict[str, Any] = {
+            "name": vp.name,
+            "version": "0.0.0",
+            "description": description,
+            "keywords": [vp.type, "source"],
+            "artifacts": {
+                type_plural: [
+                    {
+                        "name": vp.name,
+                        "path": artifact_path,
+                        "description": description,
+                    }
+                ],
+            },
+            "dependencies": {},
+            "provenance": {
+                "source_type": "git",
+                "source_url": vp.source_name,
+                "source_commit": vp.commit_sha,
+                "fetched_at": datetime.now(UTC).isoformat(),
+            },
+        }
+
+        dump_yaml(manifest_data, pkg_dir / "aam.yaml")
+
+        # -----
+        # Create .aam archive
+        # -----
+        archive_path = tmp_dir / f"{vp.name}-0.0.0.aam"
+        create_archive(pkg_dir, archive_path)
+
+        # -----
+        # Publish to the local registry
+        # -----
+        registry.publish(archive_path)
+
+    logger.debug(f"Published '{vp.name}' to sources-registry")
+
+
+def _ensure_sources_registry_configured(
+    config: AamConfig,
+    registry_dir: Path,
+) -> None:
+    """Add the sources-registry to config if not already present.
+
+    Args:
+        config: AAM configuration to update.
+        registry_dir: Path to the sources-registry directory.
+    """
+    from aam_cli.utils.paths import to_file_url
+
+    registry_name = "aam-sources"
+    registry_url = to_file_url(registry_dir)
+
+    # -----
+    # Check if already registered
+    # -----
+    for reg in config.registries:
+        if reg.name == registry_name:
+            logger.debug("Sources-registry already in config")
+            return
+
+    # -----
+    # Add the sources-registry as a non-default local registry
+    # -----
+    from aam_cli.core.config import RegistrySource
+
+    config.registries.append(
+        RegistrySource(
+            name=registry_name,
+            url=registry_url,
+            type="local",
+            default=False,
+        )
+    )
+
+    logger.info(
+        f"Auto-registered sources-registry in config: "
+        f"name='{registry_name}', url='{registry_url}'"
+    )
+
+
+################################################################################
+#                                                                              #
 # PUBLIC API: SOURCE INDEX & RESOLUTION (spec 004)                             #
 #                                                                              #
 ################################################################################
@@ -1145,6 +1419,7 @@ def build_source_index(config: AamConfig | None = None) -> ArtifactIndex:
                     path=artifact.path,
                     commit_sha=commit_sha,
                     cache_dir=str(cache_dir),
+                    scan_path=source_entry.path,
                     description=artifact.description,
                     has_vendor_agent=artifact.has_vendor_agent,
                     vendor_agent_file=artifact.vendor_agent_file,

@@ -17,7 +17,7 @@ import click
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
 
-from aam_cli.utils.naming import validate_package_name
+from aam_cli.utils.naming import format_invalid_package_name_message, validate_package_name
 from aam_cli.utils.yaml_utils import dump_yaml
 
 ################################################################################
@@ -67,12 +67,10 @@ def init_package(ctx: click.Context, name: str | None) -> None:
     default_name = name or Path.cwd().name
 
     while True:
-        pkg_name = Prompt.ask("Package name", default=default_name)
+        pkg_name = Prompt.ask("Package name (e.g. my-pkg, @scope/my-pkg)", default=default_name)
         if validate_package_name(pkg_name):
             break
-        console.print(
-            "[red]Invalid package name.[/red] Use lowercase, hyphens, optional @scope/ prefix."
-        )
+        console.print(f"[red]{format_invalid_package_name_message(pkg_name)}[/red]")
 
     version = Prompt.ask("Version", default="1.0.0")
     description = Prompt.ask("Description", default="")

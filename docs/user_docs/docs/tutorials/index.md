@@ -14,13 +14,24 @@ All tutorials include:
 - **Clear explanations** of what's happening at each step
 
 !!! tip "New to AAM?"
-    Start with [Packaging Existing Skills](package-existing-skills.md) to learn the basics, then move on to [Building a Code Review Package](build-code-review-package.md) for a complete end-to-end example.
+    Start with [Installing Skills from Sources](install-from-sources.md) to get up and running quickly, then try [Skill Consolidation](skill-consolidation.md) to build a curated team package. For package authoring, begin with [Packaging Existing Skills](package-existing-skills.md).
 
 ---
 
 ## Available Tutorials
 
 <div class="grid cards" markdown>
+
+-   :material-download:{ .lg .middle } __Installing Skills from Sources__ {#install-from-sources}
+
+    ---
+
+    Set up AAM, connect to community skill repositories, discover artifacts, and install skills into your project.
+
+    **Difficulty:** Beginner
+    **Time:** 10 minutes
+
+    [:octicons-arrow-right-24: Start tutorial](install-from-sources.md)
 
 -   :material-package-variant:{ .lg .middle } __Packaging Existing Skills__ {#packaging-existing-skills}
 
@@ -66,6 +77,17 @@ All tutorials include:
 
     [:octicons-arrow-right-24: Start tutorial](multi-platform-deployment.md)
 
+-   :material-layers-triple:{ .lg .middle } __Skill Consolidation__ {#skill-consolidation}
+
+    ---
+
+    Cherry-pick skills from multiple community sources and your own project, then bundle them into a single curated team package.
+
+    **Difficulty:** Intermediate
+    **Time:** 20 minutes
+
+    [:octicons-arrow-right-24: Start tutorial](skill-consolidation.md)
+
 -   :material-graph:{ .lg .middle } __Working with Dependencies__
 
     ---
@@ -97,6 +119,8 @@ Some tutorials have additional prerequisites, which are listed at the start of e
 
 Once you've completed these tutorials, you'll be ready to:
 
+- Install and manage community skills from upstream sources
+- Consolidate skills from multiple sources into curated team packages
 - Package your own skills and agents for distribution
 - Set up a team registry for sharing artifacts
 - Deploy packages across multiple AI platforms

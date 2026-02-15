@@ -206,7 +206,7 @@ class TestCheckConfigFiles:
         assert "(valid)" in gc["message"]
 
         pc = checks[1]
-        assert pc["status"] == "pass"
+        assert pc["status"] == "warn"
         assert "not found, using defaults" in pc["message"]
         assert str(project_cfg) in pc["message"]
 
@@ -234,7 +234,7 @@ class TestCheckConfigFiles:
         assert "(valid)" in pc["message"]
 
     def test_unit_doctor_config_files_neither_exists(self, tmp_path) -> None:
-        """Neither config file exists; both report not found with pass."""
+        """Neither config file exists; global passes, project warns."""
         global_cfg = tmp_path / "global" / "config.yaml"
         project_cfg = tmp_path / "project" / ".aam" / "config.yaml"
 
@@ -246,9 +246,11 @@ class TestCheckConfigFiles:
 
         assert len(checks) == 2
 
-        for check in checks:
-            assert check["status"] == "pass"
-            assert "not found, using defaults" in check["message"]
+        gc, pc = checks[0], checks[1]
+        assert gc["status"] == "pass"
+        assert "not found, using defaults" in gc["message"]
+        assert pc["status"] == "warn"
+        assert "not found, using defaults" in pc["message"]
 
     def test_unit_doctor_config_files_invalid_yaml(self, tmp_path) -> None:
         """Config file with broken YAML reports fail status."""

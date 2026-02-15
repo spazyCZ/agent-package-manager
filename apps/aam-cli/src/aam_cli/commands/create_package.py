@@ -35,7 +35,7 @@ from aam_cli.detection.scanner import (
     DetectedArtifact,
     scan_project,
 )
-from aam_cli.utils.naming import validate_package_name
+from aam_cli.utils.naming import format_invalid_package_name_message, validate_package_name
 from aam_cli.utils.yaml_utils import dump_yaml
 
 ################################################################################
@@ -529,15 +529,12 @@ def _create_from_source(
 
         while True:
             name = Prompt.ask(
-                "Package name",
+                "Package name (e.g. my-pkg, @scope/my-pkg)",
                 default=pkg_name or default_name,
             )
             if validate_package_name(name):
                 break
-            console.print(
-                "[red]Invalid package name.[/red] "
-                "Use lowercase, hyphens, optional @scope/ prefix."
-            )
+            console.print(f"[red]{format_invalid_package_name_message(name)}[/red]")
 
         version = Prompt.ask("Version", default=pkg_version or "1.0.0")
         description = Prompt.ask("Description", default=pkg_description or "")
@@ -796,7 +793,7 @@ def _create_from_source(
     default=None,
     help="Artifact type for --include",
 )
-@click.option("--name", "pkg_name", default=None, help="Package name")
+@click.option("--name", "pkg_name", default=None, help="Package name (e.g. my-pkg, @scope/my-pkg)")
 @click.option("--scope", "pkg_scope", default=None, help="Scope prefix")
 @click.option("--version", "pkg_version", default=None, help="Package version")
 @click.option("--description", "pkg_description", default=None, help="Package description")
@@ -973,14 +970,12 @@ def create_package(
 
         while True:
             name = Prompt.ask(
-                "Package name",
+                "Package name (e.g. my-pkg, @scope/my-pkg)",
                 default=pkg_name or default_name,
             )
             if validate_package_name(name):
                 break
-            console.print(
-                "[red]Invalid package name.[/red] Use lowercase, hyphens, optional @scope/ prefix."
-            )
+            console.print(f"[red]{format_invalid_package_name_message(name)}[/red]")
 
         version = Prompt.ask("Version", default=pkg_version or "1.0.0")
         description = Prompt.ask("Description", default=pkg_description or "")

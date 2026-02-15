@@ -204,34 +204,29 @@ class ArtifactIndex:
 ################################################################################
 
 # Default sources registered on first init (per spec 003 FR-040)
+# URLs use canonical HTTPS format (no .git suffix) to match git_url.parse() output
 DEFAULT_SOURCES: list[dict[str, str]] = [
     {
         "name": "github/awesome-copilot",
-        "url": "https://github.com/github/awesome-copilot.git",
+        "url": "https://github.com/github/awesome-copilot",
         "ref": "main",
         "path": "skills",
     },
     {
         "name": "openai/skills:.curated",
-        "url": "https://github.com/openai/skills.git",
+        "url": "https://github.com/openai/skills",
         "ref": "main",
         "path": "skills/.curated",
     },
     {
-        "name": "cursor/community-skills",
-        "url": "https://github.com/cursor/community-skills.git",
-        "ref": "main",
-        "path": "skills",
-    },
-    {
         "name": "anthropics/skills",
-        "url": "https://github.com/anthropics/skills.git",
+        "url": "https://github.com/anthropics/skills",
         "ref": "main",
         "path": "skills",
     },
     {
         "name": "microsoft/skills",
-        "url": "https://github.com/microsoft/skills.git",
+        "url": "https://github.com/microsoft/skills",
         "ref": "main",
         "path": ".github/skills",
     },

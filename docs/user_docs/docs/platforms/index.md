@@ -302,6 +302,27 @@ aam platforms
 # Valid platforms: cursor, copilot, claude, codex
 ```
 
+## Converting Between Platforms
+
+Use `aam convert` to migrate existing platform configurations between any two platforms:
+
+```bash
+# Convert Cursor configs to Copilot format
+aam convert -s cursor -t copilot
+
+# Preview conversion without writing files
+aam convert -s copilot -t claude --dry-run
+
+# Convert only instructions
+aam convert -s cursor -t claude --type instruction
+```
+
+The convert command handles field mapping (e.g. Cursor `globs` ↔ Copilot `applyTo`),
+strips unsupported metadata, and warns about lossy conversions. Skills use a
+universal format and are directly copied.
+
+See [`aam convert`](../cli/convert.md) for the full reference.
+
 ## Next Steps
 
 Explore each platform's detailed deployment guide:
@@ -314,5 +335,6 @@ Explore each platform's detailed deployment guide:
 Or continue learning:
 
 - [Platform Adapters Concept](../concepts/platform-adapters.md) - Deep dive into adapter architecture
+- [`aam convert` CLI Reference](../cli/convert.md) - Cross-platform conversion command
 - [Configuration: Project config](../configuration/project.md) - Platform settings in config
 - [Getting Started: Quick Start](../getting-started/quickstart.md) - Hands-on package installation

@@ -19,9 +19,11 @@ from click.testing import CliRunner
 
 from aam_cli.main import cli
 from aam_cli.utils.naming import (
+    format_invalid_package_name_message,
     format_package_name,
     parse_package_name,
     parse_package_spec,
+    suggest_package_name,
     to_filesystem_name,
     validate_package_name,
 )
@@ -593,6 +595,34 @@ class TestNamingValidate:
         assert validate_package_name("UPPERCASE") is False
         assert validate_package_name("-starts-with-hyphen") is False
         assert validate_package_name("@/name") is False
+
+
+class TestNamingSuggest:
+    """Test suggest_package_name and format_invalid_package_name_message."""
+
+    def test_unit_suggest_underscores_unscoped(self) -> None:
+        """Underscores in unscoped name -> suggest hyphens."""
+        assert suggest_package_name("rb_1_prompt") == "rb-1-prompt"
+
+    def test_unit_suggest_underscores_scoped(self) -> None:
+        """Underscores in scoped name part -> suggest hyphens."""
+        assert suggest_package_name("@rma/rb_1_prompt") == "@rma/rb-1-prompt"
+
+    def test_unit_suggest_no_fix_uppercase(self) -> None:
+        """Uppercase has no simple fix."""
+        assert suggest_package_name("My-Package") is None
+
+    def test_unit_format_message_with_suggestion(self) -> None:
+        """Message includes suggestion when available."""
+        msg = format_invalid_package_name_message("rb_1_prompt")
+        assert "rb-1-prompt" in msg
+        assert "Did you mean" in msg
+
+    def test_unit_format_message_without_suggestion(self) -> None:
+        """Message has hint but no suggestion when fix not obvious."""
+        msg = format_invalid_package_name_message("UPPERCASE")
+        assert "UPPERCASE" in msg
+        assert "no underscores" in msg
 
 
 class TestNamingFormat:

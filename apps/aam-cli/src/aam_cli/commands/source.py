@@ -606,7 +606,7 @@ def candidates(
 def enable_defaults(ctx: click.Context, output_json: bool) -> None:
     """Enable all default community skill sources.
 
-    Registers the 5 curated default skill sources shipped with AAM.
+    Registers the 4 curated default skill sources shipped with AAM.
     If any were previously removed, they are re-enabled.
     Sources that are already configured are skipped.
 

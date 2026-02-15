@@ -61,7 +61,7 @@ class OrderedGroup(click.Group):
         "Package Authoring": ["pkg"],
         "Source Management": ["source"],
         "Configuration": ["config", "registry"],
-        "Utilities": ["mcp", "doctor"],
+        "Utilities": ["mcp", "doctor", "convert"],
     }
 
     def format_commands(
@@ -146,6 +146,7 @@ from aam_cli.commands import (  # noqa: E402
     search,
 )
 from aam_cli.commands.client_init import client_init  # noqa: E402
+from aam_cli.commands.convert import convert  # noqa: E402
 from aam_cli.commands.diff import diff_cmd  # noqa: E402
 from aam_cli.commands.doctor import doctor  # noqa: E402
 from aam_cli.commands.list_packages import list_packages  # noqa: E402
@@ -224,6 +225,7 @@ cli.add_command(registry.registry)
 
 cli.add_command(mcp)
 cli.add_command(doctor)
+cli.add_command(convert)
 
 ################################################################################
 #                                                                              #

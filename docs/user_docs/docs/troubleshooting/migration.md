@@ -241,20 +241,52 @@ aam registry add file:///home/user/local-registry --name local --default
 
 ## Migrating Between Platforms
 
+### Using `aam convert` (Recommended)
+
+The `aam convert` command directly converts platform configuration files
+between Cursor, Copilot, Claude, and Codex:
+
+```bash
+# Preview the conversion first
+aam convert -s cursor -t claude --dry-run
+
+# Run the conversion
+aam convert -s cursor -t claude
+
+# Convert only specific artifact types
+aam convert -s cursor -t copilot --type instruction
+
+# Force overwrite existing targets (creates .bak backups)
+aam convert -s copilot -t cursor --force
+```
+
+This handles instructions, agents, prompts, and skills — mapping platform-specific
+fields where possible and warning about metadata that cannot be converted.
+
+See [`aam convert`](../cli/convert.md) for the full reference.
+
 ### Cursor to Claude
 
-#### 1. Install Package
+#### 1. Convert existing configs
+
+```bash
+aam convert -s cursor -t claude
+```
+
+This converts:
+- `.cursor/rules/*.mdc` → Appended to `CLAUDE.md` with section markers
+- `.cursor/agents/*.md` → `.claude/agents/*.md`
+- `.cursor/prompts/*.md` → `.claude/prompts/*.md`
+- `.cursor/skills/*/` → `.claude/skills/*/`
+
+#### 2. Install AAM packages for the new platform
 
 ```bash
 aam config set active_platforms claude
 aam install @author/my-package
 ```
 
-AAM automatically converts:
-- `.cursor/skills/` → `.claude/skills/`
-- `.cursor/rules/` → `CLAUDE.md`
-
-#### 2. Verify Deployment
+#### 3. Verify Deployment
 
 ```bash
 ls .claude/skills/

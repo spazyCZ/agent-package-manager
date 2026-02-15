@@ -69,6 +69,13 @@ Complete command reference for the AAM (Agent Artifact Manager) command-line int
 | [`aam config get`](config-get.md) | Get a configuration value |
 | [`aam config list`](config-list.md) | List all configuration values |
 
+### Utilities
+
+| Command | Description |
+|---------|-------------|
+| [`aam doctor`](doctor.md) | Run environment diagnostics |
+| [`aam convert`](convert.md) | Convert configs between platforms (Cursor, Copilot, Claude, Codex) |
+
 ## Global Options
 
 All commands support these global options:

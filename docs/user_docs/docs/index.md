@@ -16,6 +16,7 @@ The package manager for AI agent artifacts. Install, share, and deploy skills, a
 
 [Get Started](getting-started/index.md){ .md-button .md-button--primary }
 [CLI Reference](cli/index.md){ .md-button }
+[MCP Interface](mcp/index.md){ .md-button }
 
 </div>
 
@@ -102,19 +103,183 @@ AAM manages four types of AI agent artifacts:
 
 ---
 
-## Where to Go Next
+## Tools & Prerequisites
+
+AAM is designed to be lightweight. Install only what you need based on your planned tasks:
 
 <div class="grid" markdown>
 
 <div class="card" markdown>
 
-### Getting Started
+### Always Required
 
-Install AAM, configure your platform, and install your first package in under five minutes.
+| Tool | Version | Purpose |
+|------|---------|---------|
+| **Python** | 3.11+ | Runtime for AAM |
+| **pip** | 22.0+ | Install the `aam` package |
 
-[Start here](getting-started/index.md){ .md-button }
+```bash
+pip install aam
+```
 
 </div>
+
+<div class="card" markdown>
+
+### For Git Source Workflows
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| **Git** | 2.25+ | Clone and fetch community skill sources |
+
+Required when using `aam source add`, `aam source update`, or `aam source enable-defaults` to manage git-based package sources.
+
+</div>
+
+<div class="card" markdown>
+
+### For MCP / IDE Integration
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| **Cursor**, **Claude Desktop**, **VS Code**, or any MCP client | Latest | Connect to AAM's MCP server |
+
+AAM ships with a built-in MCP server. No extra install needed --- just configure your IDE to spawn `aam mcp serve`.
+
+</div>
+
+<div class="card" markdown>
+
+### For Package Authoring & Publishing
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| **Text editor** | Any | Edit `aam.yaml` manifests and artifact files |
+| **Git** | 2.25+ | Version control your packages |
+
+Use `aam pkg create` or `aam pkg init` to scaffold packages, then `aam pkg publish` to share them.
+
+</div>
+
+</div>
+
+!!! tip "Check your environment"
+    Run `aam doctor` at any time to verify your setup. It checks Python version, configuration files, registry accessibility, and package integrity.
+
+---
+
+## Get Started
+
+<div class="grid" markdown>
+
+<div class="card" markdown>
+
+### :material-download: Install AAM
+
+Install with pip, set your default AI platform, and configure a local registry. Everything you need in five minutes.
+
+[Installation guide](getting-started/installation.md){ .md-button .md-button--primary }
+
+</div>
+
+<div class="card" markdown>
+
+### :material-rocket-launch: Quick Start
+
+Create a registry, build a package, publish it, and install it --- all in a single walkthrough.
+
+[Quick start](getting-started/quickstart.md){ .md-button .md-button--primary }
+
+</div>
+
+<div class="card" markdown>
+
+### :material-package-variant: Your First Package
+
+Build a complete package with skills, agents, prompts, and instructions from scratch.
+
+[First package](getting-started/first-package.md){ .md-button .md-button--primary }
+
+</div>
+
+</div>
+
+---
+
+## CLI Reference
+
+AAM provides a comprehensive CLI organized into command groups. Every command is also available as an MCP tool for IDE agents.
+
+| Command Group | Key Commands | What It Does |
+|---------------|-------------|--------------|
+| **Getting Started** | [`aam init`](cli/init.md) | Set up AAM (platform, default sources) |
+| **Package Management** | [`aam install`](cli/install.md), [`aam search`](cli/search.md), [`aam list`](cli/list.md) | Install, search, list, upgrade, and remove packages |
+| **Package Integrity** | [`aam verify`](cli/verify.md), [`aam diff`](cli/diff.md) | Verify checksums and show diffs for modified files |
+| **Package Authoring** | [`aam pkg create`](cli/create-package.md), [`aam pkg publish`](cli/publish.md) | Create, validate, pack, and publish packages |
+| **Source Management** | [`aam source add`](cli/source-add.md), [`aam source scan`](cli/source-scan.md) | Manage git-based package sources |
+| **Registry Management** | [`aam registry init`](cli/registry-init.md), [`aam registry add`](cli/registry-add.md) | Create and configure local or remote registries |
+| **Configuration** | [`aam config set`](cli/config-set.md), [`aam config list`](cli/config-list.md) | Get and set configuration values |
+| **Diagnostics** | [`aam doctor`](cli/doctor.md) | Run health checks on your AAM setup |
+
+[Full CLI reference](cli/index.md){ .md-button }
+
+---
+
+## MCP Interface
+
+AAM ships with a built-in **MCP (Model Context Protocol) server** that lets AI agents in your IDE manage packages directly --- no terminal required.
+
+<div class="grid" markdown>
+
+<div class="card" markdown>
+
+### Read-Only Tools (17)
+
+Search packages, list sources, check configuration, verify integrity, and run diagnostics. Always safe, always available.
+
+</div>
+
+<div class="card" markdown>
+
+### Write Tools (12)
+
+Install, uninstall, upgrade, and publish packages. Create packages and manage sources. Requires explicit `--allow-write` opt-in.
+
+</div>
+
+<div class="card" markdown>
+
+### Resources (9)
+
+Passive data endpoints: installed packages, configuration, registries, source lists, and manifest data. Available to any connected agent.
+
+</div>
+
+<div class="card" markdown>
+
+### IDE Integration
+
+Works with **Cursor**, **Claude Desktop**, **VS Code**, **Windsurf**, and any MCP-compatible client. One line of config to connect.
+
+</div>
+
+</div>
+
+```bash
+# Start MCP server (read-only, safe for exploration)
+aam mcp serve
+
+# Start with full read/write access
+aam mcp serve --allow-write
+```
+
+[MCP Interface documentation](mcp/index.md){ .md-button }
+
+---
+
+## Where to Go Next
+
+<div class="grid" markdown>
 
 <div class="card" markdown>
 
@@ -128,11 +293,21 @@ Step-by-step guides for common tasks: packaging existing skills, building packag
 
 <div class="card" markdown>
 
-### CLI Reference
+### Platform Guides
 
-Complete reference for every AAM command, flag, and option.
+Deploy artifacts to Cursor, Claude Desktop, GitHub Copilot, and OpenAI Codex with platform-specific configuration.
 
-[View commands](cli/index.md){ .md-button }
+[Platform guides](platforms/index.md){ .md-button }
+
+</div>
+
+<div class="card" markdown>
+
+### Concepts
+
+Understand packages, artifacts, git sources, registries, dependency resolution, and platform adapters.
+
+[Learn concepts](concepts/index.md){ .md-button }
 
 </div>
 

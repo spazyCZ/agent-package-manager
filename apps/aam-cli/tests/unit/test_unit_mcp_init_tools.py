@@ -81,7 +81,7 @@ class TestAamInitWriteTool:
             platform="cursor",
             registry_created=False,
             registry_name=None,
-            sources_added=["community-skills"],
+            sources_added=["anthropics/skills"],
             config_path=Path("/home/user/.aam/config.yaml"),
             is_reconfigure=False,
         )
@@ -97,7 +97,7 @@ class TestAamInitWriteTool:
             result = tool_fn(platform="cursor", skip_sources=False)
 
         assert result["platform"] == "cursor"
-        assert result["sources_added"] == ["community-skills"]
+        assert result["sources_added"] == ["anthropics/skills"]
         assert result["is_reconfigure"] is False
         mock_orchestrate.assert_called_once_with(
             platform="cursor",

@@ -120,9 +120,9 @@ class TestRegisterDefaultSources:
         assert len(result["skipped"]) == len(DEFAULT_SOURCES)
         mock_save.assert_not_called()
 
-    def test_unit_default_sources_constant_has_five_entries(self) -> None:
-        """DEFAULT_SOURCES list contains exactly 5 curated sources."""
-        assert len(DEFAULT_SOURCES) == 5
+    def test_unit_default_sources_constant_has_four_entries(self) -> None:
+        """DEFAULT_SOURCES list contains exactly 4 curated sources."""
+        assert len(DEFAULT_SOURCES) == 4
 
     def test_unit_default_sources_constant_valid(self) -> None:
         """DEFAULT_SOURCES list has required fields."""
@@ -154,22 +154,22 @@ class TestEnableDefaultSources:
         mock_load: MagicMock,
         mock_save: MagicMock,
     ) -> None:
-        """Enables all 5 defaults when config has no sources."""
+        """Enables all 4 defaults when config has no sources."""
         mock_load.return_value = AamConfig()
 
         result = enable_default_sources()
 
-        assert len(result["registered"]) == 5
+        assert len(result["registered"]) == 4
         assert len(result["skipped"]) == 0
         assert len(result["re_enabled"]) == 0
-        assert result["total"] == 5
+        assert result["total"] == 4
         mock_save.assert_called_once()
 
         # -----
         # Verify all sources were persisted with default=True
         # -----
         saved_config = mock_save.call_args[0][0]
-        assert len(saved_config.sources) == 5
+        assert len(saved_config.sources) == 4
         for source in saved_config.sources:
             assert source.default is True
 
@@ -192,8 +192,8 @@ class TestEnableDefaultSources:
         result = enable_default_sources()
 
         assert DEFAULT_SOURCES[0]["name"] in result["skipped"]
-        assert len(result["registered"]) == 4
-        assert result["total"] == 5
+        assert len(result["registered"]) == 3
+        assert result["total"] == 4
         mock_save.assert_called_once()
 
     @patch("aam_cli.services.source_service.save_global_config")
@@ -215,7 +215,7 @@ class TestEnableDefaultSources:
         # -----
         assert removed_name in result["re_enabled"]
         assert removed_name in result["registered"]
-        assert len(result["registered"]) == 5
+        assert len(result["registered"]) == 4
 
         # -----
         # removed_defaults should be cleared for this source
@@ -230,7 +230,7 @@ class TestEnableDefaultSources:
         mock_load: MagicMock,
         mock_save: MagicMock,
     ) -> None:
-        """Does not save when all 5 defaults are already configured."""
+        """Does not save when all 4 defaults are already configured."""
         existing_sources = [
             SourceEntry(
                 name=d["name"],
@@ -247,8 +247,8 @@ class TestEnableDefaultSources:
         result = enable_default_sources()
 
         assert len(result["registered"]) == 0
-        assert len(result["skipped"]) == 5
-        assert result["total"] == 5
+        assert len(result["skipped"]) == 4
+        assert result["total"] == 4
         mock_save.assert_not_called()
 
     @patch("aam_cli.services.source_service.save_global_config")
@@ -265,8 +265,8 @@ class TestEnableDefaultSources:
 
         result = enable_default_sources()
 
-        assert len(result["registered"]) == 5
-        assert len(result["re_enabled"]) == 5
+        assert len(result["registered"]) == 4
+        assert len(result["re_enabled"]) == 4
         assert len(result["skipped"]) == 0
         mock_save.assert_called_once()
 

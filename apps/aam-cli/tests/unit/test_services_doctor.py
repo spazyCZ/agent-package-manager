@@ -274,7 +274,8 @@ class TestCheckConfigFiles:
 
         # Project config does not exist — should still pass
         pc = checks[1]
-        assert pc["status"] == "pass"
+        assert pc["status"] == "warn"
+        assert "not found, using defaults" in pc["message"]
 
     def test_unit_doctor_config_files_invalid_schema(self, tmp_path) -> None:
         """Config file with valid YAML but invalid schema reports fail."""

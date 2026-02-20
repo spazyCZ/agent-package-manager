@@ -195,7 +195,7 @@ scope: project
 ---
 name: python-standards
 description: "Python coding standards"
-scope: project
+applyTo: "**"
 ---
 
 # Python Coding Standards

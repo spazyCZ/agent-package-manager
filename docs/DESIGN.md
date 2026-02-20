@@ -791,6 +791,7 @@ Detection patterns:
     ─ instructions/*.md                  (AAM convention)
     ─ .cursor/rules/*.mdc                (Cursor rules, excluding agent-* rules)
     ─ CLAUDE.md                          (Claude instructions)
+    ─ .github/copilot-instructions.md    (Copilot legacy instructions)
     ─ .github/instructions/*.instructions.md  (Copilot instructions)
     ─ AGENTS.md                          (Codex instructions)
 ```

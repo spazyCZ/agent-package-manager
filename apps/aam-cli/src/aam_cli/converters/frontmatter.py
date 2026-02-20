@@ -53,13 +53,24 @@ def parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     if not stripped.startswith("---"):
         return {}, text
 
-    # Find the closing ---
-    end_idx = stripped.find("---", 3)
-    if end_idx == -1:
+    # Split into lines and find the closing '---' on its own line
+    lines = stripped.splitlines(keepends=True)
+    if not lines:
         return {}, text
 
-    yaml_block = stripped[3:end_idx].strip()
-    body = stripped[end_idx + 3:].lstrip("\n")
+    closing_idx: int | None = None
+    for i, line in enumerate(lines[1:], start=1):
+        if line.strip() == "---":
+            closing_idx = i
+            break
+
+    if closing_idx is None:
+        return {}, text
+
+    # YAML block is everything between the opening and closing delimiters
+    yaml_block = "".join(lines[1:closing_idx]).strip()
+    # Body is everything after the closing delimiter
+    body = "".join(lines[closing_idx + 1:]).lstrip("\n")
 
     try:
         frontmatter = yaml.safe_load(yaml_block)

@@ -218,6 +218,12 @@ def _print_verbose_workaround(console: Console, warning: str) -> None:
     warning_lower = warning.lower()
 
     for key, workaround in VERBOSE_WORKAROUNDS.items():
-        if key.replace("_", " ").replace("removed", "").strip() in warning_lower:
+        normalized_key = (
+            key.replace("_", " ")
+            .replace("removed", "")
+            .strip()
+            .lower()
+        )
+        if normalized_key and normalized_key in warning_lower:
             console.print(f"      [dim]{workaround}[/dim]")
             return

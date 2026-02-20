@@ -13,7 +13,7 @@ flowchart LR
     IDE["IDE / AI Agent<br/>(Cursor, Claude Desktop, etc.)"] -->|MCP protocol| AAM["AAM MCP Server<br/>(aam mcp serve)"]
     AAM -->|reads/writes| Config["~/.aam/config.yaml"]
     AAM -->|manages| Packages["~/.aam/packages/"]
-    AAM -->|clones/fetches| Sources["~/.aam/sources-cache/"]
+    AAM -->|clones/fetches| Sources["~/.aam/cache/git/"]
 
     style IDE fill:#e3f2fd
     style AAM fill:#f3e5f5

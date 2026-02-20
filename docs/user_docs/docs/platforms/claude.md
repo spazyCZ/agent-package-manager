@@ -2,13 +2,13 @@
 
 ## Overview
 
-**Claude Desktop** is Anthropic's AI assistant application. Projects using Claude Desktop use a `CLAUDE.md` file for project-specific instructions. AAM integrates with Claude by merging agents and instructions into `CLAUDE.md` using marker-based sections, while deploying skills and prompts to the `.claude/` directory.
+**Claude Desktop** is Anthropic's AI assistant application. Projects using Claude Desktop use a `CLAUDE.md` file for project-specific instructions and a `.claude/agents/` directory for custom subagents. AAM integrates with Claude by deploying agents as discrete files in `.claude/agents/`, merging instructions into `CLAUDE.md` using marker-based sections, and deploying skills and prompts to the `.claude/` directory.
 
 **Key features:**
-- Marker-based merging into `CLAUDE.md`
+- Discrete agent files in `.claude/agents/`
+- Marker-based merging of instructions into `CLAUDE.md`
 - Preserves user-written content outside markers
 - Native SKILL.md support
-- Clean separation of AAM-managed vs manual content
 - Project-based instruction organization
 
 ## Deployment Mapping
@@ -16,7 +16,7 @@
 | Artifact Type | Claude Location | Format | Merging |
 |---------------|----------------|--------|---------|
 | **Skill** | `.claude/skills/<fs-name>/SKILL.md` | SKILL.md (as-is) | No |
-| **Agent** | `CLAUDE.md` | Markdown section | Yes (markers) |
+| **Agent** | `.claude/agents/<fs-name>.md` | Markdown file | No |
 | **Prompt** | `.claude/prompts/<fs-name>.md` | Markdown (as-is) | No |
 | **Instruction** | `CLAUDE.md` | Markdown section | Yes (markers) |
 
@@ -56,7 +56,7 @@ Skills are copied as-is to `.claude/skills/`. The entire skill directory structu
 
 ### Agents
 
-Agents are merged into `CLAUDE.md` as markdown sections with AAM markers. The system prompt content is included directly between markers.
+Agents are deployed as discrete `.md` files in `.claude/agents/`. Each agent gets its own file following Claude Code's [custom subagents convention](https://code.claude.com/docs/en/sub-agents).
 
 **Source** (`agents/asvc-audit/`):
 
@@ -86,12 +86,9 @@ configurations, and documentation against ASVC framework requirements.
 - Provide remediation recommendations
 ```
 
-**Merged into `CLAUDE.md`:**
+**Deployed to** `.claude/agents/asvc-audit.md`:
 
 ```markdown
-<!-- BEGIN AAM: asvc-audit agent -->
-# ASVC Compliance Auditor
-
 You are an ASVC compliance auditor. Your role is to analyze codebases,
 configurations, and documentation against ASVC framework requirements.
 
@@ -100,25 +97,14 @@ configurations, and documentation against ASVC framework requirements.
 - Identify compliance gaps against ASVC standards
 - Generate structured audit findings
 - Provide remediation recommendations
-
-## Available Skills
-
-- asvc-report: Generate ASVC audit reports
-- generic-auditor: General-purpose code auditing
-
-## Available Prompts
-
-- audit-finding: Use for documenting individual findings
-- audit-summary: Use for executive summaries
-<!-- END AAM: asvc-audit agent -->
 ```
 
 **Conversion rules:**
-1. Content wrapped in `<!-- BEGIN AAM: ... -->` and `<!-- END AAM: ... -->` markers
-2. Marker includes artifact name and type (e.g., `asvc-audit agent`)
-3. System prompt content included directly
-4. Skills and prompts listed as references
-5. No YAML frontmatter in merged content
+1. Each agent is a separate `.md` file in `.claude/agents/`
+2. System prompt content written directly to the file
+3. File naming: `<fs-name>.md`
+4. Re-deploying overwrites the existing agent file
+5. `CLAUDE.md` is not modified by agent deployments
 
 ### Prompts
 
@@ -296,12 +282,14 @@ platforms:
 
 | Option | Values | Default | Description |
 |--------|--------|---------|-------------|
-| `merge_instructions` | `true`, `false` | `true` | Whether to merge agents/instructions into CLAUDE.md |
+| `merge_instructions` | `true`, `false` | `true` | Whether to merge instructions into CLAUDE.md |
 
 **merge_instructions:**
 
-- `true`: Agents and instructions merge into `CLAUDE.md` (recommended)
-- `false`: Would deploy as separate files (not typical for Claude)
+- `true`: Instructions merge into `CLAUDE.md` (recommended)
+- `false`: Would deploy instructions as separate files (not typical for Claude)
+
+> **Note:** Agents are always deployed as discrete files in `.claude/agents/` regardless of this setting.
 
 ## Installation Example
 
@@ -331,35 +319,12 @@ aam install @author/asvc-auditor
 
 ### After Installation
 
-**CLAUDE.md** (created or updated):
+**CLAUDE.md** (instructions merged):
 
 ```markdown
 # My Project
 
 This is my custom project description...
-
-<!-- BEGIN AAM: asvc-audit agent -->
-# ASVC Compliance Auditor
-
-You are an ASVC compliance auditor. Your role is to analyze codebases,
-configurations, and documentation against ASVC framework requirements.
-
-## Core Responsibilities
-
-- Identify compliance gaps against ASVC standards
-- Generate structured audit findings
-- Provide remediation recommendations
-
-## Available Skills
-
-- asvc-report: Generate ASVC audit reports
-- generic-auditor: General-purpose code auditing
-
-## Available Prompts
-
-- audit-finding: Use for documenting individual findings
-- audit-summary: Use for executive summaries
-<!-- END AAM: asvc-audit agent -->
 
 <!-- BEGIN AAM: python-standards instruction -->
 # Python Coding Standards
@@ -381,8 +346,10 @@ configurations, and documentation against ASVC framework requirements.
 
 ```
 my-project/
-├── CLAUDE.md                        # Merged agents + instructions
+├── CLAUDE.md                        # Instructions (marker-based)
 ├── .claude/
+│   ├── agents/
+│   │   └── asvc-audit.md           # Agent file
 │   ├── skills/
 │   │   ├── author--asvc-report/
 │   │   │   ├── SKILL.md
@@ -412,7 +379,7 @@ Downloaded 2 packages (145 KB)
 Deployed to claude:
   skill: author--asvc-report -> .claude/skills/author--asvc-report/
   skill: author--generic-auditor -> .claude/skills/author--generic-auditor/
-  agent: asvc-audit -> CLAUDE.md (merged)
+  agent: asvc-audit -> .claude/agents/asvc-audit.md
   prompt: audit-finding -> .claude/prompts/author--audit-finding.md
   prompt: audit-summary -> .claude/prompts/author--audit-summary.md
   instruction: python-standards -> CLAUDE.md (merged)
@@ -424,15 +391,23 @@ Successfully installed @author/asvc-auditor@1.0.0
 
 After deployment, verify that artifacts are correctly placed:
 
+### Check Agents
+
+```bash
+# List deployed agents
+ls .claude/agents/
+
+# Expected output:
+# asvc-audit.md
+```
+
 ### Check CLAUDE.md
 
 ```bash
-# View CLAUDE.md
+# View CLAUDE.md (instructions only)
 cat CLAUDE.md
 
-# Should contain AAM markers:
-# <!-- BEGIN AAM: asvc-audit agent -->
-# <!-- END AAM: asvc-audit agent -->
+# Should contain instruction markers:
 # <!-- BEGIN AAM: python-standards instruction -->
 # <!-- END AAM: python-standards instruction -->
 ```
@@ -440,7 +415,7 @@ cat CLAUDE.md
 ### Check Markers
 
 ```bash
-# Find all AAM markers
+# Find all AAM markers in CLAUDE.md
 grep "BEGIN AAM" CLAUDE.md
 
 # Expected output:
@@ -479,7 +454,7 @@ ls .claude/prompts/
 
 ## Tips & Best Practices
 
-### Preserve User Content
+### Preserve User Content in CLAUDE.md
 
 **Always write your own content outside AAM markers:**
 
@@ -488,9 +463,9 @@ ls .claude/prompts/
 
 <!-- Your custom instructions here -->
 
-<!-- BEGIN AAM: asvc-audit agent -->
+<!-- BEGIN AAM: python-standards instruction -->
 ...AAM-managed content...
-<!-- END AAM: asvc-audit agent -->
+<!-- END AAM: python-standards instruction -->
 
 <!-- More custom instructions here -->
 ```
@@ -508,15 +483,6 @@ Structure your `CLAUDE.md` logically:
 
 ## Overview
 Project description...
-
-## AAM Agents
-<!-- BEGIN AAM: agent1 agent -->
-...
-<!-- END AAM: agent1 agent -->
-
-<!-- BEGIN AAM: agent2 agent -->
-...
-<!-- END AAM: agent2 agent -->
 
 ## AAM Instructions
 <!-- BEGIN AAM: standards1 instruction -->
@@ -537,20 +503,13 @@ aam install @author/code-reviewer
 aam install @author/doc-writer
 ```
 
-Each agent gets its own marked section in `CLAUDE.md`:
+Each agent gets its own file in `.claude/agents/`:
 
-```markdown
-<!-- BEGIN AAM: asvc-audit agent -->
-...
-<!-- END AAM: asvc-audit agent -->
-
-<!-- BEGIN AAM: code-reviewer agent -->
-...
-<!-- END AAM: code-reviewer agent -->
-
-<!-- BEGIN AAM: doc-writer agent -->
-...
-<!-- END AAM: doc-writer agent -->
+```
+.claude/agents/
+├── asvc-audit.md
+├── code-reviewer.md
+└── doc-writer.md
 ```
 
 ### Skill References
@@ -577,7 +536,7 @@ AAM should never touch content outside markers, but it's good practice.
 
 **Symptom:** `aam install` succeeds but `CLAUDE.md` doesn't exist.
 
-**Cause:** No agents or instructions in the package.
+**Cause:** No instructions in the package (agents go to `.claude/agents/`, not `CLAUDE.md`).
 
 **Solution:**
 
@@ -586,7 +545,8 @@ Check what was deployed:
 ```bash
 aam list
 
-# If only skills/prompts are deployed, CLAUDE.md won't be created
+# If only skills/prompts/agents are deployed, CLAUDE.md won't be created
+# CLAUDE.md is only created when instructions are deployed
 ```
 
 ### Markers Appear in Claude Output
@@ -599,7 +559,7 @@ aam list
 
 ### Content Between Markers Disappears
 
-**Symptom:** Manual edits inside AAM markers are lost.
+**Symptom:** Manual edits inside AAM instruction markers are lost.
 
 **Cause:** AAM overwrites content between markers on deployment.
 
@@ -610,16 +570,16 @@ Move your custom content outside AAM markers:
 ```markdown
 <!-- Your custom content here -->
 
-<!-- BEGIN AAM: asvc-audit agent -->
+<!-- BEGIN AAM: python-standards instruction -->
 ...AAM content...
-<!-- END AAM: asvc-audit agent -->
+<!-- END AAM: python-standards instruction -->
 
 <!-- More custom content here -->
 ```
 
 ### Duplicate Markers
 
-**Symptom:** Multiple `<!-- BEGIN AAM: asvc-audit agent -->` sections.
+**Symptom:** Multiple `<!-- BEGIN AAM: python-standards instruction -->` sections.
 
 **Cause:** Manual duplication or AAM deployment bug.
 
@@ -657,19 +617,25 @@ nano CLAUDE.md
 
 ### Cannot Undeploy
 
-**Symptom:** `aam undeploy` fails to remove markers.
+**Symptom:** `aam undeploy` fails to remove an artifact.
 
-**Cause:** Markers manually edited or deleted.
+**Cause:** File or markers manually edited or deleted.
 
 **Solution:**
 
-Manually remove AAM sections from `CLAUDE.md`:
+For agents, manually delete the file:
+
+```bash
+rm .claude/agents/artifact-name.md
+```
+
+For instructions, manually remove AAM sections from `CLAUDE.md`:
 
 ```bash
 # Edit CLAUDE.md and remove:
-# <!-- BEGIN AAM: artifact-name artifact-type -->
+# <!-- BEGIN AAM: artifact-name instruction -->
 # ...content...
-# <!-- END AAM: artifact-name artifact-type -->
+# <!-- END AAM: artifact-name instruction -->
 ```
 
 ## Next Steps

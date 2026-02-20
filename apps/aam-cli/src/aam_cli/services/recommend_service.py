@@ -243,7 +243,7 @@ def recommend_skills(
     keyword_set = {k.lower() for k in repo_context.keywords}
     scored: list[SkillRecommendation] = []
 
-    for qname, vp in index.by_qualified_name.items():
+    for _qname, vp in index.by_qualified_name.items():
         score, rationale = _score_artifact(vp, keyword_set, repo_context)
         if score > 0:
             scored.append(

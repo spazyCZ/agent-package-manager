@@ -2,9 +2,9 @@
 
 Deploys AAM artifacts into the GitHub Copilot filesystem structure:
   - Skills       → ``.github/skills/<fs-name>/``
-  - Agents       → ``.github/copilot-instructions.md`` (marker-delimited section)
+  - Agents       → ``.github/agents/<fs-name>.agent.md``
   - Prompts      → ``.github/prompts/<fs-name>.md``
-  - Instructions → ``.github/copilot-instructions.md`` (marker-delimited section)
+  - Instructions → ``.github/instructions/<fs-name>.instructions.md``
 
 Decision reference: DESIGN.md Section 8.2.
 """
@@ -33,17 +33,6 @@ logger = logging.getLogger(__name__)
 
 ################################################################################
 #                                                                              #
-# CONSTANTS                                                                    #
-#                                                                              #
-################################################################################
-
-# Marker templates used to delimit AAM-managed sections inside shared files.
-# Copilot agents and instructions are merged into copilot-instructions.md.
-BEGIN_MARKER_TEMPLATE: str = "<!-- BEGIN AAM: {name} {kind} -->"
-END_MARKER_TEMPLATE: str = "<!-- END AAM: {name} {kind} -->"
-
-################################################################################
-#                                                                              #
 # COPILOT ADAPTER                                                              #
 #                                                                              #
 ################################################################################
@@ -52,9 +41,11 @@ END_MARKER_TEMPLATE: str = "<!-- END AAM: {name} {kind} -->"
 class CopilotAdapter:
     """GitHub Copilot platform adapter.
 
-    All deploy methods write to a ``.github/`` directory within the
-    project root, except agents and instructions which are appended
-    to ``.github/copilot-instructions.md`` using HTML comment markers.
+    Deploys artifacts to the ``.github/`` directory within the project root:
+      - Skills to ``.github/skills/<name>/``
+      - Agents to ``.github/agents/<name>.agent.md``
+      - Prompts to ``.github/prompts/<name>.md``
+      - Instructions to ``.github/instructions/<name>.instructions.md``
     """
 
     def __init__(self, project_root: Path) -> None:
@@ -117,10 +108,10 @@ class CopilotAdapter:
         agent_ref: ArtifactRef,
         _config: dict[str, str],
     ) -> Path:
-        """Deploy an agent section into ``.github/copilot-instructions.md``.
+        """Deploy an agent to ``.github/agents/<fs-name>.agent.md``.
 
         Reads the agent's system-prompt.md (or agent.yaml → system_prompt
-        reference) and appends it as a marker-delimited section.
+        reference) and writes it as a discrete ``.agent.md`` file.
 
         Args:
             agent_path: Path to the extracted agent directory.
@@ -128,9 +119,12 @@ class CopilotAdapter:
             _config: Platform config.
 
         Returns:
-            Path to the copilot-instructions.md file.
+            Path to the created agent file.
         """
-        logger.info(f"Deploying agent '{agent_ref.name}' -> copilot-instructions.md")
+        fs_name = self._artifact_fs_name(agent_ref.name)
+        dest = self.github_dir / "agents" / f"{fs_name}.agent.md"
+
+        logger.info(f"Deploying agent '{agent_ref.name}' -> {dest}")
 
         # -----
         # Read the system prompt content
@@ -138,13 +132,13 @@ class CopilotAdapter:
         content = self._read_agent_content(agent_path, agent_ref)
 
         # -----
-        # Merge into copilot-instructions.md
+        # Write discrete agent file
         # -----
-        instructions_path = self.github_dir / "copilot-instructions.md"
-        self._upsert_marker_section(instructions_path, agent_ref.name, "agent", content)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(content, encoding="utf-8")
 
-        logger.info(f"Agent deployed to: {instructions_path}")
-        return instructions_path
+        logger.info(f"Agent deployed: {dest}")
+        return dest
 
     def deploy_prompt(
         self,
@@ -179,10 +173,10 @@ class CopilotAdapter:
         instr_ref: ArtifactRef,
         _config: dict[str, str],
     ) -> Path:
-        """Deploy an instruction section into ``.github/copilot-instructions.md``.
+        """Deploy an instruction to ``.github/instructions/<fs-name>.instructions.md``.
 
-        Reads the instruction markdown and appends it as a marker-delimited
-        section alongside any agents already present.
+        Copies the instruction markdown as a discrete ``.instructions.md`` file
+        in the ``.github/instructions/`` directory.
 
         Args:
             instr_path: Path to the instruction file.
@@ -190,21 +184,18 @@ class CopilotAdapter:
             _config: Platform config.
 
         Returns:
-            Path to the copilot-instructions.md file.
+            Path to the created instruction file.
         """
-        logger.info(
-            f"Deploying instruction '{instr_ref.name}' -> copilot-instructions.md"
-        )
+        fs_name = self._artifact_fs_name(instr_ref.name)
+        dest = self.github_dir / "instructions" / f"{fs_name}.instructions.md"
 
-        content = instr_path.read_text(encoding="utf-8")
+        logger.info(f"Deploying instruction '{instr_ref.name}' -> {dest}")
 
-        instructions_path = self.github_dir / "copilot-instructions.md"
-        self._upsert_marker_section(
-            instructions_path, instr_ref.name, "instruction", content
-        )
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(instr_path, dest)
 
-        logger.info(f"Instruction deployed to: {instructions_path}")
-        return instructions_path
+        logger.info(f"Instruction deployed: {dest}")
+        return dest
 
     # ------------------------------------------------------------------
     # Undeploy and list
@@ -227,10 +218,17 @@ class CopilotAdapter:
                 shutil.rmtree(path)
                 logger.info(f"Removed skill directory: {path}")
 
-        elif artifact_type in ("agent", "instruction"):
-            # Remove marker-delimited section from copilot-instructions.md
-            instructions_path = self.github_dir / "copilot-instructions.md"
-            self._remove_marker_section(instructions_path, artifact_name, artifact_type)
+        elif artifact_type == "agent":
+            path = self.github_dir / "agents" / f"{fs_name}.agent.md"
+            if path.is_file():
+                path.unlink()
+                logger.info(f"Removed agent file: {path}")
+
+        elif artifact_type == "instruction":
+            path = self.github_dir / "instructions" / f"{fs_name}.instructions.md"
+            if path.is_file():
+                path.unlink()
+                logger.info(f"Removed instruction file: {path}")
 
         elif artifact_type == "prompt":
             path = self.github_dir / "prompts" / f"{fs_name}.md"
@@ -253,6 +251,15 @@ class CopilotAdapter:
                 if entry.is_dir():
                     deployed.append((entry.name, "skill", entry))
 
+        # Agents
+        agents_dir = self.github_dir / "agents"
+        if agents_dir.is_dir():
+            for entry in agents_dir.iterdir():
+                if entry.name.endswith(".agent.md"):
+                    # Strip the .agent.md suffix to get the artifact name
+                    name = entry.name.removesuffix(".agent.md")
+                    deployed.append((name, "agent", entry))
+
         # Prompts
         prompts_dir = self.github_dir / "prompts"
         if prompts_dir.is_dir():
@@ -260,124 +267,15 @@ class CopilotAdapter:
                 if entry.suffix == ".md":
                     deployed.append((entry.stem, "prompt", entry))
 
-        # Agents and instructions from copilot-instructions.md markers
-        instructions_path = self.github_dir / "copilot-instructions.md"
-        if instructions_path.is_file():
-            deployed.extend(self._list_marker_sections(instructions_path))
+        # Instructions
+        instructions_dir = self.github_dir / "instructions"
+        if instructions_dir.is_dir():
+            for entry in instructions_dir.iterdir():
+                if entry.name.endswith(".instructions.md"):
+                    name = entry.name.removesuffix(".instructions.md")
+                    deployed.append((name, "instruction", entry))
 
         return deployed
-
-    # ------------------------------------------------------------------
-    # Marker-based section management
-    # ------------------------------------------------------------------
-
-    def _upsert_marker_section(
-        self,
-        file_path: Path,
-        name: str,
-        kind: str,
-        content: str,
-    ) -> None:
-        """Insert or replace a marker-delimited section in a file.
-
-        If the file does not exist it is created. Existing user content
-        outside AAM markers is preserved.
-
-        Args:
-            file_path: Path to the target markdown file.
-            name: Artifact name (used in markers).
-            kind: Artifact kind (``"agent"`` or ``"instruction"``).
-            content: Markdown body to place between the markers.
-        """
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-
-        begin_marker = BEGIN_MARKER_TEMPLATE.format(name=name, kind=kind)
-        end_marker = END_MARKER_TEMPLATE.format(name=name, kind=kind)
-
-        section_block = f"{begin_marker}\n{content.rstrip()}\n{end_marker}\n"
-
-        if file_path.is_file():
-            existing = file_path.read_text(encoding="utf-8")
-
-            # -----
-            # Check if a section for this artifact already exists
-            # -----
-            if begin_marker in existing and end_marker in existing:
-                # Replace existing section
-                before = existing[: existing.index(begin_marker)]
-                after = existing[existing.index(end_marker) + len(end_marker) :]
-                # Strip leading newline from the remainder
-                after = after.lstrip("\n")
-                new_content = before.rstrip("\n") + "\n\n" + section_block
-                if after.strip():
-                    new_content += "\n" + after
-            else:
-                # Append new section
-                new_content = existing.rstrip("\n") + "\n\n" + section_block
-        else:
-            new_content = section_block
-
-        file_path.write_text(new_content, encoding="utf-8")
-        logger.debug(f"Upserted section '{name}' ({kind}) in {file_path}")
-
-    def _remove_marker_section(
-        self,
-        file_path: Path,
-        name: str,
-        kind: str,
-    ) -> None:
-        """Remove a marker-delimited section from a file.
-
-        Args:
-            file_path: Path to the target markdown file.
-            name: Artifact name used in markers.
-            kind: Artifact kind (``"agent"`` or ``"instruction"``).
-        """
-        if not file_path.is_file():
-            return
-
-        begin_marker = BEGIN_MARKER_TEMPLATE.format(name=name, kind=kind)
-        end_marker = END_MARKER_TEMPLATE.format(name=name, kind=kind)
-
-        existing = file_path.read_text(encoding="utf-8")
-
-        if begin_marker not in existing or end_marker not in existing:
-            return
-
-        before = existing[: existing.index(begin_marker)]
-        after = existing[existing.index(end_marker) + len(end_marker) :]
-
-        new_content = (before.rstrip("\n") + "\n" + after.lstrip("\n")).strip()
-
-        if new_content:
-            file_path.write_text(new_content + "\n", encoding="utf-8")
-        else:
-            file_path.unlink()
-            logger.info(f"Removed empty file: {file_path}")
-
-        logger.info(f"Removed section '{name}' ({kind}) from {file_path}")
-
-    def _list_marker_sections(
-        self,
-        file_path: Path,
-    ) -> list[tuple[str, str, Path]]:
-        """Parse marker-delimited sections from a file.
-
-        Returns:
-            List of ``(name, type, path)`` tuples for each AAM section found.
-        """
-        content = file_path.read_text(encoding="utf-8")
-        results: list[tuple[str, str, Path]] = []
-
-        import re
-
-        pattern = re.compile(r"<!-- BEGIN AAM: (.+?) (agent|instruction) -->")
-        for match in pattern.finditer(content):
-            name = match.group(1)
-            kind = match.group(2)
-            results.append((name, kind, file_path))
-
-        return results
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -395,7 +293,7 @@ class CopilotAdapter:
         return artifact_name
 
     def _read_agent_content(self, agent_path: Path, agent_ref: ArtifactRef) -> str:
-        """Read agent content for embedding in copilot-instructions.md.
+        """Read agent content for the ``.agent.md`` file.
 
         Reads the system-prompt.md file from the agent directory.
 
@@ -419,7 +317,7 @@ class CopilotAdapter:
             from aam_cli.utils.yaml_utils import load_yaml
 
             agent_data = load_yaml(agent_yaml_path)
-            prompt_file = agent_data.get("system_prompt", "system-prompt.md")
+            prompt_file: str = agent_data.get("system_prompt", "system-prompt.md")
             alt_path = agent_path / prompt_file
             if alt_path.is_file():
                 return alt_path.read_text(encoding="utf-8")

@@ -18,7 +18,6 @@ import pytest
 
 from aam_cli.services.recommend_service import (
     RepoContext,
-    SkillRecommendation,
     analyze_repository,
     recommend_skills,
     recommend_skills_for_repo,

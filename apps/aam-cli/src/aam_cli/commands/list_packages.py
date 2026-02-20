@@ -3,14 +3,16 @@
 Lists installed packages from the lock file and ``.aam/packages/``.
 """
 
+from __future__ import annotations
+
 ################################################################################
 #                                                                              #
 # IMPORTS & DEPENDENCIES                                                       #
 #                                                                              #
 ################################################################################
-
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 from rich.console import Console
@@ -18,9 +20,12 @@ from rich.table import Table
 from rich.tree import Tree
 
 from aam_cli.core.manifest import load_manifest
-from aam_cli.core.workspace import get_packages_dir, read_lock_file
+from aam_cli.core.workspace import LockedPackage, LockFile, get_packages_dir, read_lock_file
 from aam_cli.utils.naming import parse_package_name, to_filesystem_name
 from aam_cli.utils.paths import resolve_project_dir
+
+if TYPE_CHECKING:
+    from aam_cli.services.source_service import VirtualPackage
 
 ################################################################################
 #                                                                              #
@@ -94,7 +99,7 @@ def list_packages(ctx: click.Context, tree: bool, available: bool, is_global: bo
         _show_table(console, lock, project_dir)
 
 
-def _format_source(locked: "LockedPackage") -> str:  # noqa: F821
+def _format_source(locked: LockedPackage) -> str:
     """Build a human-readable source label from a locked package.
 
     Prefers the git source name (for example, ``google-gemini/gemini-skills``)
@@ -114,7 +119,7 @@ def _format_source(locked: "LockedPackage") -> str:  # noqa: F821
 
 def _show_table(
     console: Console,
-    lock: "LockFile",  # noqa: F821
+    lock: LockFile,
     project_dir: Path,
 ) -> None:
     """Display packages as a flat table."""
@@ -161,7 +166,7 @@ def _show_table(
 
 def _show_tree(
     console: Console,
-    lock: "LockFile",  # noqa: F821
+    lock: LockFile,
     _project_dir: Path,
 ) -> None:
     """Display packages as a dependency tree."""
@@ -188,8 +193,8 @@ def _show_tree(
 
 def _add_deps_to_tree(
     parent: Tree,
-    locked: "LockedPackage",  # noqa: F821
-    lock: "LockFile",  # noqa: F821
+    locked: LockedPackage,
+    lock: LockFile,
 ) -> None:
     """Recursively add dependencies to a Rich Tree."""
     for dep_name in locked.dependencies:
@@ -229,7 +234,7 @@ def _show_available(console: Console) -> None:
     # -----
     # Group artifacts by source
     # -----
-    by_source: dict[str, list] = {}
+    by_source: dict[str, list[VirtualPackage]] = {}
     for vp in index.by_qualified_name.values():
         by_source.setdefault(vp.source_name, []).append(vp)
 

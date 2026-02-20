@@ -323,6 +323,139 @@ aam -v publish --dry-run
 
 ---
 
+## MCP Server
+
+AAM includes a built-in [Model Context Protocol](https://modelcontextprotocol.io) server that exposes AAM capabilities as tools for IDE agents. This lets AI assistants in Cursor, Claude Desktop, Windsurf, and VS Code search for packages, manage sources, install skills, and get recommendations directly.
+
+### Starting the Server
+
+```bash
+# Read-only mode (default — safe for any IDE)
+aam mcp serve
+
+# Enable write operations (install, publish, source add/remove, etc.)
+aam mcp serve --allow-write
+
+# HTTP/SSE transport instead of stdio
+aam mcp serve --transport http --port 8000
+
+# With logging
+aam mcp serve --log-file /tmp/aam-mcp.log --log-level DEBUG
+```
+
+### Options
+
+| Flag | Description |
+|------|-------------|
+| `--transport` | `stdio` (default) or `http` |
+| `--port PORT` | HTTP port (default: `8000`, only for `--transport http`) |
+| `--allow-write` | Enable write tools — install, uninstall, publish, source management, config changes. **Without this flag, only read-only tools are available.** |
+| `--log-file PATH` | Log to file instead of stderr |
+| `--log-level` | `DEBUG`, `INFO` (default), `WARNING`, `ERROR` |
+
+### Safety Model
+
+By default the server starts in **read-only mode** — only 17 safe, non-destructive tools are available. When `--allow-write` is passed, 12 additional write tools are enabled (29 total), allowing the agent to install/uninstall packages, add/remove sources, modify configuration, and publish packages.
+
+### Available Tools
+
+**Read-only tools (always available):**
+
+| Tool | Description |
+|------|-------------|
+| `aam_search` | Search registries and sources for packages |
+| `aam_list` | List installed packages |
+| `aam_info` | Get detailed package metadata |
+| `aam_validate` | Validate package manifest and artifacts |
+| `aam_config_get` | Get configuration values |
+| `aam_registry_list` | List configured registries |
+| `aam_doctor` | Run environment diagnostics |
+| `aam_source_list` | List configured git sources |
+| `aam_source_scan` | Scan a source for artifacts |
+| `aam_source_candidates` | List unpackaged artifact candidates |
+| `aam_source_diff` | Preview upstream changes |
+| `aam_verify` | Verify package file integrity |
+| `aam_diff` | Show file differences in packages |
+| `aam_outdated` | Check for outdated source-installed packages |
+| `aam_available` | List all available artifacts from sources |
+| `aam_init_info` | Get client initialization information |
+| `aam_recommend_skills` | Recommend skills based on repo analysis |
+
+**Write tools (requires `--allow-write`):**
+
+| Tool | Description |
+|------|-------------|
+| `aam_install` | Install packages from registries or sources |
+| `aam_uninstall` | Uninstall packages |
+| `aam_publish` | Publish packages to registry |
+| `aam_create_package` | Create a package manifest |
+| `aam_config_set` | Set configuration values |
+| `aam_registry_add` | Add a new registry |
+| `aam_source_add` | Add a git source |
+| `aam_source_remove` | Remove a git source |
+| `aam_source_update` | Update git sources |
+| `aam_upgrade` | Upgrade outdated packages |
+| `aam_init` | Initialize client for a platform |
+| `aam_init_package` | Scaffold a new package |
+
+### MCP Resources
+
+The server also exposes 9 read-only resources for passive data access:
+
+| URI | Description |
+|-----|-------------|
+| `aam://config` | Current merged configuration |
+| `aam://packages/installed` | List of installed packages |
+| `aam://packages/{name}` | Details for a specific package |
+| `aam://registries` | Configured registries |
+| `aam://manifest` | Read `aam.yaml` from current directory |
+| `aam://sources` | List of git sources |
+| `aam://sources/{source_id}` | Source details with artifacts |
+| `aam://sources/{source_id}/candidates` | Candidate artifacts from a source |
+| `aam://init_status` | Client initialization status |
+
+### IDE Configuration
+
+**Cursor / Claude Desktop / Windsurf** (stdio):
+
+```json
+{
+  "mcpServers": {
+    "aam": {
+      "command": "aam",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
+```
+
+**With write access enabled:**
+
+```json
+{
+  "mcpServers": {
+    "aam": {
+      "command": "aam",
+      "args": ["mcp", "serve", "--allow-write"]
+    }
+  }
+}
+```
+
+**HTTP transport:**
+
+```json
+{
+  "mcpServers": {
+    "aam": {
+      "url": "http://localhost:8000"
+    }
+  }
+}
+```
+
+---
+
 ## Development
 
 ```bash

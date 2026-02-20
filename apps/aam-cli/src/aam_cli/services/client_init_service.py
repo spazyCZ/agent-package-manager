@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from aam_cli.core.config import (
-    AamConfig,
     load_config,
     save_global_config,
 )
@@ -133,7 +132,8 @@ def setup_default_sources() -> list[str]:
     logger.info("Setting up default sources")
 
     result = register_default_sources()
-    return result.get("registered", [])
+    registered: list[str] = result.get("registered", [])
+    return registered
 
 
 ################################################################################

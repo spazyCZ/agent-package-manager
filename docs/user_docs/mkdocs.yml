@@ -116,10 +116,12 @@ nav:
     - Your First Package: getting-started/first-package.md
   - Tutorials:
     - tutorials/index.md
+    - Install Skills from Sources: tutorials/install-from-sources.md
     - Package Existing Skills: tutorials/package-existing-skills.md
     - Build a Code Review Package: tutorials/build-code-review-package.md
     - Share Packages with Your Team: tutorials/share-with-team.md
     - Multi-Platform Deployment: tutorials/multi-platform-deployment.md
+    - Skill Consolidation: tutorials/skill-consolidation.md
     - Working with Dependencies: tutorials/working-with-dependencies.md
   - Concepts:
     - concepts/index.md
@@ -172,7 +174,10 @@ nav:
       - aam config list: cli/config-list.md
     - Utilities:
       - aam doctor: cli/doctor.md
+      - aam convert: cli/convert.md
     - Global Options: cli/global-options.md
+  - MCP Interface:
+    - mcp/index.md
   - Configuration:
     - configuration/index.md
     - Global Config: configuration/global.md

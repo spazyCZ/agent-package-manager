@@ -15,6 +15,7 @@ user can inspect it in the browser.
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import click
 import yaml
@@ -145,7 +146,7 @@ def _resolve_artifact_file(
     return None
 
 
-def _extract_frontmatter(file_path: Path) -> dict | None:
+def _extract_frontmatter(file_path: Path) -> dict[str, Any] | None:
     """Parse YAML frontmatter delimited by ``---`` from a file.
 
     Reads only the frontmatter block at the top of the file (between
@@ -188,7 +189,7 @@ def _extract_frontmatter(file_path: Path) -> dict | None:
 
 def _render_frontmatter(
     console: Console,
-    frontmatter: dict,
+    frontmatter: dict[str, Any],
 ) -> None:
     """Render YAML frontmatter as a Rich panel.
 

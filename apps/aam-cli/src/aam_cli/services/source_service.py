@@ -16,11 +16,16 @@ Reference: spec.md User Stories 1–3, 7; data-model.md entities 4–6.
 #                                                                              #
 ################################################################################
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from aam_cli.registry.local import LocalRegistry
 
 from aam_cli.core.config import (
     AamConfig,
@@ -199,34 +204,29 @@ class ArtifactIndex:
 ################################################################################
 
 # Default sources registered on first init (per spec 003 FR-040)
+# URLs use canonical HTTPS format (no .git suffix) to match git_url.parse() output
 DEFAULT_SOURCES: list[dict[str, str]] = [
     {
         "name": "github/awesome-copilot",
-        "url": "https://github.com/github/awesome-copilot.git",
+        "url": "https://github.com/github/awesome-copilot",
         "ref": "main",
         "path": "skills",
     },
     {
         "name": "openai/skills:.curated",
-        "url": "https://github.com/openai/skills.git",
+        "url": "https://github.com/openai/skills",
         "ref": "main",
         "path": "skills/.curated",
     },
     {
-        "name": "cursor/community-skills",
-        "url": "https://github.com/cursor/community-skills.git",
-        "ref": "main",
-        "path": "skills",
-    },
-    {
         "name": "anthropics/skills",
-        "url": "https://github.com/anthropics/skills.git",
+        "url": "https://github.com/anthropics/skills",
         "ref": "main",
         "path": "skills",
     },
     {
         "name": "microsoft/skills",
-        "url": "https://github.com/microsoft/skills.git",
+        "url": "https://github.com/microsoft/skills",
         "ref": "main",
         "path": ".github/skills",
     },
@@ -1127,12 +1127,9 @@ def materialize_source_packages(
         Dict with ``packages_created``, ``errors``, ``registry_path``.
     """
     import shutil
-    import tempfile
 
     from aam_cli.registry.local import LocalRegistry
-    from aam_cli.utils.archive import create_archive
-    from aam_cli.utils.paths import get_sources_registry_dir, to_file_url
-    from aam_cli.utils.yaml_utils import dump_yaml
+    from aam_cli.utils.paths import get_sources_registry_dir
 
     logger.info("Materializing source artifacts into local registry")
 
@@ -1196,7 +1193,7 @@ def materialize_source_packages(
 
 
 def _publish_virtual_package_to_registry(
-    registry: "LocalRegistry",
+    registry: LocalRegistry,
     vp: VirtualPackage,
     registry_dir: Path,
 ) -> None:

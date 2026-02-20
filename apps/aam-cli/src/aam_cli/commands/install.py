@@ -19,11 +19,12 @@ import click
 from rich.console import Console
 
 from aam_cli.adapters.factory import create_adapter, is_supported_platform
-from aam_cli.core.config import load_config
+from aam_cli.core.config import AamConfig, load_config
 from aam_cli.core.installer import install_packages
 from aam_cli.core.manifest import load_manifest
 from aam_cli.core.resolver import resolve_dependencies
 from aam_cli.core.workspace import (
+    FileChecksums,
     LockedPackage,
     ensure_workspace,
     get_packages_dir,
@@ -190,7 +191,7 @@ def _handle_upgrade_warning(
 
 def _read_file_checksums_from_package(
     package_dir: Path,
-) -> "object | None":
+) -> FileChecksums | None:
     """Read file checksums from a package's aam.yaml if present.
 
     The ``file_checksums`` section is written by ``aam pack`` and
@@ -204,7 +205,6 @@ def _read_file_checksums_from_package(
         A :class:`FileChecksums` instance or ``None`` if the package
         does not contain per-file checksums.
     """
-    from aam_cli.core.workspace import FileChecksums
 
     manifest_path = package_dir / "aam.yaml"
     if not manifest_path.is_file():
@@ -351,7 +351,7 @@ def install(
 ################################################################################
 
 
-def _collect_available_names(config: "AamConfig") -> list[str]:  # noqa: F821
+def _collect_available_names(config: AamConfig) -> list[str]:
     """Collect all known package names from registries and sources.
 
     Used for "Did you mean?" suggestions when the user supplies an
@@ -403,7 +403,7 @@ def _collect_available_names(config: "AamConfig") -> list[str]:  # noqa: F821
 def _show_name_suggestions(
     console: Console,
     invalid_input: str,
-    config: "AamConfig",  # noqa: F821
+    config: AamConfig,
 ) -> None:
     """Show "Did you mean?" suggestions for an invalid package name.
 
@@ -437,7 +437,7 @@ def _install_from_registry_or_source(
     console: Console,
     package_spec: str,
     project_dir: Path,
-    config: "AamConfig",  # noqa: F821
+    config: AamConfig,
     platform_name: str,
     no_deploy: bool,
     force: bool,
@@ -609,7 +609,7 @@ def _try_install_from_source(
     console: Console,
     artifact_name: str,
     project_dir: Path,
-    config: "AamConfig",  # noqa: F821
+    config: AamConfig,
     platform_name: str,
     no_deploy: bool,
     force: bool,
@@ -623,11 +623,11 @@ def _try_install_from_source(
     Raises:
         ValueError: If the artifact cannot be found in sources.
     """
+    from aam_cli.services.install_service import install_from_source
     from aam_cli.services.source_service import (
         build_source_index,
         resolve_artifact,
     )
-    from aam_cli.services.install_service import install_from_source
 
     console.print(f"Searching sources for '{artifact_name}'...")
 

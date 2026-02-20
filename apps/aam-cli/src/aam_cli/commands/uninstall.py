@@ -11,7 +11,6 @@ Removes an installed package and its deployed artifacts.
 
 import logging
 import shutil
-from pathlib import Path
 
 import click
 from rich.console import Console

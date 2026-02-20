@@ -99,7 +99,7 @@ Installed packages:
 ┃ Name          ┃ Version ┃ Source                      ┃ Artifacts           ┃
 ┡━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━┩
 │ docs-writer   │ 0.0.0   │ google-gemini/gemini-skills │ 1 (1 skill)         │
-│ code-reviewer │ 0.0.0   │ cursor/community-skills     │ 1 (1 skill)         │
+│ code-reviewer │ 0.0.0   │ anthropics/skills          │ 1 (1 skill)         │
 └───────────────┴─────────┴────────────────────────────┴─────────────────────┘
 ```
 

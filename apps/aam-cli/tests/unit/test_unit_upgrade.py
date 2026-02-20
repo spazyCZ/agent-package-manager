@@ -13,8 +13,6 @@ Reference: spec 004 US5; tasks.md T030.
 
 import logging
 
-import pytest
-
 from aam_cli.services.upgrade_service import UpgradeResult
 
 ################################################################################

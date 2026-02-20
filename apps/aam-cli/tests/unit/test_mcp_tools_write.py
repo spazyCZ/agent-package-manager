@@ -3,10 +3,9 @@
 import logging
 from unittest.mock import patch
 
-import pytest
+from fastmcp import Client
 
 from aam_cli.mcp.server import create_mcp_server
-from fastmcp import Client
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +25,8 @@ class TestWriteTools:
             "failed": [],
             "dependencies_resolved": 1
         }
-        with patch("aam_cli.mcp.tools_write.install_packages", return_value=mock_result):
-            with patch("aam_cli.mcp.tools_write.load_config"):
+        with patch("aam_cli.mcp.tools_write.install_packages", return_value=mock_result), \
+             patch("aam_cli.mcp.tools_write.load_config"):
                 server = create_mcp_server(allow_write=True)
                 async def check():
                     async with Client(server) as client:

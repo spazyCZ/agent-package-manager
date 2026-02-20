@@ -58,7 +58,7 @@ jobs:
         working-directory: apps/aam-cli
 
       - name: Lint and test aam-cli
-        run: npx nx run-many -t lint,test -p aam-cli
+        run: npx nx run-many -t lint,test -p aam-cli --verbose
 
   # ==========================================================================
   #  BUILD & PUBLISH — Build wheels/sdists and upload to Test PyPI

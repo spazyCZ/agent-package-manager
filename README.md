@@ -148,13 +148,12 @@ aam pkg publish     # Upload to registry
 
 ## Default Skill Sources
 
-On first run or when you run `aam source enable-defaults`, AAM registers 5 curated community repositories:
+On first run or when you run `aam source enable-defaults`, AAM registers 4 curated community repositories:
 
 | Source | Repository | Path |
 |--------|------------|------|
 | `github/awesome-copilot` | [github/awesome-copilot](https://github.com/github/awesome-copilot) | `skills` |
 | `openai/skills:.curated` | [openai/skills](https://github.com/openai/skills) | `skills/.curated` |
-| `cursor/community-skills` | [cursor/community-skills](https://github.com/cursor/community-skills) | `skills` |
 | `anthropics/skills` | [anthropics/skills](https://github.com/anthropics/skills) | `skills` |
 | `microsoft/skills` | [microsoft/skills](https://github.com/microsoft/skills) | `.github/skills` |
 
@@ -168,14 +167,13 @@ flowchart LR
         direction TB
         A["github/awesome-copilot"]
         B["openai/skills"]
-        C["cursor/community-skills"]
-        D["anthropics/skills"]
-        E["microsoft/skills"]
+        C["anthropics/skills"]
+        D["microsoft/skills"]
         Custom["+ Your own<br/>aam source add &lt;url&gt;"]
     end
 
     subgraph AAM["🔧 AAM"]
-        Cache["~/.aam/sources-cache/"]
+        Cache["~/.aam/cache/git/"]
         Scan["Scan & Index"]
         Cache --> Scan
     end
@@ -188,7 +186,6 @@ flowchart LR
     B -->|clone| Cache
     C -->|clone| Cache
     D -->|clone| Cache
-    E -->|clone| Cache
     Custom -->|clone| Cache
 
     Scan -->|install| Cursor
@@ -203,12 +200,60 @@ flowchart LR
 
 ---
 
+## MCP Server
+
+AAM includes a built-in [Model Context Protocol](https://modelcontextprotocol.io) server, allowing IDE agents to interact with AAM directly — search packages, manage sources, install skills, and get recommendations without leaving the editor.
+
+```bash
+# Start read-only server (default, safe for any IDE)
+aam mcp serve
+
+# Enable write operations (install, publish, source management)
+aam mcp serve --allow-write
+```
+
+**IDE configuration (Cursor, Claude Desktop, Windsurf, VS Code):**
+
+```json
+{
+  "mcpServers": {
+    "aam": {
+      "command": "aam",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
+```
+
+The server exposes **29 tools** and **9 resources**:
+
+| Category | Read-only tools | Write tools (opt-in) |
+|----------|----------------|---------------------|
+| **Packages** | `search`, `list`, `info`, `validate` | `install`, `uninstall`, `publish`, `create_package` |
+| **Sources** | `source_list`, `source_scan`, `source_candidates`, `source_diff` | `source_add`, `source_remove`, `source_update` |
+| **Config** | `config_get`, `doctor`, `registry_list` | `config_set`, `registry_add`, `init` |
+| **Discovery** | `recommend_skills`, `available`, `outdated` | `upgrade`, `init_package` |
+| **Integrity** | `verify`, `diff` | — |
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--transport` | `stdio` (default) or `http` |
+| `--port PORT` | HTTP port (default: `8000`, HTTP transport only) |
+| `--allow-write` | Enable write tools (install, publish, source management). Without this flag, only read-only tools are available. |
+| `--log-file PATH` | Log to file instead of stderr |
+| `--log-level` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+
+---
+
 ## Features
 
 - **One package, all platforms** — Write once, deploy to Cursor, Claude, GitHub Copilot, and Codex
 - **Dependency management** — Declare dependencies, AAM resolves them automatically
 - **Local & centralized registries** — Work offline or share with the community
 - **Package signing** — Sigstore (keyless) and GPG signature support
+- **MCP server** — IDE agents can use AAM tools directly via Model Context Protocol
 - **Simple CLI** — Intuitive commands: `init`, `install`, `pkg publish`, `source`
 
 ---
@@ -232,6 +277,9 @@ flowchart LR
 | `aam source` | Manage git artifact sources (add, list, update, remove) |
 | `aam registry` | Manage registries (init, add, list) |
 | `aam config` | Manage configuration |
+| `aam mcp serve` | Start MCP server for IDE agent integration |
+| `aam doctor` | Run environment diagnostics |
+| `aam convert` | Convert configs between platforms (Cursor, Copilot, Claude, Codex) |
 
 ---
 
@@ -290,8 +338,8 @@ AAM automatically deploys artifacts to the correct locations for each platform:
 | Platform | Skills | Agents | Prompts | Instructions |
 |----------|--------|--------|---------|--------------|
 | **Cursor** | `.cursor/skills/` | `.cursor/rules/` | `.cursor/prompts/` | `.cursor/rules/` |
-| **Claude** | `.claude/skills/` | `CLAUDE.md` | `.claude/prompts/` | `CLAUDE.md` |
-| **Copilot** | `.github/skills/` | `copilot-instructions.md` | `.github/prompts/` | `copilot-instructions.md` |
+| **Claude** | `.claude/skills/` | `.claude/agents/` | `.claude/prompts/` | `CLAUDE.md` |
+| **Copilot** | `.github/skills/` | `.github/agents/` | `.github/prompts/` | `.github/instructions/` |
 | **Codex** | `~/.codex/skills/` | `AGENTS.md` | `~/.codex/prompts/` | `AGENTS.md` |
 
 ---

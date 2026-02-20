@@ -15,6 +15,7 @@ Reference: contracts/cli-commands.md (aam verify)
 import json
 import logging
 import sys
+from typing import Any
 
 import click
 from rich.console import Console
@@ -98,7 +99,7 @@ def verify(
         _display_single_result(result)
 
 
-def _display_single_result(result: dict) -> None:
+def _display_single_result(result: dict[str, Any]) -> None:
     """Display verification result for a single package."""
     console.print()
     name = result["package_name"]
@@ -141,7 +142,7 @@ def _display_single_result(result: dict) -> None:
     console.print()
 
 
-def _display_all_results(result: dict) -> None:
+def _display_all_results(result: dict[str, Any]) -> None:
     """Display verification results for all packages."""
     console.print()
 

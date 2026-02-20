@@ -90,8 +90,8 @@ to popular skills, agents, and prompts:
 
 - `github/awesome-copilot` (from `github.com/github/awesome-copilot`)
 - `openai/skills:.curated` (curated subset of `github.com/openai/skills`)
-- `cursor/community-skills` (from `github.com/cursor/community-skills`)
-- `anthropic/claude-prompts` (from `github.com/anthropic/claude-prompts`)
+- `anthropics/skills` (from `github.com/anthropics/skills`)
+- `microsoft/skills` (from `github.com/microsoft/skills`)
 
 These are automatically registered when you run `aam init`. You can also
 enable them at any time with `aam source enable-defaults`.

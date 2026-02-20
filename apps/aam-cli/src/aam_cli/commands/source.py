@@ -20,6 +20,7 @@ Reference: contracts/cli-commands.md
 
 import json
 import logging
+from typing import Any
 
 import click
 from rich.console import Console
@@ -566,7 +567,7 @@ def candidates(
     # -----
     # Group by source
     # -----
-    by_source: dict[str, list[dict]] = {}
+    by_source: dict[str, list[dict[str, Any]]] = {}
     for c in candidates_list:
         src = c.get("source_name", "unknown")
         by_source.setdefault(src, []).append(c)
@@ -605,7 +606,7 @@ def candidates(
 def enable_defaults(ctx: click.Context, output_json: bool) -> None:
     """Enable all default community skill sources.
 
-    Registers the 5 curated default skill sources shipped with AAM.
+    Registers the 4 curated default skill sources shipped with AAM.
     If any were previously removed, they are re-enabled.
     Sources that are already configured are skipped.
 

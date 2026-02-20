@@ -26,6 +26,25 @@ from aam_cli.utils.yaml_utils import dump_yaml, load_yaml_optional
 
 ################################################################################
 #                                                                              #
+# PUBLIC API                                                                   #
+#                                                                              #
+################################################################################
+
+__all__ = [
+    "FileChecksums",
+    "LockedPackage",
+    "LockFile",
+    "ensure_workspace",
+    "get_packages_dir",
+    "get_workspace_path",
+    "read_lock_file",
+    "write_lock_file",
+    "get_installed_packages",
+    "is_package_installed",
+]
+
+################################################################################
+#                                                                              #
 # LOGGING                                                                      #
 #                                                                              #
 ################################################################################

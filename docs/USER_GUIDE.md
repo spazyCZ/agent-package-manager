@@ -22,6 +22,7 @@ This guide walks you through creating, publishing, and installing AAM packages w
 11. [Portable Bundles](#11-portable-bundles)
 12. [MCP Server Integration](#12-mcp-server-integration)
 13. [Environment Diagnostics (aam doctor)](#13-environment-diagnostics-aam-doctor)
+14. [Cross-Platform Conversion (aam convert)](#14-cross-platform-conversion-aam-convert)
 
 ---
 
@@ -1856,7 +1857,7 @@ packages:
 $ aam outdated
 
 Package          Current  Latest  Source               Status
-code-analysis    1a2b3c4  9f8e7d6 community-skills     outdated
+code-analysis    1a2b3c4  9f8e7d6 anthropics/skills     outdated
 common-prompts   5e6f7a8  b1c2d3e awesome-prompts      outdated (modified)
 
 2 outdated, 1 up to date, 0 from registry
@@ -3308,8 +3309,8 @@ AAM ships with 4 curated community skill sources:
 
 - `github/awesome-copilot` - GitHub Copilot skills
 - `openai/skills:.curated` - OpenAI curated skills
-- `cursor/community-skills` - Cursor community skills
-- `anthropic/claude-prompts` - Anthropic Claude prompts
+- `anthropics/skills` - Anthropic Claude skills
+- `microsoft/skills` - Microsoft skills
 
 These are registered automatically when you run `aam init`. You can also enable them at any time:
 
@@ -3442,7 +3443,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 | `aam_recommend_skills` | Recommend skills based on repository analysis |
 | `aam_init_info` | Get client initialization status and detected platform |
 
-**Write tools** (require `--allow-write`, 10 tools):
+**Write tools** (require `--allow-write`, 12 tools):
 
 | Tool | Description |
 |------|-------------|
@@ -3456,6 +3457,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 | `aam_source_add` | Add a remote git repository as an artifact source |
 | `aam_source_remove` | Remove a configured source (with optional cache purge) |
 | `aam_source_update` | Fetch upstream changes for one or all sources |
+| `aam_upgrade` | Upgrade outdated source-installed packages (supports `dry_run` and `force`) |
+| `aam_init` | Initialize the AAM client for a specific AI platform (`platform`, `skip_sources`) |
 
 **Skill recommendation (`aam_recommend_skills`):**
 
@@ -3485,6 +3488,7 @@ Resources provide passive data access — agents can read them without invoking 
 | `aam://sources` | List of all configured remote git sources |
 | `aam://sources/{id}` | Source details with artifact list (use `--` for `/` in names) |
 | `aam://sources/{id}/candidates` | Unpackaged candidates from a source |
+| `aam://init_status` | Client initialization status and detected platform |
 
 ### 13.6 Example Agent Conversations
 
@@ -3563,6 +3567,93 @@ AAM Environment Diagnostics
 | Package manifest error | `aam install <package> --force` to reinstall |
 | Incomplete installation | Remove `.aam/.tmp/` directory, then re-run the install |
 | Configuration error | Check `~/.aam/config.yaml` for syntax errors |
+
+---
+
+## 14. Cross-Platform Conversion (aam convert)
+
+The `aam convert` command converts AI agent configurations between platforms,
+making it easy to migrate or maintain configs across Cursor, Copilot, Claude, and Codex.
+
+### 14.1 Basic Usage
+
+```bash
+# Convert all Cursor configs to Copilot format
+aam convert -s cursor -t copilot
+
+# Convert only instructions from Copilot to Claude
+aam convert -s copilot -t claude --type instruction
+
+# Preview what would happen without writing files
+aam convert -s cursor -t copilot --dry-run
+```
+
+### 14.2 What Gets Converted
+
+| Artifact Type | Behavior |
+|---------------|----------|
+| **Skills** | Direct copy — universal `SKILL.md` format works everywhere |
+| **Instructions** | Field mapping (e.g. Cursor `globs` ↔ Copilot `applyTo`). Platform-only fields generate warnings |
+| **Agents** | Metadata filtered to target platform's supported fields. Codex gets AGENTS.md sections |
+| **Prompts** | Frontmatter stripped or added as needed. Codex gets AGENTS.md sections |
+
+### 14.3 Handling Lossy Conversions
+
+Some metadata cannot be converted between platforms. The convert command warns
+you about each lost field and suggests workarounds:
+
+```bash
+$ aam convert -s cursor -t claude --verbose
+
+INSTRUCTIONS:
+  ✓ .cursor/rules/python-style.mdc → CLAUDE.md (appended)
+    ⚠ Glob-scoped instruction converted to always-on. Original globs: **/*.py
+      The target platform does not support file-scoped instructions.
+      The instruction will apply globally. Consider adding file-path
+      references in the instruction text to indicate intended scope.
+```
+
+### 14.4 Force Overwrite with Backup
+
+By default, existing target files are skipped. Use `--force` to overwrite
+(a `.bak` backup is created automatically):
+
+```bash
+aam convert -s codex -t cursor --force
+```
+
+### 14.5 Appending to Single-File Targets
+
+Claude (`CLAUDE.md`) and Codex (`AGENTS.md`) use single files for instructions.
+When multiple source files convert to the same target, they are appended with
+section markers:
+
+```markdown
+<!-- BEGIN AAM CONVERTED: python-style -->
+## Python Standards (applies to: **/*.py)
+Use type hints...
+<!-- END AAM CONVERTED: python-style -->
+```
+
+Re-running the conversion updates existing sections in place.
+
+### 14.6 Common Conversion Workflows
+
+**Migrating from Cursor to Copilot:**
+```bash
+aam convert -s cursor -t copilot --dry-run   # Preview first
+aam convert -s cursor -t copilot             # Run conversion
+```
+
+**Setting up Claude Code alongside Cursor:**
+```bash
+aam convert -s cursor -t claude
+```
+
+**Converting Codex AGENTS.md to Cursor rules:**
+```bash
+aam convert -s codex -t cursor --force
+```
 
 ---
 

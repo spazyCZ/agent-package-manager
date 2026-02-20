@@ -61,7 +61,7 @@ class OrderedGroup(click.Group):
         "Package Authoring": ["pkg"],
         "Source Management": ["source"],
         "Configuration": ["config", "registry"],
-        "Utilities": ["mcp", "doctor"],
+        "Utilities": ["mcp", "doctor", "convert"],
     }
 
     def format_commands(
@@ -76,7 +76,7 @@ class OrderedGroup(click.Group):
             formatter: Click help formatter.
         """
         for section_name, cmd_names in self.SECTIONS.items():
-            commands: list[tuple[str, click.BaseCommand]] = []
+            commands: list[tuple[str, click.Command]] = []
             for name in cmd_names:
                 cmd = self.commands.get(name)
                 if cmd and not cmd.hidden:
@@ -146,6 +146,7 @@ from aam_cli.commands import (  # noqa: E402
     search,
 )
 from aam_cli.commands.client_init import client_init  # noqa: E402
+from aam_cli.commands.convert import convert  # noqa: E402
 from aam_cli.commands.diff import diff_cmd  # noqa: E402
 from aam_cli.commands.doctor import doctor  # noqa: E402
 from aam_cli.commands.list_packages import list_packages  # noqa: E402
@@ -224,6 +225,7 @@ cli.add_command(registry.registry)
 
 cli.add_command(mcp)
 cli.add_command(doctor)
+cli.add_command(convert)
 
 ################################################################################
 #                                                                              #
@@ -257,7 +259,7 @@ cli.add_command(doctor)
 @click.option("--from-source", "from_source", default=None)
 @click.option("--artifacts", "artifact_names", multiple=True)
 @click.pass_context
-def deprecated_create_package(ctx: click.Context, **kwargs) -> None:  # type: ignore[no-untyped-def]
+def deprecated_create_package(ctx: click.Context, /, **kwargs: object) -> None:
     """(Deprecated) Use 'aam pkg create' instead."""
     print_deprecation_warning("aam create-package", "aam pkg create")
     ctx.invoke(create_package.create_package, **kwargs)

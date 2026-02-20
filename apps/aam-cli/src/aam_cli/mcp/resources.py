@@ -64,7 +64,8 @@ def register_resources(mcp: FastMCP) -> None:
         """
         logger.debug("MCP resource aam://config accessed")
         result = get_config(key=None)
-        return result["value"]
+        value: dict[str, Any] = result["value"]
+        return value
 
     @mcp.resource("aam://packages/installed")
     def resource_packages_installed() -> list[dict[str, Any]]:
@@ -160,7 +161,8 @@ def register_resources(mcp: FastMCP) -> None:
         """
         logger.debug("MCP resource aam://sources accessed")
         result = list_sources()
-        return result.get("sources", [])
+        sources: list[dict[str, Any]] = result.get("sources", [])
+        return sources
 
     @mcp.resource("aam://sources/{source_id}")
     def resource_source_detail(source_id: str) -> dict[str, Any] | None:
@@ -209,7 +211,8 @@ def register_resources(mcp: FastMCP) -> None:
         )
         try:
             result = list_candidates(source_filter=source_name)
-            return result.get("candidates", [])
+            candidates: list[dict[str, Any]] = result.get("candidates", [])
+            return candidates
         except ValueError:
             logger.debug(f"Source not found for candidates: {source_name}")
             return []

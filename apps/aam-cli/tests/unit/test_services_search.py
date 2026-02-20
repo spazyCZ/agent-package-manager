@@ -12,6 +12,7 @@ Tests cover:
 ################################################################################
 
 import logging
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -30,9 +31,6 @@ from aam_cli.services.search_service import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-import time
 
 ################################################################################
 #                                                                              #
@@ -1204,14 +1202,14 @@ class TestSearchPackagesNew:
         )
         vp2 = _make_virtual_package(
             "docs-writer",
-            source_name="cursor/community-skills",
-            description="Write docs (Cursor)",
+            source_name="anthropics/skills",
+            description="Write docs (Anthropic)",
             commit_sha="fff9999aaa1111",
         )
         mock_index = MagicMock()
         mock_index.by_qualified_name = {
             "google-gemini/gemini-skills/docs-writer": vp1,
-            "cursor/community-skills/docs-writer": vp2,
+            "anthropics/skills/docs-writer": vp2,
         }
         mock_build_index.return_value = mock_index
 
@@ -1219,7 +1217,7 @@ class TestSearchPackagesNew:
             registries=[],
             sources=[
                 _make_source("google-gemini/gemini-skills"),
-                _make_source("cursor/community-skills"),
+                _make_source("anthropics/skills"),
             ],
         )
         response = search_packages("docs", config)
@@ -1230,7 +1228,7 @@ class TestSearchPackagesNew:
         assert len(response.results) == 2
         origins = {r.origin for r in response.results}
         assert "google-gemini/gemini-skills" in origins
-        assert "cursor/community-skills" in origins
+        assert "anthropics/skills" in origins
 
         # Both should have distinct version hashes
         versions = {r.version for r in response.results}

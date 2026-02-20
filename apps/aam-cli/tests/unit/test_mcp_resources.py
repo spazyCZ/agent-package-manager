@@ -3,10 +3,9 @@
 import logging
 from unittest.mock import patch
 
-import pytest
+from fastmcp import Client
 
 from aam_cli.mcp.server import create_mcp_server
-from fastmcp import Client
 
 logger = logging.getLogger(__name__)
 

@@ -23,6 +23,8 @@ from aam_cli.adapters.factory import create_adapter, is_supported_platform
 from aam_cli.core.config import AamConfig
 from aam_cli.core.installer import (
     _deploy_package,
+)
+from aam_cli.core.installer import (
     install_packages as core_install_packages,
 )
 from aam_cli.core.resolver import resolve_dependencies

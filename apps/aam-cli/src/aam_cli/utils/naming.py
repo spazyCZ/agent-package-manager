@@ -59,6 +59,65 @@ _FULL_NAME_PATTERN: re.Pattern[str] = re.compile(FULL_NAME_REGEX)
 # Example: @author/asvc-report -> author--asvc-report
 FS_SEPARATOR: str = "--"
 
+# -----
+# User-facing validation hints
+# -----
+PACKAGE_NAME_HINT: str = (
+    "Use lowercase letters, digits, and hyphens only (no underscores). "
+    "Examples: my-pkg, @scope/my-pkg"
+)
+
+
+def suggest_package_name(invalid_name: str) -> str | None:
+    """Suggest a valid package name by replacing underscores with hyphens.
+
+    Only suggests when the fix is straightforward (underscores in the name
+    part). Returns None if the name has other issues (uppercase, etc.).
+
+    Args:
+        invalid_name: The invalid name the user entered.
+
+    Returns:
+        A suggested valid name, or None if no simple fix applies.
+    """
+    if not invalid_name:
+        return None
+    # If it's just underscores in the name part, suggest hyphen replacement
+    if invalid_name.startswith("@"):
+        slash = invalid_name.find("/")
+        if slash == -1:
+            return None
+        scope = invalid_name[1:slash]
+        name_part = invalid_name[slash + 1 :]
+        if "_" in name_part and _SCOPE_PATTERN.match(scope):
+            suggested = f"@{scope}/{name_part.replace('_', '-')}"
+            if validate_package_name(suggested):
+                return suggested
+    else:
+        if "_" in invalid_name:
+            suggested = invalid_name.replace("_", "-")
+            if validate_package_name(suggested):
+                return suggested
+    return None
+
+
+def format_invalid_package_name_message(invalid_name: str) -> str:
+    """Build a user-friendly error message for an invalid package name.
+
+    Args:
+        invalid_name: The invalid name the user entered.
+
+    Returns:
+        A complete error message, optionally with a suggested fix.
+    """
+    suggestion = suggest_package_name(invalid_name)
+    if suggestion:
+        return (
+            f"Invalid package name '{invalid_name}'. {PACKAGE_NAME_HINT} "
+            f"Did you mean: {suggestion}?"
+        )
+    return f"Invalid package name '{invalid_name}'. {PACKAGE_NAME_HINT}"
+
 ################################################################################
 #                                                                              #
 # FUNCTIONS                                                                    #

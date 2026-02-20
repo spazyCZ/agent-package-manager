@@ -167,13 +167,14 @@ flowchart LR
         direction TB
         A["github/awesome-copilot"]
         B["openai/skills"]
-        C["anthropics/skills"]
-        D["microsoft/skills"]
+        C["cursor/community-skills"]
+        D["anthropics/skills"]
+        E["microsoft/skills"]
         Custom["+ Your own<br/>aam source add &lt;url&gt;"]
     end
 
     subgraph AAM["🔧 AAM"]
-        Cache["~/.aam/cache/git/"]
+        Cache["~/.aam/sources-cache/"]
         Scan["Scan & Index"]
         Cache --> Scan
     end
@@ -260,26 +261,30 @@ The server exposes **29 tools** and **9 resources**:
 
 ## CLI Commands
 
+### Using skills from source
+
 | Command | Description |
 |---------|-------------|
 | `aam init` | Set up AAM (platform, default sources) |
-| `aam pkg create` | Create package from existing project (autodetect + interactive) |
-| `aam pkg init` | Create a new package from scratch (interactive) |
 | `aam install <pkg>` | Install a package and dependencies |
 | `aam uninstall <pkg>` | Remove an installed package |
 | `aam upgrade` | Update packages to latest compatible versions |
 | `aam list` | List installed packages |
 | `aam search <query>` | Search registry and sources for packages |
 | `aam info <pkg>` | Show package details |
-| `aam pkg validate` | Validate package manifest and artifacts |
-| `aam pkg pack` | Build distributable `.aam` archive |
-| `aam pkg publish` | Publish package to registry |
 | `aam source` | Manage git artifact sources (add, list, update, remove) |
 | `aam registry` | Manage registries (init, add, list) |
 | `aam config` | Manage configuration |
-| `aam mcp serve` | Start MCP server for IDE agent integration |
-| `aam doctor` | Run environment diagnostics |
-| `aam convert` | Convert configs between platforms (Cursor, Copilot, Claude, Codex) |
+
+### Package authoring (pkg)
+
+| Command | Description |
+|---------|-------------|
+| `aam pkg create` | Create package from existing project (autodetect + interactive) |
+| `aam pkg init` | Create a new package from scratch (interactive) |
+| `aam pkg validate` | Validate package manifest and artifacts |
+| `aam pkg pack` | Build distributable `.aam` archive |
+| `aam pkg publish` | Publish package to registry |
 
 ---
 

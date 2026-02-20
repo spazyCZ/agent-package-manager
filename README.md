@@ -12,30 +12,15 @@ pip install "git+https://github.com/spazyCZ/agent-package-manager.git#subdirecto
 
 ## Why AAM?
 
-While working with AI agents, Copilot-style workflows, prompts, and skills, I kept running into the same structural problem: **managing agent artifacts at scale is still messy.**
+We know how to manage software dependencies with `npm` and `pip`. But when it comes to agentic development — prompts, skills, agent configurations, and instruction sets — the ecosystem is still fragmented.
 
-We already know how to manage software dependencies with tools like `npm` or `pip`. But when it comes to agentic development — prompts, skills, agent configurations, templates, and instruction sets — the ecosystem is still fragmented.
+AAM makes agent artifacts **versionable, packageable, and shareable** — just like software dependencies.
 
-**Three problems kept repeating in my projects:**
-
-- **✅ SOLVED — Tracking distributed skills and their versions** — Skills live across multiple repositories and providers. It's hard to track sources, versions, synchronization state, and updates. This leads to invisible dependencies and inconsistent agent behavior.
-- **🔄 Problem 2 — Packaging artifacts into reusable units** — Real use-cases require more than a single prompt. They usually combine skills, agent configuration, and execution prompts. Sharing this as a reusable unit is surprisingly difficult.
-- **🔄 Problem 3 — No registry for agent artifacts** — We have package managers for code, but nothing equivalent for agent artifacts. Prompts, skills, and agents remain distributed and unsorted.
-
-
-**Current progress:**
-
-- Skills source synchronization implemented
-- Artifact packaging implemented
-- CLI client available
-- MCP integration available
-- Local repository support
-
-The goal is to make agent artifacts **versionable, packageable, and shareable** — just like software dependencies.
-
-This is still early, but I believe agent artifact management will become a foundational layer of AI-augmented software engineering.
-
-*If you're building with AI agents, prompts, or Copilot workflows, I'd love to hear what problems you're facing.*
+| Status | Problem | Description |
+|--------|---------|-------------|
+| ✅ **Solved** | **Tracking distributed skills** | Skills live across multiple repositories and providers. AAM's git sources workflow unifies discovery, versioning, and synchronization. |
+| 🔄 **In progress** | **Packaging artifacts** | Real use-cases combine skills, agent configs, and prompts. AAM packages them into reusable, shareable units. |
+| 🔄 **In progress** | **Registry for agent artifacts** | There's no `npm` for agent artifacts. AAM provides a registry to publish, discover, and install them. |
 
 ```mermaid
 flowchart TB
@@ -61,37 +46,7 @@ flowchart TB
 
 ---
 
-## Project Status
-
-AAM addresses three core problems in the AI agent ecosystem:
-
-| Status | Problem | Description |
-|--------|---------|-------------|
-| ✅ **Solved** | **Tracking distributed skills** | Skills live across multiple repositories and providers. It was hard to track sources, versions, synchronization state, and updates — leading to invisible dependencies and inconsistent agent behavior. AAM's git sources workflow solves this. |
-| 🔄 **In progress** | **Packaging artifacts into reusable units** | Real use-cases require more than a single prompt. They combine skills, templates, scripts, agent configuration, and execution prompts. Sharing this as a reusable unit has been surprisingly difficult. |
-| 🔄 **In progress** | **Registry for agent artifacts** | We have package managers for code (`pip`, `npm`), but nothing equivalent for agent artifacts. Prompts, skills, and agents remain distributed and unsorted. |
-
----
-
 ## Quick Start
-
-### Install AAM
-
-**From PyPI** (when available):
-
-```bash
-pip install aam
-aam --version
-```
-
-**From source** (GitHub):
-
-```bash
-pip install "git+https://github.com/spazyCZ/agent-package-manager.git#subdirectory=apps/aam-cli"
-aam --version
-```
-
----
 
 ### 1. Use remote skills
 
@@ -103,8 +58,6 @@ aam source update --all     # Clone and scan upstream repositories
 aam search python           # Search for skills
 aam install code-reviewer   # Install a skill to your workspace
 ```
-
----
 
 ### 2. Create your own package
 
@@ -159,7 +112,7 @@ On first run or when you run `aam source enable-defaults`, AAM registers 4 curat
 
 After enabling defaults, run `aam source update --all` to clone and scan. Remove sources with `aam source remove`, re-enable with `aam source enable-defaults`.
 
-**Problem 1 — Skills from upstreams:** AAM tracks and unifies skills from multiple community repositories:
+AAM tracks and unifies skills from multiple community repositories:
 
 ```mermaid
 flowchart LR
@@ -167,9 +120,8 @@ flowchart LR
         direction TB
         A["github/awesome-copilot"]
         B["openai/skills"]
-        C["cursor/community-skills"]
-        D["anthropics/skills"]
-        E["microsoft/skills"]
+        C["anthropics/skills"]
+        D["microsoft/skills"]
         Custom["+ Your own<br/>aam source add &lt;url&gt;"]
     end
 
@@ -388,19 +340,13 @@ platforms:
 - **[Design Document](docs/DESIGN.md)** — Architecture and technical details
 - **[HTTP Registry Spec](docs/HTTP_REGISTRY_SPEC.md)** — API specification for registry service
 
----
-
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
-
----
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE) for details.
-
----
 
 <p align="center">
   <strong>Built for the AI agent ecosystem.</strong><br>

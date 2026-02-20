@@ -2,23 +2,23 @@
 
 ## Overview
 
-**GitHub Copilot** is GitHub's AI pair programming tool. It uses `.github/copilot-instructions.md` for project-specific instructions and coding guidelines. AAM integrates with Copilot by merging agents and instructions into `copilot-instructions.md` using marker-based sections, while deploying skills and prompts to the `.github/` directory.
+**GitHub Copilot** is GitHub's AI pair programming tool. It supports custom agents via `.github/agents/*.agent.md`, conditional instructions via `.github/instructions/*.instructions.md`, and reusable prompts via `.github/prompts/`. AAM integrates with Copilot by deploying discrete files into the `.github/` directory structure.
 
 **Key features:**
-- Marker-based merging into `copilot-instructions.md`
-- Preserves user-written content outside markers
+- Discrete agent files in `.github/agents/`
+- Conditional instruction files in `.github/instructions/`
 - SKILL.md support in `.github/skills/`
 - GitHub-native directory structure
-- Clean separation of AAM-managed vs manual content
+- Prompt files in `.github/prompts/`
 
 ## Deployment Mapping
 
 | Artifact Type | Copilot Location | Format | Merging |
 |---------------|-----------------|--------|---------|
 | **Skill** | `.github/skills/<fs-name>/SKILL.md` | SKILL.md (as-is) | No |
-| **Agent** | `.github/copilot-instructions.md` | Markdown section | Yes (markers) |
+| **Agent** | `.github/agents/<fs-name>.agent.md` | Markdown file | No |
 | **Prompt** | `.github/prompts/<fs-name>.md` | Markdown (as-is) | No |
-| **Instruction** | `.github/copilot-instructions.md` | Markdown section | Yes (markers) |
+| **Instruction** | `.github/instructions/<fs-name>.instructions.md` | Markdown file | No |
 
 > **Note:** `<fs-name>` uses the double-hyphen convention for scoped packages: `@author/name` becomes `author--name`.
 
@@ -58,7 +58,7 @@ Skills are copied as-is to `.github/skills/`. The entire skill directory structu
 
 ### Agents
 
-Agents are merged into `.github/copilot-instructions.md` as markdown sections with AAM markers. The system prompt content is included directly between markers.
+Agents are deployed as discrete `.agent.md` files in `.github/agents/`. Each agent gets its own file following Copilot's [custom agents convention](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/create-custom-agents).
 
 **Source** (`agents/asvc-audit/`):
 
@@ -88,12 +88,9 @@ configurations, and documentation against ASVC framework requirements.
 - Provide remediation recommendations
 ```
 
-**Merged into `.github/copilot-instructions.md`:**
+**Deployed to** `.github/agents/asvc-audit.agent.md`:
 
 ```markdown
-<!-- BEGIN AAM: asvc-audit agent -->
-# ASVC Compliance Auditor
-
 You are an ASVC compliance auditor. Your role is to analyze codebases,
 configurations, and documentation against ASVC framework requirements.
 
@@ -102,25 +99,13 @@ configurations, and documentation against ASVC framework requirements.
 - Identify compliance gaps against ASVC standards
 - Generate structured audit findings
 - Provide remediation recommendations
-
-## Available Skills
-
-- asvc-report: Generate ASVC audit reports
-- generic-auditor: General-purpose code auditing
-
-## Available Prompts
-
-- audit-finding: Use for documenting individual findings
-- audit-summary: Use for executive summaries
-<!-- END AAM: asvc-audit agent -->
 ```
 
 **Conversion rules:**
-1. Content wrapped in `<!-- BEGIN AAM: ... -->` and `<!-- END AAM: ... -->` markers
-2. Marker includes artifact name and type (e.g., `asvc-audit agent`)
-3. System prompt content included directly
-4. Skills and prompts listed as references
-5. No YAML frontmatter in merged content
+1. Each agent is a separate `.agent.md` file in `.github/agents/`
+2. System prompt content written directly to the file
+3. File naming: `<fs-name>.agent.md`
+4. Re-deploying overwrites the existing agent file
 
 ### Prompts
 
@@ -174,7 +159,7 @@ description: "Template for documenting audit findings"
 
 ### Instructions
 
-Instructions are merged into `.github/copilot-instructions.md` as markdown sections with AAM markers.
+Instructions are deployed as discrete `.instructions.md` files in `.github/instructions/`. This follows Copilot's [custom instructions convention](https://code.visualstudio.com/docs/copilot/customization/custom-instructions), which supports conditional application via glob patterns.
 
 **Source** (`instructions/python-standards.md`):
 
@@ -204,10 +189,15 @@ scope: project
 - Use Google-style docstring format
 ```
 
-**Merged into `.github/copilot-instructions.md`:**
+**Deployed to** `.github/instructions/python-standards.instructions.md`:
 
 ```markdown
-<!-- BEGIN AAM: python-standards instruction -->
+---
+name: python-standards
+description: "Python coding standards"
+scope: project
+---
+
 # Python Coding Standards
 
 ## Type Hints
@@ -225,68 +215,45 @@ scope: project
 
 - Docstrings for all public functions
 - Use Google-style docstring format
-<!-- END AAM: python-standards instruction -->
 ```
 
-## Marker-Based Merging
+## File-Based Deployment
 
-AAM uses HTML comment markers to manage sections in `copilot-instructions.md`:
+AAM deploys agents and instructions as discrete files in the `.github/` directory:
 
-```markdown
-<!-- BEGIN AAM: artifact-name artifact-type -->
-...content...
-<!-- END AAM: artifact-name artifact-type -->
-```
+- **Agents:** `.github/agents/<name>.agent.md`
+- **Instructions:** `.github/instructions/<name>.instructions.md`
 
 ### How It Works
 
-1. **First deployment:** If `copilot-instructions.md` doesn't exist, AAM creates it with AAM sections
-2. **Subsequent deployments:** AAM finds existing markers and updates only the content between them
-3. **User content preserved:** Any content outside AAM markers is never modified
-4. **Undeploy:** AAM removes the entire marked section, including markers
+1. **First deployment:** AAM creates the target directory and writes the file
+2. **Subsequent deployments:** AAM overwrites the existing file with updated content
+3. **Undeploy:** AAM deletes the file
 
-### Example copilot-instructions.md
+### Example Directory Structure
 
-```markdown
-# Coding Guidelines for This Project
-
-Our team follows these standards when writing code...
-
-## General Principles
-
-- Write clean, readable code
-- Test thoroughly
-- Document complex logic
-
-<!-- BEGIN AAM: asvc-audit agent -->
-# ASVC Compliance Auditor
-
-You are an ASVC compliance auditor...
-<!-- END AAM: asvc-audit agent -->
-
-## Project-Specific Context
-
-This is a compliance auditing tool built for enterprise clients...
-
-<!-- BEGIN AAM: python-standards instruction -->
-# Python Coding Standards
-
-- Use type hints on all functions...
-<!-- END AAM: python-standards instruction -->
-
-## Additional Resources
-
-- [Internal wiki](https://wiki.example.com)
-- [Architecture docs](./docs/architecture.md)
+```
+.github/
+├── agents/
+│   └── asvc-audit.agent.md
+├── instructions/
+│   └── python-standards.instructions.md
+├── skills/
+│   └── author--asvc-report/
+│       └── SKILL.md
+├── prompts/
+│   └── author--audit-finding.md
+└── workflows/                    # Existing GitHub Actions (untouched)
+    └── ci.yml
 ```
 
 ### Benefits
 
-- **Coexistence:** AAM-managed and user-written content live together
-- **Clean updates:** Re-deploying updates only AAM sections
-- **Clear boundaries:** Easy to see what AAM manages vs what you wrote
-- **Safe removal:** Undeploying removes only AAM sections
-- **GitHub integration:** Lives in `.github/` with other GitHub configs
+- **Discrete files:** Each agent and instruction is a separate file
+- **Conditional instructions:** `.instructions.md` files support glob-based conditional application
+- **GitHub-native:** Follows official Copilot directory conventions
+- **Clean updates:** Re-deploying overwrites only the specific file
+- **Easy management:** Standard file operations for adding/removing artifacts
 
 ## Platform-Specific Configuration
 
@@ -295,19 +262,14 @@ This is a compliance auditing tool built for enterprise clients...
 
 platforms:
   copilot:
-    merge_instructions: true          # Merge into copilot-instructions.md (default)
+    enabled: true
 ```
 
 ### Configuration Options
 
 | Option | Values | Default | Description |
 |--------|--------|---------|-------------|
-| `merge_instructions` | `true`, `false` | `true` | Whether to merge agents/instructions into copilot-instructions.md |
-
-**merge_instructions:**
-
-- `true`: Agents and instructions merge into `copilot-instructions.md` (recommended)
-- `false`: Would deploy as separate files (not typical for Copilot)
+| `enabled` | `true`, `false` | `true` | Whether to deploy artifacts for Copilot |
 
 ## Installation Example
 
@@ -316,10 +278,6 @@ Let's install the `@author/asvc-auditor` package and see how it deploys to GitHu
 ### Before Installation
 
 ```bash
-# Check if copilot-instructions.md exists
-cat .github/copilot-instructions.md
-# File might not exist or contains only user content
-
 # Check .github/ directory
 ls -R .github/
 # Directory might not exist or contains only GitHub workflows
@@ -337,58 +295,15 @@ aam install @author/asvc-auditor
 
 ### After Installation
 
-**.github/copilot-instructions.md** (created or updated):
-
-```markdown
-# Project Instructions
-
-This project implements ASVC compliance auditing...
-
-<!-- BEGIN AAM: asvc-audit agent -->
-# ASVC Compliance Auditor
-
-You are an ASVC compliance auditor. Your role is to analyze codebases,
-configurations, and documentation against ASVC framework requirements.
-
-## Core Responsibilities
-
-- Identify compliance gaps against ASVC standards
-- Generate structured audit findings
-- Provide remediation recommendations
-
-## Available Skills
-
-- asvc-report: Generate ASVC audit reports
-- generic-auditor: General-purpose code auditing
-
-## Available Prompts
-
-- audit-finding: Use for documenting individual findings
-- audit-summary: Use for executive summaries
-<!-- END AAM: asvc-audit agent -->
-
-<!-- BEGIN AAM: python-standards instruction -->
-# Python Coding Standards
-
-## Type Hints
-
-- Use type hints on all functions
-- Import from `typing` for complex types
-
-## Style
-
-- Follow PEP 8 style guide
-- Use 4 spaces for indentation
-- Maximum line length: 88 characters
-<!-- END AAM: python-standards instruction -->
-```
-
 **Directory structure:**
 
 ```
 my-project/
 ├── .github/
-│   ├── copilot-instructions.md      # Merged agents + instructions
+│   ├── agents/
+│   │   └── asvc-audit.agent.md      # Agent definition
+│   ├── instructions/
+│   │   └── python-standards.instructions.md  # Instruction file
 │   ├── skills/
 │   │   ├── author--asvc-report/
 │   │   │   ├── SKILL.md
@@ -420,10 +335,10 @@ Downloaded 2 packages (145 KB)
 Deployed to copilot:
   skill: author--asvc-report -> .github/skills/author--asvc-report/
   skill: author--generic-auditor -> .github/skills/author--generic-auditor/
-  agent: asvc-audit -> .github/copilot-instructions.md (merged)
+  agent: asvc-audit -> .github/agents/asvc-audit.agent.md
   prompt: audit-finding -> .github/prompts/author--audit-finding.md
   prompt: audit-summary -> .github/prompts/author--audit-summary.md
-  instruction: python-standards -> .github/copilot-instructions.md (merged)
+  instruction: python-standards -> .github/instructions/python-standards.instructions.md
 
 Successfully installed @author/asvc-auditor@1.0.0
 ```
@@ -432,28 +347,24 @@ Successfully installed @author/asvc-auditor@1.0.0
 
 After deployment, verify that artifacts are correctly placed:
 
-### Check copilot-instructions.md
+### Check Agents
 
 ```bash
-# View copilot-instructions.md
-cat .github/copilot-instructions.md
-
-# Should contain AAM markers:
-# <!-- BEGIN AAM: asvc-audit agent -->
-# <!-- END AAM: asvc-audit agent -->
-# <!-- BEGIN AAM: python-standards instruction -->
-# <!-- END AAM: python-standards instruction -->
-```
-
-### Check Markers
-
-```bash
-# Find all AAM markers
-grep "BEGIN AAM" .github/copilot-instructions.md
+# List deployed agents
+ls .github/agents/
 
 # Expected output:
-# <!-- BEGIN AAM: asvc-audit agent -->
-# <!-- BEGIN AAM: python-standards instruction -->
+# asvc-audit.agent.md
+```
+
+### Check Instructions
+
+```bash
+# List deployed instructions
+ls .github/instructions/
+
+# Expected output:
+# python-standards.instructions.md
 ```
 
 ### Check Skills
@@ -482,30 +393,10 @@ ls .github/prompts/
 
 1. Open project in VS Code or your IDE
 2. Ensure GitHub Copilot extension is installed
-3. Copilot automatically reads `.github/copilot-instructions.md`
+3. Copilot automatically reads `.github/agents/` and `.github/instructions/`
 4. Test Copilot suggestions reflect the deployed instructions
 
 ## Tips & Best Practices
-
-### Preserve User Content
-
-**Always write your own content outside AAM markers:**
-
-```markdown
-# Our Team's Coding Guidelines
-
-<!-- Your custom instructions here -->
-
-<!-- BEGIN AAM: asvc-audit agent -->
-...AAM-managed content...
-<!-- END AAM: asvc-audit agent -->
-
-<!-- More custom instructions here -->
-```
-
-**Never edit content between markers:**
-
-AAM will overwrite any manual changes inside markers on the next deployment.
 
 ### GitHub Integration
 
@@ -513,7 +404,10 @@ Copilot's `.github/` directory coexists with other GitHub features:
 
 ```
 .github/
-├── copilot-instructions.md    # AAM-managed + custom instructions
+├── agents/                     # AAM-deployed agents
+│   └── asvc-audit.agent.md
+├── instructions/               # AAM-deployed instructions
+│   └── python-standards.instructions.md
 ├── skills/                     # AAM-deployed skills
 ├── prompts/                    # AAM-deployed prompts
 ├── workflows/                  # GitHub Actions (unrelated to AAM)
@@ -523,39 +417,7 @@ Copilot's `.github/` directory coexists with other GitHub features:
 └── pull_request_template.md   # PR templates (unrelated)
 ```
 
-AAM only touches `copilot-instructions.md`, `skills/`, and `prompts/`.
-
-### Organize copilot-instructions.md
-
-Structure your instructions logically:
-
-```markdown
-# Project Instructions
-
-## Overview
-Project description and general guidelines...
-
-## AAM Agents
-<!-- BEGIN AAM: agent1 agent -->
-...
-<!-- END AAM: agent1 agent -->
-
-<!-- BEGIN AAM: agent2 agent -->
-...
-<!-- END AAM: agent2 agent -->
-
-## AAM Coding Standards
-<!-- BEGIN AAM: python-standards instruction -->
-...
-<!-- END AAM: python-standards instruction -->
-
-<!-- BEGIN AAM: typescript-standards instruction -->
-...
-<!-- END AAM: typescript-standards instruction -->
-
-## Team-Specific Guidelines
-Your custom guidelines that aren't managed by AAM...
-```
+AAM only touches `agents/`, `instructions/`, `skills/`, and `prompts/`.
 
 ### Multiple Instruction Sets
 
@@ -567,58 +429,26 @@ aam install @standards/typescript
 aam install @standards/rust
 ```
 
-Each gets its own marked section in `copilot-instructions.md`:
+Each gets its own file in `.github/instructions/`:
 
-```markdown
-<!-- BEGIN AAM: python-standards instruction -->
-...Python guidelines...
-<!-- END AAM: python-standards instruction -->
-
-<!-- BEGIN AAM: typescript-standards instruction -->
-...TypeScript guidelines...
-<!-- END AAM: typescript-standards instruction -->
-
-<!-- BEGIN AAM: rust-standards instruction -->
-...Rust guidelines...
-<!-- END AAM: rust-standards instruction -->
+```
+.github/instructions/
+├── python-standards.instructions.md
+├── typescript-standards.instructions.md
+└── rust-standards.instructions.md
 ```
 
 ### Copilot Instruction Processing
 
-GitHub Copilot reads `copilot-instructions.md` and uses it to guide code suggestions. Instructions are most effective when:
+GitHub Copilot reads `.github/instructions/` files and uses them to guide code suggestions. Instructions are most effective when:
 
 - **Clear and specific:** Concrete rules work better than vague guidelines
 - **Well-structured:** Use headings to organize by topic
 - **Example-driven:** Include code examples where appropriate
 - **Focused:** Instructions should be relevant to your project
-
-### Backup Before Major Changes
-
-Before significant updates, backup your instructions:
-
-```bash
-cp .github/copilot-instructions.md .github/copilot-instructions.md.backup
-```
-
-AAM should never touch content outside markers, but it's good practice.
+- **Conditionally scoped:** Use `applyTo` frontmatter for file-type-specific instructions
 
 ## Troubleshooting
-
-### copilot-instructions.md Not Created
-
-**Symptom:** `aam install` succeeds but `copilot-instructions.md` doesn't exist.
-
-**Cause:** No agents or instructions in the package.
-
-**Solution:**
-
-Check what was deployed:
-
-```bash
-aam list
-
-# If only skills/prompts are deployed, copilot-instructions.md won't be created
-```
 
 ### Copilot Not Following Instructions
 
@@ -627,7 +457,7 @@ aam list
 **Possible causes:**
 
 1. **Copilot cache:** Copilot might cache instructions
-2. **Content location:** Instructions must be in `.github/copilot-instructions.md`
+2. **Content location:** Instructions must be in `.github/instructions/`
 3. **Instruction clarity:** Vague instructions are harder for Copilot to follow
 
 **Solutions:**
@@ -636,9 +466,10 @@ aam list
    - Close and reopen VS Code
    - Or restart the Copilot extension
 
-2. **Verify file location:**
+2. **Verify file locations:**
    ```bash
-   ls -la .github/copilot-instructions.md
+   ls -la .github/agents/
+   ls -la .github/instructions/
    ```
 
 3. **Check instruction clarity:**
@@ -646,60 +477,17 @@ aam list
    - Use concrete examples
    - Focus on actionable guidelines
 
-### Markers Appear in Copilot Context
-
-**Symptom:** HTML comments visible in Copilot's context window.
-
-**Cause:** This is expected - HTML comments are standard markdown.
-
-**Solution:** Copilot typically ignores HTML comments. If they're affecting behavior, it's a Copilot issue, not AAM.
-
-### Content Between Markers Disappears
-
-**Symptom:** Manual edits inside AAM markers are lost.
-
-**Cause:** AAM overwrites content between markers on deployment.
-
-**Solution:**
-
-Move your custom content outside AAM markers:
-
-```markdown
-<!-- Your custom content here -->
-
-<!-- BEGIN AAM: asvc-audit agent -->
-...AAM content...
-<!-- END AAM: asvc-audit agent -->
-
-<!-- More custom content here -->
-```
-
-### Duplicate Markers
-
-**Symptom:** Multiple `<!-- BEGIN AAM: asvc-audit agent -->` sections.
-
-**Cause:** Manual duplication or AAM deployment bug.
-
-**Solution:**
-
-Manually remove duplicate sections, keeping only one:
-
-```bash
-# Edit copilot-instructions.md and remove duplicate marker pairs
-code .github/copilot-instructions.md
-```
-
 ### Skills Not Recognized
 
 **Symptom:** Skills in `.github/skills/` not available in Copilot.
 
 **Cause:** GitHub Copilot's skill support is experimental and may not be fully functional.
 
-**Note:** As of early 2024, Copilot's SKILL.md support is limited. AAM deploys skills to `.github/skills/` for future compatibility, but Copilot may not use them yet.
+**Note:** Copilot's SKILL.md support is limited. AAM deploys skills to `.github/skills/` for future compatibility, but Copilot may not use them yet.
 
 **Workaround:**
 
-Reference skills in `copilot-instructions.md`:
+Reference skills in an instruction file in `.github/instructions/`:
 
 ```markdown
 ## Available Skills
@@ -713,20 +501,20 @@ Skills are located in `.github/skills/`:
 
 ### Cannot Undeploy
 
-**Symptom:** `aam undeploy` fails to remove markers.
+**Symptom:** `aam undeploy` fails to remove an agent or instruction.
 
-**Cause:** Markers manually edited or deleted.
+**Cause:** File may have been manually renamed or deleted.
 
 **Solution:**
 
-Manually remove AAM sections from `copilot-instructions.md`:
+Manually delete the file:
 
 ```bash
-# Edit and remove:
-# <!-- BEGIN AAM: artifact-name artifact-type -->
-# ...content...
-# <!-- END AAM: artifact-name artifact-type -->
-code .github/copilot-instructions.md
+# Remove agent file
+rm .github/agents/artifact-name.agent.md
+
+# Remove instruction file
+rm .github/instructions/artifact-name.instructions.md
 ```
 
 ## Next Steps

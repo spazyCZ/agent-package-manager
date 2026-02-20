@@ -9,7 +9,6 @@
 import logging
 from pathlib import Path
 
-import pytest
 from click.testing import CliRunner
 
 from aam_cli.converters.frontmatter import generate_frontmatter, parse_frontmatter

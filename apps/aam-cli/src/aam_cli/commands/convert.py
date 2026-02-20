@@ -19,7 +19,7 @@ import click
 from rich.console import Console
 
 from aam_cli.converters.mappings import PLATFORMS, VERBOSE_WORKAROUNDS
-from aam_cli.services.convert_service import run_conversion
+from aam_cli.services.convert_service import ConversionResult, run_conversion
 
 ################################################################################
 #                                                                              #
@@ -149,7 +149,7 @@ def convert(
         return
 
     # Group results by artifact type
-    grouped: dict[str, list] = {}
+    grouped: dict[str, list[ConversionResult]] = {}
     for result in report.results:
         grouped.setdefault(result.artifact_type.upper() + "S", []).append(result)
 

@@ -791,7 +791,7 @@ Detection patterns:
     ─ instructions/*.md                  (AAM convention)
     ─ .cursor/rules/*.mdc                (Cursor rules, excluding agent-* rules)
     ─ CLAUDE.md                          (Claude instructions)
-    ─ .github/copilot-instructions.md    (Copilot instructions)
+    ─ .github/instructions/*.instructions.md  (Copilot instructions)
     ─ AGENTS.md                          (Codex instructions)
 ```
 
@@ -877,7 +877,7 @@ When artifacts are found in platform-specific locations, they may need conversio
 | `.cursor/rules/*.mdc` (instruction) | `instructions/*.md` | Strip `.mdc` frontmatter, convert to instruction markdown with YAML frontmatter |
 | `.cursor/rules/agent-*.mdc` (agent) | `agents/*/` | Extract system prompt from rule body, generate `agent.yaml` |
 | `CLAUDE.md` sections | `instructions/*.md` | Split `CLAUDE.md` into individual instruction files |
-| `.github/copilot-instructions.md` sections | `instructions/*.md` | Split into individual instruction files |
+| `.github/instructions/*.instructions.md` | `instructions/*.md` | Copy instruction files |
 
 **Manual include:**
 
@@ -2165,29 +2165,29 @@ alwaysApply: {{true if no globs, false otherwise}}
 | Artifact Type | Copilot Location | Format |
 |---------------|-----------------|--------|
 | skill | `.github/skills/<name>/SKILL.md` | SKILL.md (as-is, Copilot supports this) |
-| agent | `.github/copilot-instructions.md` (appended section) | Markdown section |
+| agent | `.github/agents/<name>.agent.md` | Discrete markdown file |
 | prompt | `.github/prompts/<name>.md` | Stored as markdown |
-| instruction | `.github/copilot-instructions.md` (appended section) | Markdown section |
+| instruction | `.github/instructions/<name>.instructions.md` | Discrete markdown file |
 
-**Agent → Copilot conversion:**
+**Agent deployment:**
 
-Agents and instructions are merged into `.github/copilot-instructions.md` as clearly delineated sections:
+Each agent is deployed as a discrete `.agent.md` file in `.github/agents/`, following Copilot's custom agents convention:
 
-```markdown
-<!-- BEGIN AAM: asvc-audit agent -->
-# ASVC Compliance Auditor
-
-{{system-prompt.md contents}}
-<!-- END AAM: asvc-audit agent -->
-
-<!-- BEGIN AAM: asvc-coding-standards instruction -->
-# ASVC Coding Standards
-
-{{instruction contents}}
-<!-- END AAM: asvc-coding-standards instruction -->
+```
+.github/agents/
+├── asvc-audit.agent.md
+└── code-reviewer.agent.md
 ```
 
-AAM uses the `<!-- BEGIN AAM -->` / `<!-- END AAM -->` markers to manage its own sections without disturbing user-written content.
+**Instruction deployment:**
+
+Each instruction is deployed as a discrete `.instructions.md` file in `.github/instructions/`, supporting conditional application via glob patterns:
+
+```
+.github/instructions/
+├── python-standards.instructions.md
+└── typescript-standards.instructions.md
+```
 
 ### 8.3 Claude Adapter
 
@@ -2196,20 +2196,32 @@ AAM uses the `<!-- BEGIN AAM -->` / `<!-- END AAM -->` markers to manage its own
 | Artifact Type | Claude Location | Format |
 |---------------|----------------|--------|
 | skill | `.claude/skills/<name>/SKILL.md` | SKILL.md (as-is) |
-| agent | `CLAUDE.md` (appended section) | Markdown section |
+| agent | `.claude/agents/<name>.md` | Discrete markdown file |
 | prompt | `.claude/prompts/<name>.md` | Stored as markdown |
 | instruction | `CLAUDE.md` (appended section) | Markdown section |
 
-**Conversion approach:**
+**Agent deployment:**
 
-Same marker-based merging as Copilot, but targeting `CLAUDE.md`:
+Each agent is deployed as a discrete `.md` file in `.claude/agents/`, following Claude Code's subagents convention:
+
+```
+.claude/agents/
+├── asvc-audit.md
+└── code-reviewer.md
+```
+
+**Instruction deployment:**
+
+Instructions are merged into `CLAUDE.md` using marker-based sections:
 
 ```markdown
-<!-- BEGIN AAM: asvc-audit agent -->
-# ASVC Compliance Auditor
-{{system-prompt.md contents}}
-<!-- END AAM: asvc-audit agent -->
+<!-- BEGIN AAM: python-standards instruction -->
+# Python Coding Standards
+{{instruction contents}}
+<!-- END AAM: python-standards instruction -->
 ```
+
+AAM uses the `<!-- BEGIN AAM -->` / `<!-- END AAM -->` markers to manage its own sections without disturbing user-written content in `CLAUDE.md`.
 
 ### 8.4 Codex (OpenAI) Adapter
 
@@ -2234,8 +2246,8 @@ flowchart TB
     Package --> CodexAdapter["Codex Adapter"]
     
     CursorAdapter --> CursorFiles[".cursor/<br/>rules/, skills/, prompts/"]
-    CopilotAdapter --> CopilotFiles[".github/<br/>copilot-instructions.md<br/>prompts/"]
-    ClaudeAdapter --> ClaudeFiles["CLAUDE.md<br/>.claude/skills/, prompts/"]
+    CopilotAdapter --> CopilotFiles[".github/<br/>agents/, instructions/<br/>skills/, prompts/"]
+    ClaudeAdapter --> ClaudeFiles["CLAUDE.md<br/>.claude/agents/, skills/, prompts/"]
     CodexAdapter --> CodexFiles["AGENTS.md<br/>~/.codex/skills/"]
     
     style Package fill:#e1f5fe
@@ -2378,9 +2390,12 @@ my-project/
 │   └── prompts/
 │       ├── audit-finding.md
 │       └── audit-summary.md
-├── CLAUDE.md               # Deployed Claude artifacts (sections)
+├── CLAUDE.md               # Deployed Claude instructions (sections)
+├── .claude/
+│   └── agents/             # Deployed Claude agents
 └── .github/
-    └── copilot-instructions.md  # Deployed Copilot artifacts (sections)
+    ├── agents/             # Deployed Copilot agents
+    └── instructions/       # Deployed Copilot instructions
 ```
 
 ### 10.3 What Gets Committed to Git

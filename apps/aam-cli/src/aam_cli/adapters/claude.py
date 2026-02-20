@@ -2,7 +2,7 @@
 
 Deploys AAM artifacts into the Claude Code filesystem structure:
   - Skills       → ``.claude/skills/<fs-name>/``
-  - Agents       → ``CLAUDE.md`` (marker-delimited section)
+  - Agents       → ``.claude/agents/<fs-name>.md``
   - Prompts      → ``.claude/prompts/<fs-name>.md``
   - Instructions → ``CLAUDE.md`` (marker-delimited section)
 
@@ -38,7 +38,8 @@ logger = logging.getLogger(__name__)
 #                                                                              #
 ################################################################################
 
-# Marker templates for AAM-managed sections inside CLAUDE.md
+# Marker templates for AAM-managed sections inside CLAUDE.md.
+# Only used for instructions — agents are now discrete files.
 BEGIN_MARKER_TEMPLATE: str = "<!-- BEGIN AAM: {name} {kind} -->"
 END_MARKER_TEMPLATE: str = "<!-- END AAM: {name} {kind} -->"
 
@@ -52,9 +53,9 @@ END_MARKER_TEMPLATE: str = "<!-- END AAM: {name} {kind} -->"
 class ClaudeAdapter:
     """Claude Code platform adapter.
 
-    Skills and prompts are deployed to a ``.claude/`` directory.
-    Agents and instructions are merged into ``CLAUDE.md`` at the project
-    root using HTML comment markers.
+    Skills, agents, and prompts are deployed to a ``.claude/`` directory.
+    Instructions are merged into ``CLAUDE.md`` at the project root using
+    HTML comment markers.
     """
 
     def __init__(self, project_root: Path) -> None:
@@ -117,10 +118,10 @@ class ClaudeAdapter:
         agent_ref: ArtifactRef,
         _config: dict[str, str],
     ) -> Path:
-        """Deploy an agent section into ``CLAUDE.md``.
+        """Deploy an agent to ``.claude/agents/<fs-name>.md``.
 
-        Reads the agent's system-prompt.md and appends it as a
-        marker-delimited section in the project-root ``CLAUDE.md``.
+        Reads the agent's system-prompt.md and writes it as a discrete
+        markdown file in the ``.claude/agents/`` directory.
 
         Args:
             agent_path: Path to the extracted agent directory.
@@ -128,17 +129,20 @@ class ClaudeAdapter:
             _config: Platform config.
 
         Returns:
-            Path to CLAUDE.md.
+            Path to the created agent file.
         """
-        logger.info(f"Deploying agent '{agent_ref.name}' -> CLAUDE.md")
+        fs_name = self._artifact_fs_name(agent_ref.name)
+        dest = self.claude_dir / "agents" / f"{fs_name}.md"
+
+        logger.info(f"Deploying agent '{agent_ref.name}' -> {dest}")
 
         content = self._read_agent_content(agent_path, agent_ref)
 
-        claude_md = self.project_root / "CLAUDE.md"
-        self._upsert_marker_section(claude_md, agent_ref.name, "agent", content)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(content, encoding="utf-8")
 
-        logger.info(f"Agent deployed to: {claude_md}")
-        return claude_md
+        logger.info(f"Agent deployed: {dest}")
+        return dest
 
     def deploy_prompt(
         self,
@@ -217,9 +221,15 @@ class ClaudeAdapter:
                 shutil.rmtree(path)
                 logger.info(f"Removed skill directory: {path}")
 
-        elif artifact_type in ("agent", "instruction"):
+        elif artifact_type == "agent":
+            path = self.claude_dir / "agents" / f"{fs_name}.md"
+            if path.is_file():
+                path.unlink()
+                logger.info(f"Removed agent file: {path}")
+
+        elif artifact_type == "instruction":
             claude_md = self.project_root / "CLAUDE.md"
-            self._remove_marker_section(claude_md, artifact_name, artifact_type)
+            self._remove_marker_section(claude_md, artifact_name, "instruction")
 
         elif artifact_type == "prompt":
             path = self.claude_dir / "prompts" / f"{fs_name}.md"
@@ -242,6 +252,13 @@ class ClaudeAdapter:
                 if entry.is_dir():
                     deployed.append((entry.name, "skill", entry))
 
+        # Agents
+        agents_dir = self.claude_dir / "agents"
+        if agents_dir.is_dir():
+            for entry in agents_dir.iterdir():
+                if entry.suffix == ".md":
+                    deployed.append((entry.stem, "agent", entry))
+
         # Prompts
         prompts_dir = self.claude_dir / "prompts"
         if prompts_dir.is_dir():
@@ -249,7 +266,7 @@ class ClaudeAdapter:
                 if entry.suffix == ".md":
                     deployed.append((entry.stem, "prompt", entry))
 
-        # Agents and instructions from CLAUDE.md markers
+        # Instructions from CLAUDE.md markers
         claude_md = self.project_root / "CLAUDE.md"
         if claude_md.is_file():
             deployed.extend(self._list_marker_sections(claude_md))
@@ -257,7 +274,7 @@ class ClaudeAdapter:
         return deployed
 
     # ------------------------------------------------------------------
-    # Marker-based section management
+    # Marker-based section management (instructions only)
     # ------------------------------------------------------------------
 
     def _upsert_marker_section(
@@ -275,7 +292,7 @@ class ClaudeAdapter:
         Args:
             file_path: Path to the target markdown file.
             name: Artifact name (used in markers).
-            kind: Artifact kind (``"agent"`` or ``"instruction"``).
+            kind: Artifact kind (``"instruction"``).
             content: Markdown body to place between the markers.
         """
         file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -314,7 +331,7 @@ class ClaudeAdapter:
         Args:
             file_path: Path to the target markdown file.
             name: Artifact name used in markers.
-            kind: Artifact kind (``"agent"`` or ``"instruction"``).
+            kind: Artifact kind (``"instruction"``).
         """
         if not file_path.is_file():
             return
@@ -352,7 +369,7 @@ class ClaudeAdapter:
         content = file_path.read_text(encoding="utf-8")
         results: list[tuple[str, str, Path]] = []
 
-        pattern = re.compile(r"<!-- BEGIN AAM: (.+?) (agent|instruction) -->")
+        pattern = re.compile(r"<!-- BEGIN AAM: (.+?) (instruction) -->")
         for match in pattern.finditer(content):
             name = match.group(1)
             kind = match.group(2)
@@ -376,7 +393,7 @@ class ClaudeAdapter:
         return artifact_name
 
     def _read_agent_content(self, agent_path: Path, agent_ref: ArtifactRef) -> str:
-        """Read agent content for embedding in CLAUDE.md.
+        """Read agent content for the agent file.
 
         Reads the system-prompt.md file from the agent directory.
 

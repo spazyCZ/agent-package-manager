@@ -22,7 +22,6 @@ from aam_cli.converters.mappings import (
     AGENT_SUPPORTED_FIELDS,
     AGENT_TARGET_DIRS,
     AGENT_TARGET_EXTENSIONS,
-    INSTRUCTION_SUPPORTED_FIELDS,
     PROMPT_SUPPORTED_FIELDS,
     PROMPT_TARGET_DIRS,
     PROMPT_TARGET_EXTENSIONS,
@@ -441,17 +440,21 @@ def _convert_instruction(
         target_file = target_dir / f"{name}.mdc"
         target_path_str = str(target_file.relative_to(root))
 
-        new_meta: dict[str, object] = {}
-        new_meta["description"] = frontmatter.get("description", "Converted instruction")
+        cursor_meta: dict[str, object] = {}
+        cursor_meta["description"] = frontmatter.get(
+            "description", "Converted instruction"
+        )
 
         if frontmatter.get("applyTo"):
-            new_meta["alwaysApply"] = False
+            cursor_meta["alwaysApply"] = False
             apply_to = frontmatter["applyTo"]
-            new_meta["globs"] = [apply_to] if isinstance(apply_to, str) else apply_to
+            cursor_meta["globs"] = (
+                [apply_to] if isinstance(apply_to, str) else apply_to
+            )
         else:
-            new_meta["alwaysApply"] = True
+            cursor_meta["alwaysApply"] = True
 
-        content = generate_frontmatter(new_meta, body)
+        content = generate_frontmatter(cursor_meta, body)
 
         if not dry_run:
             if target_file.exists() and not force:

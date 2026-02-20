@@ -338,8 +338,8 @@ AAM automatically deploys artifacts to the correct locations for each platform:
 | Platform | Skills | Agents | Prompts | Instructions |
 |----------|--------|--------|---------|--------------|
 | **Cursor** | `.cursor/skills/` | `.cursor/rules/` | `.cursor/prompts/` | `.cursor/rules/` |
-| **Claude** | `.claude/skills/` | `CLAUDE.md` | `.claude/prompts/` | `CLAUDE.md` |
-| **Copilot** | `.github/skills/` | `copilot-instructions.md` | `.github/prompts/` | `copilot-instructions.md` |
+| **Claude** | `.claude/skills/` | `.claude/agents/` | `.claude/prompts/` | `CLAUDE.md` |
+| **Copilot** | `.github/skills/` | `.github/agents/` | `.github/prompts/` | `.github/instructions/` |
 | **Codex** | `~/.codex/skills/` | `AGENTS.md` | `~/.codex/prompts/` | `AGENTS.md` |
 
 ---

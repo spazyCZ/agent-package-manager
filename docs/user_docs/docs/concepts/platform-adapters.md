@@ -714,7 +714,7 @@ def to_filesystem_name(scoped_name: str) -> str:
 
 ## Next Steps
 
-- **Deploy your package:** See [Tutorial: Install a Package](../tutorials/install-package.md)
-- **Configure platforms:** See [Configuration: Platforms](../configuration/platforms.md)
+- **Deploy your package:** See [Tutorial: Quick Start](../getting-started/quickstart.md) and [aam install](../cli/install.md)
+- **Configure platforms:** See [Platform Guides](../platforms/index.md)
 - **Understand workspaces:** See [Workspaces](workspaces.md)
-- **Create custom adapters:** See [Advanced: Custom Adapters](../advanced/custom-adapters.md)
+- **Create custom adapters:** See [Platform Adapters](platform-adapters.md) for adapter architecture

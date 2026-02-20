@@ -14,8 +14,8 @@ The package manager for AI agent artifacts. Install, share, and deploy skills, a
 
 <div class="hero-actions" markdown>
 
-[Get Started](getting-started/){ .md-button .md-button--primary }
-[CLI Reference](cli/){ .md-button }
+[Get Started](getting-started/index.md){ .md-button .md-button--primary }
+[CLI Reference](cli/index.md){ .md-button }
 
 </div>
 
@@ -112,7 +112,7 @@ AAM manages four types of AI agent artifacts:
 
 Install AAM, configure your platform, and install your first package in under five minutes.
 
-[Start here](getting-started/){ .md-button }
+[Start here](getting-started/index.md){ .md-button }
 
 </div>
 
@@ -122,7 +122,7 @@ Install AAM, configure your platform, and install your first package in under fi
 
 Step-by-step guides for common tasks: packaging existing skills, building packages, and deploying to multiple platforms.
 
-[Browse tutorials](tutorials/){ .md-button }
+[Browse tutorials](tutorials/index.md){ .md-button }
 
 </div>
 
@@ -132,7 +132,7 @@ Step-by-step guides for common tasks: packaging existing skills, building packag
 
 Complete reference for every AAM command, flag, and option.
 
-[View commands](cli/){ .md-button }
+[View commands](cli/index.md){ .md-button }
 
 </div>
 

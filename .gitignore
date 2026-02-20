@@ -94,3 +94,7 @@ scripts/
 docs/work/
 .specify/
 .claude/
+remove-deploy-prepare-public.sh
+deploy/
+!deploy/local/
+!deploy/docker/

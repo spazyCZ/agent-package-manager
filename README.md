@@ -215,23 +215,30 @@ flowchart LR
 
 ## CLI Commands
 
+### Using skills from source
+
 | Command | Description |
 |---------|-------------|
 | `aam init` | Set up AAM (platform, default sources) |
-| `aam pkg create` | Create package from existing project (autodetect + interactive) |
-| `aam pkg init` | Create a new package from scratch (interactive) |
 | `aam install <pkg>` | Install a package and dependencies |
 | `aam uninstall <pkg>` | Remove an installed package |
 | `aam upgrade` | Update packages to latest compatible versions |
 | `aam list` | List installed packages |
 | `aam search <query>` | Search registry and sources for packages |
 | `aam info <pkg>` | Show package details |
-| `aam pkg validate` | Validate package manifest and artifacts |
-| `aam pkg pack` | Build distributable `.aam` archive |
-| `aam pkg publish` | Publish package to registry |
 | `aam source` | Manage git artifact sources (add, list, update, remove) |
 | `aam registry` | Manage registries (init, add, list) |
 | `aam config` | Manage configuration |
+
+### Package authoring (pkg)
+
+| Command | Description |
+|---------|-------------|
+| `aam pkg create` | Create package from existing project (autodetect + interactive) |
+| `aam pkg init` | Create a new package from scratch (interactive) |
+| `aam pkg validate` | Validate package manifest and artifacts |
+| `aam pkg pack` | Build distributable `.aam` archive |
+| `aam pkg publish` | Publish package to registry |
 
 ---
 

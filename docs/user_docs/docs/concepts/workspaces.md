@@ -779,5 +779,5 @@ rm -rf ~/.aam/cache/*
 
 - **Configure your workspace:** See [Configuration](../configuration/index.md)
 - **Understand lock files:** See [Dependencies](dependencies.md)
-- **Manage packages:** See [CLI Reference](../cli-reference/index.md)
+- **Manage packages:** See [CLI Reference](../cli/index.md)
 - **Set up security:** See [Security](security.md)

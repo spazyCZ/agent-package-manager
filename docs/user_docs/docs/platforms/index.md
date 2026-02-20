@@ -314,5 +314,5 @@ Explore each platform's detailed deployment guide:
 Or continue learning:
 
 - [Platform Adapters Concept](../concepts/platform-adapters.md) - Deep dive into adapter architecture
-- [Configuration: Platforms](../configuration/platforms.md) - Detailed configuration reference
-- [Tutorial: Install a Package](../tutorials/install-package.md) - Hands-on package installation
+- [Configuration: Project config](../configuration/project.md) - Platform settings in config
+- [Getting Started: Quick Start](../getting-started/quickstart.md) - Hands-on package installation

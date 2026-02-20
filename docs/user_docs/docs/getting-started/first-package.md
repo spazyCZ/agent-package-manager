@@ -131,8 +131,8 @@ Use these templates for consistent output:
 
 Load these for detailed guidance:
 
-- [PEP 8 Summary](references/pep8-summary.md) — PEP 8 quick reference
-- [Best Practices](references/best-practices.md) — Python idioms and patterns
+- [PEP 8 Summary](#create-reference-documents) — PEP 8 quick reference
+- [Best Practices](#create-reference-documents) — Python idioms and patterns
 
 ## Review Checklist
 
@@ -385,7 +385,7 @@ if __name__ == "__main__":
     main()
 ```
 
-### Create Reference Documents
+### Create Reference Documents {#create-reference-documents}
 
 Create `skills/python-reviewer/references/pep8-summary.md`:
 
@@ -1096,9 +1096,9 @@ Now that you've created a complete package, you can:
 
 - **[Dependencies](../concepts/dependencies.md)** — Declare and resolve package dependencies
 - **[Platform Adapters](../concepts/platform-adapters.md)** — Understand how AAM deploys to different platforms
-- **[Package Existing Artifacts](../tutorials/package-existing-artifacts.md)** — Wrap existing skills into packages
-- **[Signing Packages](../tutorials/signing-packages.md)** — Add cryptographic signatures
-- **[Testing and Evals](../tutorials/testing-and-evals.md)** — Add quality gates to your packages
+- **[Package Existing Skills](../tutorials/package-existing-skills.md)** — Wrap existing skills into packages
+- **[Package Signing](../advanced/signing.md)** — Add cryptographic signatures
+- **[Quality & Evals](../advanced/quality-evals.md)** — Add quality gates to your packages
 
 ---
 

@@ -733,6 +733,6 @@ code .github/copilot-instructions.md
 
 - [Platform Overview](index.md) - Compare all platforms
 - [Claude Desktop](claude.md) - Similar marker-based platform
-- [Configuration: Copilot](../configuration/platforms.md#copilot) - Detailed configuration reference
-- [Tutorial: Install a Package](../tutorials/install-package.md) - Hands-on installation guide
+- [Configuration: Project config](../configuration/project.md) - Platform settings
+- [Getting Started: Quick Start](../getting-started/quickstart.md) - Hands-on installation guide
 - [Concepts: Platform Adapters](../concepts/platform-adapters.md) - Deep dive into adapter architecture

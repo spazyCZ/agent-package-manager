@@ -1,9 +1,0 @@
-name: aam-infra
-runtime:
-  name: python
-  options:
-    virtualenv: venv
-description: >
-  AAM (Agent Artifact Manager) infrastructure on Google Cloud Platform.
-  Manages Cloud Run, Cloud SQL, Memorystore, GCS, Artifact Registry,
-  Secret Manager, and Cloud Load Balancer across dev / test / prod stacks.

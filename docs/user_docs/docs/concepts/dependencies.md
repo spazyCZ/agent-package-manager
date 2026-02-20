@@ -603,5 +603,5 @@ flowchart TD
 
 - **Learn about lock files:** See [Workspaces](workspaces.md) for lock file management
 - **Understand security:** See [Security](security.md) for dependency verification
-- **Create packages:** See [Tutorial: Create a Package](../tutorials/create-package.md)
+- **Create packages:** See [Tutorial: Create a Package](../tutorials/package-existing-skills.md)
 - **Deploy artifacts:** See [Platform Adapters](platform-adapters.md)

@@ -455,16 +455,16 @@ You've completed the quick start! Here's where to go from here:
 ### Learn More
 
 - **[Your First Package](first-package.md)** — Create a complete package with all 4 artifact types (skills, agents, prompts, instructions)
-- **[Package Existing Artifacts](../tutorials/package-existing-artifacts.md)** — Wrap your existing skills and agents into AAM packages
+- **[Package Existing Skills](../tutorials/package-existing-skills.md)** — Wrap your existing skills and agents into AAM packages
 - **[Multi-Platform Deployment](../tutorials/multi-platform-deployment.md)** — Deploy the same package to Cursor, Claude, Copilot, and Codex
 
 ### Explore Advanced Features
 
 - **Keeping packages up to date** — Use `aam outdated` to list packages with newer versions and `aam upgrade` to upgrade them
 - **[Dependencies](../concepts/dependencies.md)** — Learn how to declare and resolve dependencies between packages
-- **[Dist-Tags](../concepts/dist-tags.md)** — Use named aliases like `stable` or `beta` for versions
-- **[Signing Packages](../tutorials/signing-packages.md)** — Sign packages with Sigstore or GPG for authenticity
-- **[Portable Bundles](../tutorials/portable-bundles.md)** — Create self-contained bundles for sharing via Slack or email
+- **[Dist-Tags](../advanced/dist-tags.md)** — Use named aliases like `stable` or `beta` for versions
+- **[Package Signing](../advanced/signing.md)** — Sign packages with Sigstore or GPG for authenticity
+- **[aam pack](../cli/pack.md)** — Create self-contained .aam archives for sharing
 
 ### Build Something Useful
 

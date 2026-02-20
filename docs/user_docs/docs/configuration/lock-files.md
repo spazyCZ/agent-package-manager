@@ -624,5 +624,5 @@ Converting from `package.json`, `requirements.txt`, etc.:
 
 - [Manifest Reference](manifest.md) - Define dependencies in `aam.yaml`
 - [CLI Reference: install](../cli/install.md) - Installing packages
-- [CLI Reference: update](../cli/update.md) - Updating dependencies
+- [CLI Reference: source update](../cli/source-update.md) - Updating dependencies
 - [Concepts: Dependency Resolution](../concepts/dependencies.md) - How resolution works

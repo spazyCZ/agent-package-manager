@@ -562,4 +562,4 @@ When deployed, all artifacts are available to the agent.
 
 - **Package artifacts:** See [Packages](packages.md) for manifest structure
 - **Deploy to platforms:** See [Platform Adapters](platform-adapters.md) for deployment details
-- **Create your first artifact:** See [Tutorial: Create a Package](../tutorials/create-package.md)
+- **Create your first artifact:** See [Tutorial: Create a Package](../tutorials/package-existing-skills.md)

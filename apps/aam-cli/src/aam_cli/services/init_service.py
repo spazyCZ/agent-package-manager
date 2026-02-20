@@ -15,7 +15,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from aam_cli.utils.naming import validate_package_name
+from aam_cli.utils.naming import format_invalid_package_name_message, validate_package_name
 from aam_cli.utils.yaml_utils import dump_yaml
 
 ################################################################################
@@ -102,8 +102,7 @@ def init_package(
     # -----
     if not validate_package_name(name):
         raise ValueError(
-            f"[AAM_INVALID_ARGUMENT] Invalid package name '{name}'. "
-            "Use lowercase letters, digits, and hyphens, with optional @scope/ prefix."
+            f"[AAM_INVALID_ARGUMENT] {format_invalid_package_name_message(name)}"
         )
 
     # -----

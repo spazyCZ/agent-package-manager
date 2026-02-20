@@ -26,8 +26,8 @@ from aam_cli.services.package_service import (
     get_package_info,
     list_installed_packages,
 )
-from aam_cli.services.registry_service import list_registries
 from aam_cli.services.recommend_service import recommend_skills_for_repo
+from aam_cli.services.registry_service import list_registries
 from aam_cli.services.search_service import search_packages
 from aam_cli.services.source_service import (
     list_candidates,
@@ -220,7 +220,8 @@ def register_read_tools(mcp: FastMCP) -> None:
         """
         logger.info("MCP tool aam_source_list")
         result = list_sources()
-        return result.get("sources", [])
+        sources: list[dict[str, Any]] = result.get("sources", [])
+        return sources
 
     @mcp.tool(tags={"read"})
     def aam_source_scan(
@@ -289,7 +290,8 @@ def register_read_tools(mcp: FastMCP) -> None:
             source_filter=source_name,
             type_filter=type_filter,
         )
-        return result.get("candidates", [])
+        candidates: list[dict[str, Any]] = result.get("candidates", [])
+        return candidates
 
     @mcp.tool(tags={"read"})
     def aam_source_diff(source_name: str) -> dict[str, Any]:
@@ -433,7 +435,7 @@ def register_read_tools(mcp: FastMCP) -> None:
         # Group by source for structured output
         # -----
         by_source: dict[str, list[dict[str, Any]]] = {}
-        for qname, vp in index.by_qualified_name.items():
+        for _qname, vp in index.by_qualified_name.items():
             source_group = by_source.setdefault(vp.source_name, [])
             source_group.append({
                 "name": vp.name,

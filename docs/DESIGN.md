@@ -668,6 +668,7 @@ Configuration:
 Utilities:
   mcp serve                      Start MCP stdio server for IDE integration
   doctor                         Check environment and diagnose issues
+  convert                        Convert configs between platforms
 ```
 
 ### 5.2 Command Details
@@ -790,7 +791,8 @@ Detection patterns:
     ─ instructions/*.md                  (AAM convention)
     ─ .cursor/rules/*.mdc                (Cursor rules, excluding agent-* rules)
     ─ CLAUDE.md                          (Claude instructions)
-    ─ .github/copilot-instructions.md    (Copilot instructions)
+    ─ .github/copilot-instructions.md    (Copilot legacy instructions)
+    ─ .github/instructions/*.instructions.md  (Copilot instructions)
     ─ AGENTS.md                          (Codex instructions)
 ```
 
@@ -876,7 +878,7 @@ When artifacts are found in platform-specific locations, they may need conversio
 | `.cursor/rules/*.mdc` (instruction) | `instructions/*.md` | Strip `.mdc` frontmatter, convert to instruction markdown with YAML frontmatter |
 | `.cursor/rules/agent-*.mdc` (agent) | `agents/*/` | Extract system prompt from rule body, generate `agent.yaml` |
 | `CLAUDE.md` sections | `instructions/*.md` | Split `CLAUDE.md` into individual instruction files |
-| `.github/copilot-instructions.md` sections | `instructions/*.md` | Split into individual instruction files |
+| `.github/instructions/*.instructions.md` | `instructions/*.md` | Copy instruction files |
 
 **Manual include:**
 
@@ -1057,6 +1059,39 @@ asvc-auditor@1.0.0
     report-templates ^2.0.0   (installed: 2.1.0)
 ```
 
+#### `aam convert`
+
+Converts AI agent configurations between platforms (Cursor, Copilot, Claude, Codex).
+Reads artifacts from one platform's format and writes them in another's format,
+with warnings about metadata that cannot be directly converted.
+
+```bash
+# Convert all Cursor configs to Copilot format
+aam convert -s cursor -t copilot
+
+# Convert only instructions, dry-run
+aam convert -s copilot -t claude --type instruction --dry-run
+
+# Force overwrite existing target files (with .bak backup)
+aam convert -s codex -t cursor --force
+```
+
+**Options:**
+- `--source-platform` / `-s` (required): Source platform
+- `--target-platform` / `-t` (required): Target platform
+- `--type`: Filter by artifact type (`instruction`, `agent`, `prompt`, `skill`)
+- `--dry-run`: Preview conversions without writing files
+- `--force`: Overwrite existing targets (creates `.bak` backup)
+- `--verbose`: Show detailed workaround instructions for lossy conversions
+
+**Conversion behavior:**
+- Skills: Direct copy (universal `SKILL.md` format)
+- Instructions: Field mapping (e.g. Cursor `globs` → Copilot `applyTo`)
+- Agents: Metadata filtering (platform-specific fields dropped with warnings)
+- Prompts: Frontmatter stripping or addition as needed
+
+See `docs/specs/SPEC-convert-command.md` for the full conversion matrix.
+
 ### 5.3 MCP Server Mode
 
 AAM exposes its CLI capabilities as an **MCP (Model Context Protocol) server**, allowing AI agents inside IDEs (Cursor, VS Code, Windsurf, etc.) to invoke AAM operations programmatically. The server communicates over **stdio** (JSON-RPC 2.0) — the standard transport for locally-embedded MCP servers.
@@ -1142,6 +1177,16 @@ CLI commands are exposed as MCP tools via `@mcp.tool` decorators. Each tool is t
 | `aam_config_get` | `aam config get` | Get configuration value(s) |
 | `aam_registry_list` | `aam registry list` | List configured registries |
 | `aam_doctor` | `aam doctor` | Check environment and diagnose issues |
+| `aam_source_list` | `aam source list` | List configured artifact sources |
+| `aam_source_scan` | `aam source scan` | Scan a source for available artifacts |
+| `aam_source_candidates` | `aam source candidates` | List unpackaged candidates from a source |
+| `aam_source_diff` | `aam source diff` | Show diff between source and installed version |
+| `aam_verify` | `aam verify` | Verify installed package integrity |
+| `aam_diff` | `aam diff` | Show diff between installed and source versions |
+| `aam_outdated` | `aam outdated` | Check for outdated source-installed packages |
+| `aam_available` | `aam available` | List all available artifacts from configured sources |
+| `aam_recommend_skills` | `aam recommend-skills` | Recommend skills based on repository analysis |
+| `aam_init_info` | `aam init --info` | Get client initialization status and detected platform |
 
 **Write tools** (require `--allow-write`):
 
@@ -1153,6 +1198,12 @@ CLI commands are exposed as MCP tools via `@mcp.tool` decorators. Each tool is t
 | `aam_create_package` | `aam pkg create` | Create AAM package from existing project |
 | `aam_config_set` | `aam config set` | Set a configuration value |
 | `aam_registry_add` | `aam registry add` | Add a new registry source |
+| `aam_init_package` | `aam pkg init` | Scaffold a new package with directories and manifest |
+| `aam_source_add` | `aam source add` | Add a remote git repository as an artifact source |
+| `aam_source_remove` | `aam source remove` | Remove a configured source |
+| `aam_source_update` | `aam source update` | Fetch upstream changes for one or all sources |
+| `aam_upgrade` | `aam upgrade` | Upgrade outdated source-installed packages |
+| `aam_init` | `aam init` | Initialize the AAM client for a specific AI platform |
 
 > **Tool naming:** All tools are prefixed with `aam_` to avoid collisions when multiple
 > MCP servers are active in an IDE.
@@ -1259,20 +1310,20 @@ def aam_doctor() -> dict:
 @mcp.tool(tags={"write"})
 def aam_install(
     packages: list[str],
-    dev: bool = False,
-    force: bool = False,
     platform: str | None = None,
+    force: bool = False,
+    no_deploy: bool = False,
 ) -> dict:
-    """Install one or more AAM packages and their dependencies.
+    """Install AAM packages from registries or local sources.
 
     Args:
-        packages: Package specifiers (e.g. ['asvc-auditor', '@author/pkg@1.2.0']).
-        dev: Install as development dependency.
-        force: Force reinstall even if already installed.
-        platform: Deploy to specific platform only (default: all configured).
+        packages: List of package specs (e.g. ['my-pkg', 'other@1.0']).
+        platform: Target platform override (default: from config).
+        force: Reinstall even if already present.
+        no_deploy: Download only, skip deployment.
 
     Returns:
-        Installation summary with installed packages, versions, and deployment paths.
+        Install result with lists of installed, already_installed, and failed packages.
     """
     ...
 
@@ -2115,29 +2166,29 @@ alwaysApply: {{true if no globs, false otherwise}}
 | Artifact Type | Copilot Location | Format |
 |---------------|-----------------|--------|
 | skill | `.github/skills/<name>/SKILL.md` | SKILL.md (as-is, Copilot supports this) |
-| agent | `.github/copilot-instructions.md` (appended section) | Markdown section |
+| agent | `.github/agents/<name>.agent.md` | Discrete markdown file |
 | prompt | `.github/prompts/<name>.md` | Stored as markdown |
-| instruction | `.github/copilot-instructions.md` (appended section) | Markdown section |
+| instruction | `.github/instructions/<name>.instructions.md` | Discrete markdown file |
 
-**Agent → Copilot conversion:**
+**Agent deployment:**
 
-Agents and instructions are merged into `.github/copilot-instructions.md` as clearly delineated sections:
+Each agent is deployed as a discrete `.agent.md` file in `.github/agents/`, following Copilot's custom agents convention:
 
-```markdown
-<!-- BEGIN AAM: asvc-audit agent -->
-# ASVC Compliance Auditor
-
-{{system-prompt.md contents}}
-<!-- END AAM: asvc-audit agent -->
-
-<!-- BEGIN AAM: asvc-coding-standards instruction -->
-# ASVC Coding Standards
-
-{{instruction contents}}
-<!-- END AAM: asvc-coding-standards instruction -->
+```
+.github/agents/
+├── asvc-audit.agent.md
+└── code-reviewer.agent.md
 ```
 
-AAM uses the `<!-- BEGIN AAM -->` / `<!-- END AAM -->` markers to manage its own sections without disturbing user-written content.
+**Instruction deployment:**
+
+Each instruction is deployed as a discrete `.instructions.md` file in `.github/instructions/`, supporting conditional application via glob patterns:
+
+```
+.github/instructions/
+├── python-standards.instructions.md
+└── typescript-standards.instructions.md
+```
 
 ### 8.3 Claude Adapter
 
@@ -2146,20 +2197,32 @@ AAM uses the `<!-- BEGIN AAM -->` / `<!-- END AAM -->` markers to manage its own
 | Artifact Type | Claude Location | Format |
 |---------------|----------------|--------|
 | skill | `.claude/skills/<name>/SKILL.md` | SKILL.md (as-is) |
-| agent | `CLAUDE.md` (appended section) | Markdown section |
+| agent | `.claude/agents/<name>.md` | Discrete markdown file |
 | prompt | `.claude/prompts/<name>.md` | Stored as markdown |
 | instruction | `CLAUDE.md` (appended section) | Markdown section |
 
-**Conversion approach:**
+**Agent deployment:**
 
-Same marker-based merging as Copilot, but targeting `CLAUDE.md`:
+Each agent is deployed as a discrete `.md` file in `.claude/agents/`, following Claude Code's subagents convention:
+
+```
+.claude/agents/
+├── asvc-audit.md
+└── code-reviewer.md
+```
+
+**Instruction deployment:**
+
+Instructions are merged into `CLAUDE.md` using marker-based sections:
 
 ```markdown
-<!-- BEGIN AAM: asvc-audit agent -->
-# ASVC Compliance Auditor
-{{system-prompt.md contents}}
-<!-- END AAM: asvc-audit agent -->
+<!-- BEGIN AAM: python-standards instruction -->
+# Python Coding Standards
+{{instruction contents}}
+<!-- END AAM: python-standards instruction -->
 ```
+
+AAM uses the `<!-- BEGIN AAM -->` / `<!-- END AAM -->` markers to manage its own sections without disturbing user-written content in `CLAUDE.md`.
 
 ### 8.4 Codex (OpenAI) Adapter
 
@@ -2184,8 +2247,8 @@ flowchart TB
     Package --> CodexAdapter["Codex Adapter"]
     
     CursorAdapter --> CursorFiles[".cursor/<br/>rules/, skills/, prompts/"]
-    CopilotAdapter --> CopilotFiles[".github/<br/>copilot-instructions.md<br/>prompts/"]
-    ClaudeAdapter --> ClaudeFiles["CLAUDE.md<br/>.claude/skills/, prompts/"]
+    CopilotAdapter --> CopilotFiles[".github/<br/>agents/, instructions/<br/>skills/, prompts/"]
+    ClaudeAdapter --> ClaudeFiles["CLAUDE.md<br/>.claude/agents/, skills/, prompts/"]
     CodexAdapter --> CodexFiles["AGENTS.md<br/>~/.codex/skills/"]
     
     style Package fill:#e1f5fe
@@ -2328,9 +2391,12 @@ my-project/
 │   └── prompts/
 │       ├── audit-finding.md
 │       └── audit-summary.md
-├── CLAUDE.md               # Deployed Claude artifacts (sections)
+├── CLAUDE.md               # Deployed Claude instructions (sections)
+├── .claude/
+│   └── agents/             # Deployed Claude agents
 └── .github/
-    └── copilot-instructions.md  # Deployed Copilot artifacts (sections)
+    ├── agents/             # Deployed Copilot agents
+    └── instructions/       # Deployed Copilot instructions
 ```
 
 ### 10.3 What Gets Committed to Git

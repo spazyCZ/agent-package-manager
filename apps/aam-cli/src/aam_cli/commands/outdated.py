@@ -14,14 +14,13 @@ Reference: spec 004 US4; contracts/cli-commands.md.
 
 import json
 import logging
-from pathlib import Path
 
 import click
 from rich.console import Console
 from rich.table import Table
 
-from aam_cli.core.config import load_config
-from aam_cli.core.workspace import read_lock_file
+from aam_cli.core.config import AamConfig, load_config
+from aam_cli.core.workspace import LockFile, read_lock_file
 from aam_cli.services.upgrade_service import OutdatedPackage, OutdatedResult
 from aam_cli.utils.paths import resolve_project_dir
 
@@ -168,8 +167,8 @@ def outdated(ctx: click.Context, output_json: bool, is_global: bool) -> None:
 
 
 def check_outdated(
-    lock: "LockFile",  # noqa: F821
-    config: "AamConfig",  # noqa: F821
+    lock: LockFile,
+    config: AamConfig,
 ) -> OutdatedResult:
     """Compare installed source packages against source HEAD commits.
 

@@ -16,7 +16,7 @@ import logging
 
 import pytest
 
-from aam_cli.core.workspace import LockFile, LockedPackage
+from aam_cli.core.workspace import LockedPackage
 from aam_cli.services.upgrade_service import OutdatedPackage, OutdatedResult
 
 ################################################################################

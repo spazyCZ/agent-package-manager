@@ -122,7 +122,7 @@ class TestClientInitResult:
             platform="copilot",
             registry_created=True,
             registry_name="my-registry",
-            sources_added=["community-skills", "awesome-prompts"],
+            sources_added=["anthropics/skills", "awesome-prompts"],
             config_path=Path("/tmp/test/config.yaml"),
             is_reconfigure=True,
         )
@@ -178,12 +178,12 @@ class TestOrchestrateInit:
         """Orchestrate init saves config and registers sources."""
         mock_aam_dir.return_value = tmp_path
         mock_load.return_value = MagicMock(default_platform="cursor")
-        mock_sources.return_value = ["community-skills"]
+        mock_sources.return_value = ["anthropics/skills"]
 
         result = orchestrate_init(platform="copilot")
 
         assert result.platform == "copilot"
-        assert result.sources_added == ["community-skills"]
+        assert result.sources_added == ["anthropics/skills"]
         assert result.is_reconfigure is False
         mock_save.assert_called_once()
 

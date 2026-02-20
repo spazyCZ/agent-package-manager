@@ -18,6 +18,7 @@ import json
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
@@ -55,7 +56,7 @@ err_console = Console(stderr=True)
 def diff_package(
     package_name: str,
     project_dir: Path | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Compute diffs for modified files in an installed package.
 
     First runs verification to identify modified files, then generates
@@ -109,7 +110,7 @@ def diff_package(
     # -----
     packages_dir = get_packages_dir(project_dir)
     package_dir = packages_dir / package_name
-    diffs: list[dict] = []
+    diffs: list[dict[str, Any]] = []
 
     for rel_path in verify_result["modified_files"]:
         file_path = package_dir / rel_path

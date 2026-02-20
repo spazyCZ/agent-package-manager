@@ -72,7 +72,7 @@ logger = logging.getLogger(__name__)
     default=None,
     help="Artifact type for --include",
 )
-@click.option("--name", "pkg_name", default=None, help="Package name")
+@click.option("--name", "pkg_name", default=None, help="Package name (e.g. my-pkg, @scope/my-pkg)")
 @click.option("--scope", "pkg_scope", default=None, help="Scope prefix")
 @click.option("--version", "pkg_version", default=None, help="Package version")
 @click.option("--description", "pkg_description", default=None, help="Package description")

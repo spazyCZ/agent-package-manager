@@ -36,8 +36,8 @@ AAM ships with 4 curated community sources:
 |---|------|------------|------|
 | 1 | `github/awesome-copilot` | github.com/github/awesome-copilot | `skills` |
 | 2 | `openai/skills:.curated` | github.com/openai/skills | `skills/.curated` |
-| 3 | `cursor/community-skills` | github.com/cursor/community-skills | `skills` |
-| 4 | `anthropic/claude-prompts` | github.com/anthropic/claude-prompts | `prompts` |
+| 3 | `anthropics/skills` | github.com/anthropics/skills | `skills` |
+| 4 | `microsoft/skills` | github.com/microsoft/skills | `.github/skills` |
 
 ## Examples
 
@@ -51,8 +51,8 @@ aam source enable-defaults
 ```
   ✓ github/awesome-copilot — added
   ✓ openai/skills:.curated — added
-  ✓ cursor/community-skills — added
-  ✓ anthropic/claude-prompts — added
+  ✓ anthropics/skills — added
+  ✓ microsoft/skills — added
 
   4 source(s) enabled, 0 already configured (out of 4 defaults)
 
@@ -64,8 +64,8 @@ aam source enable-defaults
   ┡━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
   │ 1 │ github/awesome-copilot    │ https://github.com/github/awesome-…  │ skills          │
   │ 2 │ openai/skills:.curated    │ https://github.com/openai/skills.…   │ skills/.curated │
-  │ 3 │ cursor/community-skills   │ https://github.com/cursor/communit…  │ skills          │
-  │ 4 │ anthropic/claude-prompts  │ https://github.com/anthropic/claud…  │ prompts         │
+  │ 3 │ anthropics/skills         │ https://github.com/anthropics/skil…  │ skills          │
+  │ 4 │ microsoft/skills         │ https://github.com/microsoft/skills   │ .github/skills  │
   └───┴───────────────────────────┴──────────────────────────────────────┴─────────────────┘
 ```
 
@@ -83,8 +83,8 @@ aam source enable-defaults
 ```
   ✓ openai/skills:.curated — re-enabled
   – github/awesome-copilot — already configured
-  – cursor/community-skills — already configured
-  – anthropic/claude-prompts — already configured
+  – anthropics/skills — already configured
+  – microsoft/skills — already configured
 
   1 source(s) enabled, 3 already configured (out of 4 defaults)
 
@@ -101,7 +101,7 @@ aam source enable-defaults --json
 ```json
 {
   "registered": ["github/awesome-copilot", "openai/skills:.curated",
-    "cursor/community-skills", "anthropic/claude-prompts"],
+    "anthropics/skills", "microsoft/skills"],
   "re_enabled": [],
   "skipped": [],
   "total": 4

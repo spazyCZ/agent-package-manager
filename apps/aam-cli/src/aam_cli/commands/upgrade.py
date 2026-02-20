@@ -19,9 +19,9 @@ import click
 from rich.console import Console
 
 from aam_cli.commands.outdated import check_outdated
-from aam_cli.core.config import load_config
+from aam_cli.core.config import AamConfig, load_config
 from aam_cli.core.workspace import read_lock_file
-from aam_cli.services.upgrade_service import UpgradeResult
+from aam_cli.services.upgrade_service import OutdatedPackage, UpgradeResult
 from aam_cli.utils.paths import resolve_project_dir
 
 ################################################################################
@@ -181,8 +181,8 @@ def upgrade(
 
 
 def upgrade_packages(
-    targets: list,
-    config: "AamConfig",  # noqa: F821
+    targets: list["OutdatedPackage"],
+    config: AamConfig,
     project_dir: Path,
     force: bool,
     dry_run: bool,

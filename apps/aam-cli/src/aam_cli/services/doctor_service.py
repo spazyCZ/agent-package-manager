@@ -184,13 +184,15 @@ def _check_config_files(project_dir: Path) -> list[dict[str, Any]]:
 
         if not config_path.exists():
             # -----
-            # File does not exist — perfectly fine, defaults will be used
+            # File does not exist — defaults will be used; warn for project config
             # -----
             logger.debug(f"{label} not found: path='{config_path}'")
+            # Project config missing is a warning (user may want to initialize)
+            is_project = "project" in check_name.lower()
             checks.append(
                 {
                     "name": check_name,
-                    "status": "pass",
+                    "status": "warn" if is_project else "pass",
                     "message": f"{label}: {config_path} (not found, using defaults)",
                     "suggestion": None,
                 }
@@ -279,6 +281,11 @@ def _check_config_valid(project_dir: Path) -> dict[str, Any]:
     try:
         config = load_config(project_dir)
         reg_count = len(config.registries)
+        suggestion = (
+            "Run 'aam init' to set up AAM and add default sources."
+            if reg_count == 0
+            else None
+        )
         return {
             "name": "config_valid",
             "status": "pass",
@@ -286,7 +293,7 @@ def _check_config_valid(project_dir: Path) -> dict[str, Any]:
                 f"Configuration loaded ({reg_count} "
                 f"registr{'y' if reg_count == 1 else 'ies'} configured)"
             ),
-            "suggestion": None,
+            "suggestion": suggestion,
         }
     except Exception as exc:
         return {

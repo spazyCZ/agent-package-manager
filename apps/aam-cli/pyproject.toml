@@ -42,6 +42,7 @@ dev = [
     "mypy>=1.11.0",
     "ruff>=0.6.0",
     "black>=24.0.0",
+    "types-PyYAML>=6.0.0",
 ]
 
 [project.scripts]
@@ -79,6 +80,8 @@ select = [
 ignore = [
     "E501",   # line too long (handled by formatter)
     "B008",   # do not perform function calls in argument defaults
+    "ARG001", # unused function arguments (false positives from API contracts)
+    "ARG002", # unused method arguments (false positives from @patch decorators, overrides)
 ]
 
 [tool.ruff.lint.isort]

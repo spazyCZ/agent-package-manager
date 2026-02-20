@@ -16,11 +16,10 @@ import json
 import logging
 from unittest.mock import MagicMock, patch
 
-import pytest
 from click.testing import CliRunner
 
 from aam_cli.commands.search import _collect_installed_names, search
-from aam_cli.core.workspace import LockFile, LockedPackage
+from aam_cli.core.workspace import LockedPackage, LockFile
 from aam_cli.services.search_service import SearchResponse, SearchResult
 
 ################################################################################
@@ -228,8 +227,9 @@ class TestSearchInstalledIndicator:
         mock_installed: MagicMock,
     ) -> None:
         """JSON output includes 'installed' field for each result."""
-        from rich.console import Console
         from io import StringIO
+
+        from rich.console import Console
 
         mock_config.return_value = MagicMock()
         mock_search.return_value = _make_search_response(

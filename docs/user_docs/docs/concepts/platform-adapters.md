@@ -207,16 +207,16 @@ my-project/
 
 ## GitHub Copilot Adapter
 
-**GitHub Copilot** is GitHub's AI pair programmer. It uses a single `copilot-instructions.md` file for instructions.
+**GitHub Copilot** is GitHub's AI pair programmer. It uses `.github/agents/` for custom agents and `.github/instructions/` for conditional instruction files.
 
 ### Deployment Mapping
 
 | Artifact Type | Copilot Location | Format | Merging |
 |---------------|-----------------|--------|---------|
 | **Skill** | `.github/skills/<name>/SKILL.md` | SKILL.md (as-is) | No |
-| **Agent** | `.github/copilot-instructions.md` | Markdown section | Yes (markers) |
+| **Agent** | `.github/agents/<name>.agent.md` | Markdown file | No |
 | **Prompt** | `.github/prompts/<name>.md` | Markdown (as-is) | No |
-| **Instruction** | `.github/copilot-instructions.md` | Markdown section | Yes (markers) |
+| **Instruction** | `.github/instructions/<name>.instructions.md` | Markdown file | No |
 
 ### Configuration
 
@@ -224,12 +224,8 @@ my-project/
 # aam.yaml
 platforms:
   copilot:
-    merge_instructions: true    # Merge into copilot-instructions.md
+    enabled: true
 ```
-
-| Option | Values | Default | Description |
-|--------|--------|---------|-------------|
-| `merge_instructions` | `true`, `false` | `true` | Merge agents/instructions into single file |
 
 ### Skill Deployment
 
@@ -244,60 +240,35 @@ Skills are copied to `.github/skills/`:
     └── SKILL.md
 ```
 
-### Agent and Instruction Deployment (Merged)
+### Agent Deployment
 
-Agents and instructions are merged into `.github/copilot-instructions.md` using markers:
+Agents are deployed as discrete `.agent.md` files in `.github/agents/`:
 
-```markdown
-<!-- User's manual content -->
-# My Project Instructions
-
-This is my project. Follow these rules...
-
-<!-- BEGIN AAM: asvc-audit agent -->
-# ASVC Compliance Auditor
-
-You are an ASVC compliance auditor. Your role is to analyze codebases,
-configurations, and documentation against ASVC framework requirements.
-
-## Core Responsibilities
-- Identify compliance gaps against ASVC standards
-- Generate structured audit findings
-...
-<!-- END AAM: asvc-audit agent -->
-
-<!-- BEGIN AAM: python-standards instruction -->
-# Python Coding Standards
-
-- Use type hints on all functions
-- Follow PEP 8 style guide
-...
-<!-- END AAM: python-standards instruction -->
-
-<!-- User's manual content continues -->
+```
+.github/agents/
+├── asvc-audit.agent.md
+└── code-reviewer.agent.md
 ```
 
-### Marker-Based Merging
+### Instruction Deployment
 
-AAM uses `<!-- BEGIN AAM: ... -->` and `<!-- END AAM: ... -->` markers to:
+Instructions are deployed as discrete `.instructions.md` files in `.github/instructions/`:
 
-1. **Identify AAM-managed sections** — Only edit content within markers
-2. **Preserve user content** — Never touch content outside markers
-3. **Update cleanly** — Replace marker content on re-deploy
-4. **Remove cleanly** — Remove marked sections on undeploy
-
-**Benefits:**
-
-- Users can add their own instructions alongside AAM-managed ones
-- AAM updates don't interfere with user content
-- Clear boundaries between managed and manual content
+```
+.github/instructions/
+├── python-standards.instructions.md
+└── typescript-standards.instructions.md
+```
 
 ### Copilot Directory Structure After Deploy
 
 ```
 my-project/
 ├── .github/
-│   ├── copilot-instructions.md   # Merged agents + instructions
+│   ├── agents/
+│   │   └── asvc-audit.agent.md
+│   ├── instructions/
+│   │   └── python-standards.instructions.md
 │   ├── skills/
 │   │   └── author--asvc-report/
 │   └── prompts/
@@ -309,14 +280,14 @@ my-project/
 
 ## Claude Adapter
 
-**Claude** is Anthropic's AI assistant. Projects use `CLAUDE.md` for instructions.
+**Claude** is Anthropic's AI assistant. Projects use `CLAUDE.md` for instructions and `.claude/agents/` for custom subagents.
 
 ### Deployment Mapping
 
 | Artifact Type | Claude Location | Format | Merging |
 |---------------|----------------|--------|---------|
 | **Skill** | `.claude/skills/<name>/SKILL.md` | SKILL.md (as-is) | No |
-| **Agent** | `CLAUDE.md` | Markdown section | Yes (markers) |
+| **Agent** | `.claude/agents/<name>.md` | Markdown file | No |
 | **Prompt** | `.claude/prompts/<name>.md` | Markdown (as-is) | No |
 | **Instruction** | `CLAUDE.md` | Markdown section | Yes (markers) |
 
@@ -326,12 +297,12 @@ my-project/
 # aam.yaml
 platforms:
   claude:
-    merge_instructions: true    # Merge into CLAUDE.md
+    merge_instructions: true    # Merge instructions into CLAUDE.md
 ```
 
 | Option | Values | Default | Description |
 |--------|--------|---------|-------------|
-| `merge_instructions` | `true`, `false` | `true` | Merge agents/instructions into CLAUDE.md |
+| `merge_instructions` | `true`, `false` | `true` | Merge instructions into CLAUDE.md |
 
 ### Skill Deployment
 
@@ -344,20 +315,24 @@ Skills are copied to `.claude/skills/`:
     └── scripts/
 ```
 
-### Agent and Instruction Deployment (Merged)
+### Agent Deployment
 
-Similar to Copilot, agents and instructions merge into `CLAUDE.md`:
+Agents are deployed as discrete `.md` files in `.claude/agents/`:
+
+```
+.claude/agents/
+├── asvc-audit.md
+└── code-reviewer.md
+```
+
+### Instruction Deployment (Merged)
+
+Instructions are merged into `CLAUDE.md` using markers:
 
 ```markdown
 # Project: ASVC Compliance Tool
 
 This project implements ASVC compliance auditing...
-
-<!-- BEGIN AAM: asvc-audit agent -->
-# ASVC Compliance Auditor
-
-You are an ASVC compliance auditor...
-<!-- END AAM: asvc-audit agent -->
 
 <!-- BEGIN AAM: python-standards instruction -->
 # Python Coding Standards
@@ -370,8 +345,10 @@ You are an ASVC compliance auditor...
 
 ```
 my-project/
-├── CLAUDE.md                    # Merged agents + instructions
+├── CLAUDE.md                    # Instructions (marker-based)
 ├── .claude/
+│   ├── agents/
+│   │   └── asvc-audit.md
 │   ├── skills/
 │   │   └── author--asvc-report/
 │   └── prompts/
@@ -472,8 +449,8 @@ graph TB
     Package --> CodexAdapter[Codex Adapter]
 
     CursorAdapter --> CursorDeploy[".cursor/<br/>skills/, rules/, prompts/"]
-    CopilotAdapter --> CopilotDeploy[".github/<br/>copilot-instructions.md<br/>skills/, prompts/"]
-    ClaudeAdapter --> ClaudeDeploy["CLAUDE.md<br/>.claude/skills/, prompts/"]
+    CopilotAdapter --> CopilotDeploy[".github/<br/>agents/, instructions/<br/>skills/, prompts/"]
+    ClaudeAdapter --> ClaudeDeploy["CLAUDE.md<br/>.claude/agents/, skills/, prompts/"]
     CodexAdapter --> CodexDeploy["AGENTS.md<br/>~/.codex/skills/, prompts/"]
 
     style Package fill:#e1f5fe
@@ -495,11 +472,11 @@ graph TB
 |---------|--------|---------|--------|-------|
 | **Skill format** | SKILL.md | SKILL.md | SKILL.md | SKILL.md (native) |
 | **Skill location** | `.cursor/skills/` | `.github/skills/` | `.claude/skills/` | `~/.codex/skills/` |
-| **Agent format** | `.mdc` rule | Merged section | Merged section | Merged section |
-| **Agent location** | `.cursor/rules/` | `copilot-instructions.md` | `CLAUDE.md` | `AGENTS.md` |
-| **Instruction format** | `.mdc` rule | Merged section | Merged section | Merged section |
-| **Instruction location** | `.cursor/rules/` | `copilot-instructions.md` | `CLAUDE.md` | `AGENTS.md` |
-| **Merging strategy** | Separate files | Marker-based | Marker-based | Marker-based |
+| **Agent format** | `.mdc` rule | `.agent.md` file | `.md` file | Merged section |
+| **Agent location** | `.cursor/rules/` | `.github/agents/` | `.claude/agents/` | `AGENTS.md` |
+| **Instruction format** | `.mdc` rule | `.instructions.md` file | Merged section | Merged section |
+| **Instruction location** | `.cursor/rules/` | `.github/instructions/` | `CLAUDE.md` | `AGENTS.md` |
+| **Merging strategy** | Separate files | Separate files | Marker-based (instructions) | Marker-based |
 
 ---
 
@@ -522,12 +499,11 @@ ls -R .cursor/
 ### Copilot
 
 ```bash
-# Check merged file
-cat .github/copilot-instructions.md | grep "BEGIN AAM"
+# List deployed agents
+ls .github/agents/
 
-# Expected:
-# <!-- BEGIN AAM: asvc-audit agent -->
-# <!-- BEGIN AAM: python-standards instruction -->
+# List deployed instructions
+ls .github/instructions/
 
 # List skills
 ls .github/skills/
@@ -536,7 +512,10 @@ ls .github/skills/
 ### Claude
 
 ```bash
-# Check merged file
+# List deployed agents
+ls .claude/agents/
+
+# Check instruction markers in CLAUDE.md
 cat CLAUDE.md | grep "BEGIN AAM"
 
 # List skills
@@ -575,9 +554,9 @@ aam install @author/asvc-auditor
 # Deploys to:
 # - .cursor/skills/author--asvc-report/
 # - .cursor/rules/agent-author--asvc-audit.mdc
-# - CLAUDE.md (merged section)
+# - .claude/agents/asvc-audit.md
 # - .claude/skills/author--asvc-report/
-# - .github/copilot-instructions.md (merged section)
+# - .github/agents/asvc-audit.agent.md
 # - .github/skills/author--asvc-report/
 ```
 
@@ -612,8 +591,8 @@ aam undeploy asvc-auditor --platform cursor
 | Platform | Removal Behavior |
 |----------|------------------|
 | **Cursor** | Delete skill dirs, delete rule files, delete prompt files |
-| **Copilot** | Remove marked sections from `copilot-instructions.md`, delete skills/prompts |
-| **Claude** | Remove marked sections from `CLAUDE.md`, delete skills/prompts |
+| **Copilot** | Delete agent/instruction/skill/prompt files from `.github/` |
+| **Claude** | Delete agent files from `.claude/agents/`, remove instruction markers from `CLAUDE.md`, delete skills/prompts |
 | **Codex** | Remove marked sections from `AGENTS.md`, delete skills/prompts |
 
 ---

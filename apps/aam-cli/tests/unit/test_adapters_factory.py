@@ -8,7 +8,6 @@
 
 import logging
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -130,8 +129,8 @@ class TestCopilotAdapter:
         assert dest == project / ".github" / "skills" / "my-skill"
         assert (dest / "SKILL.md").is_file()
 
-    def test_unit_deploy_agent_to_copilot_instructions(self, tmp_path: Path) -> None:
-        """Agent is merged into .github/copilot-instructions.md with markers."""
+    def test_unit_deploy_agent_to_agents_dir(self, tmp_path: Path) -> None:
+        """Agent is deployed to .github/agents/<name>.agent.md."""
         project = tmp_path / "project"
         project.mkdir()
         agent_dir = self._make_agent_dir(tmp_path)
@@ -140,11 +139,10 @@ class TestCopilotAdapter:
         ref = ArtifactRef(name="my-agent", path="agents/my-agent", description="test")
         dest = adapter.deploy_agent(agent_dir, ref, {})
 
-        assert dest == project / ".github" / "copilot-instructions.md"
+        assert dest == project / ".github" / "agents" / "my-agent.agent.md"
+        assert dest.is_file()
         content = dest.read_text()
-        assert "<!-- BEGIN AAM: my-agent agent -->" in content
         assert "You are a helpful agent." in content
-        assert "<!-- END AAM: my-agent agent -->" in content
 
     def test_unit_deploy_prompt(self, tmp_path: Path) -> None:
         """Prompt is deployed to .github/prompts/<name>.md."""
@@ -159,8 +157,8 @@ class TestCopilotAdapter:
         assert dest == project / ".github" / "prompts" / "my-prompt.md"
         assert dest.is_file()
 
-    def test_unit_deploy_instruction_to_copilot_instructions(self, tmp_path: Path) -> None:
-        """Instruction is merged into .github/copilot-instructions.md."""
+    def test_unit_deploy_instruction_to_instructions_dir(self, tmp_path: Path) -> None:
+        """Instruction is deployed to .github/instructions/<name>.instructions.md."""
         project = tmp_path / "project"
         project.mkdir()
         instr_file = self._make_instruction_file(tmp_path)
@@ -173,13 +171,13 @@ class TestCopilotAdapter:
         )
         dest = adapter.deploy_instruction(instr_file, ref, {})
 
+        assert dest == project / ".github" / "instructions" / "coding-standards.instructions.md"
+        assert dest.is_file()
         content = dest.read_text()
-        assert "<!-- BEGIN AAM: coding-standards instruction -->" in content
         assert "Follow PEP 8." in content
-        assert "<!-- END AAM: coding-standards instruction -->" in content
 
-    def test_unit_upsert_replaces_existing_section(self, tmp_path: Path) -> None:
-        """Re-deploying an agent replaces the existing section."""
+    def test_unit_redeploy_overwrites_agent_file(self, tmp_path: Path) -> None:
+        """Re-deploying an agent overwrites the existing agent file."""
         project = tmp_path / "project"
         project.mkdir()
         adapter = CopilotAdapter(project)
@@ -199,11 +197,10 @@ class TestCopilotAdapter:
 
         adapter.deploy_agent(agent_dir_v2, ref, {})
 
-        content = (project / ".github" / "copilot-instructions.md").read_text()
+        agent_file = project / ".github" / "agents" / "my-agent.agent.md"
+        content = agent_file.read_text()
         assert "Version 2 content." in content
         assert "Version 1 content." not in content
-        # Only one begin marker
-        assert content.count("<!-- BEGIN AAM: my-agent agent -->") == 1
 
     def test_unit_undeploy_skill(self, tmp_path: Path) -> None:
         """Undeploying a skill removes its directory."""
@@ -219,8 +216,8 @@ class TestCopilotAdapter:
         adapter.undeploy("my-skill", "skill")
         assert not (project / ".github" / "skills" / "my-skill").exists()
 
-    def test_unit_undeploy_agent_section(self, tmp_path: Path) -> None:
-        """Undeploying an agent removes its marker section."""
+    def test_unit_undeploy_agent_file(self, tmp_path: Path) -> None:
+        """Undeploying an agent removes its .agent.md file."""
         project = tmp_path / "project"
         project.mkdir()
         agent_dir = self._make_agent_dir(tmp_path)
@@ -229,11 +226,11 @@ class TestCopilotAdapter:
         ref = ArtifactRef(name="my-agent", path="agents/my-agent", description="test")
         adapter.deploy_agent(agent_dir, ref, {})
 
-        adapter.undeploy("my-agent", "agent")
+        agent_file = project / ".github" / "agents" / "my-agent.agent.md"
+        assert agent_file.is_file()
 
-        instructions_path = project / ".github" / "copilot-instructions.md"
-        # File should be removed if it was the only section
-        assert not instructions_path.exists()
+        adapter.undeploy("my-agent", "agent")
+        assert not agent_file.exists()
 
     def test_unit_list_deployed(self, tmp_path: Path) -> None:
         """list_deployed returns all deployed artifact tuples."""
@@ -251,14 +248,21 @@ class TestCopilotAdapter:
         ref_agent = ArtifactRef(name="a1", path="agents/a1", description="test")
         adapter.deploy_agent(agent_dir, ref_agent, {})
 
+        # Deploy an instruction
+        instr_file = self._make_instruction_file(tmp_path)
+        ref_instr = ArtifactRef(name="i1", path="instructions/i1.md", description="test")
+        adapter.deploy_instruction(instr_file, ref_instr, {})
+
         deployed = adapter.list_deployed()
         names = [d[0] for d in deployed]
         types = [d[1] for d in deployed]
 
         assert "s1" in names
         assert "a1" in names
+        assert "i1" in names
         assert "skill" in types
         assert "agent" in types
+        assert "instruction" in types
 
 
 ################################################################################
@@ -286,8 +290,8 @@ class TestClaudeAdapter:
         assert dest == project / ".claude" / "skills" / "my-skill"
         assert (dest / "SKILL.md").is_file()
 
-    def test_unit_deploy_agent_to_claude_md(self, tmp_path: Path) -> None:
-        """Agent is merged into CLAUDE.md with markers."""
+    def test_unit_deploy_agent_to_agents_dir(self, tmp_path: Path) -> None:
+        """Agent is deployed to .claude/agents/<name>.md."""
         project = tmp_path / "project"
         project.mkdir()
         agent_dir = tmp_path / "src-agent"
@@ -298,9 +302,9 @@ class TestClaudeAdapter:
         ref = ArtifactRef(name="audit-agent", path="agents/audit-agent", description="test")
         dest = adapter.deploy_agent(agent_dir, ref, {})
 
-        assert dest == project / "CLAUDE.md"
+        assert dest == project / ".claude" / "agents" / "audit-agent.md"
+        assert dest.is_file()
         content = dest.read_text()
-        assert "<!-- BEGIN AAM: audit-agent agent -->" in content
         assert "You help with audits." in content
 
     def test_unit_deploy_prompt_to_claude_dir(self, tmp_path: Path) -> None:
@@ -332,8 +336,8 @@ class TestClaudeAdapter:
         content = dest.read_text()
         assert "<!-- BEGIN AAM: standards instruction -->" in content
 
-    def test_unit_preserves_existing_claude_md(self, tmp_path: Path) -> None:
-        """Deploying an agent preserves existing user content in CLAUDE.md."""
+    def test_unit_deploy_agent_does_not_modify_claude_md(self, tmp_path: Path) -> None:
+        """Deploying an agent does not modify CLAUDE.md — agents go to .claude/agents/."""
         project = tmp_path / "project"
         project.mkdir()
         (project / "CLAUDE.md").write_text("# My Project\n\nUser content here.\n")
@@ -346,10 +350,14 @@ class TestClaudeAdapter:
         ref = ArtifactRef(name="my-agent", path="agents/my-agent", description="test")
         adapter.deploy_agent(agent_dir, ref, {})
 
-        content = (project / "CLAUDE.md").read_text()
-        assert "# My Project" in content
-        assert "User content here." in content
-        assert "Agent content." in content
+        # CLAUDE.md should be untouched
+        claude_content = (project / "CLAUDE.md").read_text()
+        assert claude_content == "# My Project\n\nUser content here.\n"
+
+        # Agent should be in .claude/agents/
+        agent_file = project / ".claude" / "agents" / "my-agent.md"
+        assert agent_file.is_file()
+        assert "Agent content." in agent_file.read_text()
 
 
 ################################################################################

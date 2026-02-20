@@ -81,13 +81,13 @@ class TestMCPIntegration:
         _run_async(check())
 
     def test_integration_full_access_has_all_tools(self) -> None:
-        """Full-access server should list all 23 tools (spec 002 + 003)."""
+        """Full-access server should list all 29 tools (spec 002–005)."""
         server = create_mcp_server(allow_write=True)
 
         async def check() -> None:
             async with Client(server) as client:
                 tools = await client.list_tools()
-                assert len(tools) == 23
+                assert len(tools) == 29
 
         _run_async(check())
 

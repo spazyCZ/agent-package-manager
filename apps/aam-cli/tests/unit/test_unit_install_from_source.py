@@ -14,7 +14,6 @@ Reference: spec 004 US2; tasks.md T024.
 ################################################################################
 
 import logging
-from unittest.mock import MagicMock, patch
 
 import pytest
 

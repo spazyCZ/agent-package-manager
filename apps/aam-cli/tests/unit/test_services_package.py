@@ -7,6 +7,7 @@
 ################################################################################
 
 import logging
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -46,7 +47,7 @@ class TestPackageService:
             result = list_installed_packages()
             assert result == []
 
-    def test_unit_list_packages_with_installed(self, tmp_path: "Path") -> None:
+    def test_unit_list_packages_with_installed(self, tmp_path: Path) -> None:
         """Verify list structure when packages are installed."""
         mock_locked = MagicMock()
         mock_locked.version = "1.0.0"
@@ -62,15 +63,14 @@ class TestPackageService:
         with patch(
             "aam_cli.services.package_service.read_lock_file",
             return_value=mock_lock,
+        ), patch(
+            "aam_cli.services.package_service.get_packages_dir",
+            return_value=packages_dir,
         ):
-            with patch(
-                "aam_cli.services.package_service.get_packages_dir",
-                return_value=packages_dir,
-            ):
-                result = list_installed_packages(tmp_path)
-                assert len(result) == 1
-                assert result[0]["name"] == "test-pkg"
-                assert result[0]["version"] == "1.0.0"
+            result = list_installed_packages(tmp_path)
+            assert len(result) == 1
+            assert result[0]["name"] == "test-pkg"
+            assert result[0]["version"] == "1.0.0"
 
     def test_unit_get_package_info_not_found(self) -> None:
         """Verify error when package not installed."""
@@ -80,6 +80,5 @@ class TestPackageService:
         with patch(
             "aam_cli.services.package_service.read_lock_file",
             return_value=mock_lock,
-        ):
-            with pytest.raises(ValueError, match="AAM_PACKAGE_NOT_FOUND"):
-                get_package_info("nonexistent")
+        ), pytest.raises(ValueError, match="AAM_PACKAGE_NOT_FOUND"):
+            get_package_info("nonexistent")

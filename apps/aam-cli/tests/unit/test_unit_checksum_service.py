@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 def _create_package_dir(tmp_path: Path, pkg_name: str = "test-pkg") -> Path:
     """Create a fake installed package directory with files."""
-    pkg_dir = tmp_path / ".aam" / "packages" / pkg_name
+    pkg_dir = tmp_path / ".agent-packages" / pkg_name
     pkg_dir.mkdir(parents=True)
 
     skills_dir = pkg_dir / "skills" / "my-skill"
@@ -81,7 +81,7 @@ class TestVerifyPackage:
     ) -> None:
         """All files match their recorded checksums."""
         _create_package_dir(tmp_path)
-        mock_pkgs_dir.return_value = tmp_path / ".aam" / "packages"
+        mock_pkgs_dir.return_value = tmp_path / ".agent-packages"
 
         # Compute actual checksums for the files
         skill_content = "# My Skill\nOriginal content."
@@ -119,7 +119,7 @@ class TestVerifyPackage:
     ) -> None:
         """Detects a modified file with different checksum."""
         _create_package_dir(tmp_path)
-        mock_pkgs_dir.return_value = tmp_path / ".aam" / "packages"
+        mock_pkgs_dir.return_value = tmp_path / ".agent-packages"
 
         mock_installed.return_value = {
             "test-pkg": LockedPackage(
@@ -150,7 +150,7 @@ class TestVerifyPackage:
     ) -> None:
         """Detects a file recorded in checksums but missing from disk."""
         _create_package_dir(tmp_path)
-        mock_pkgs_dir.return_value = tmp_path / ".aam" / "packages"
+        mock_pkgs_dir.return_value = tmp_path / ".agent-packages"
 
         mock_installed.return_value = {
             "test-pkg": LockedPackage(
@@ -368,7 +368,7 @@ class TestCheckModifications:
     ) -> None:
         """Detects modifications when file checksums differ."""
         _create_package_dir(tmp_path)
-        mock_pkgs_dir.return_value = tmp_path / ".aam" / "packages"
+        mock_pkgs_dir.return_value = tmp_path / ".agent-packages"
 
         mock_installed.return_value = {
             "test-pkg": LockedPackage(
@@ -400,7 +400,7 @@ class TestCheckModifications:
     ) -> None:
         """No modifications when all checksums match."""
         _create_package_dir(tmp_path)
-        mock_pkgs_dir.return_value = tmp_path / ".aam" / "packages"
+        mock_pkgs_dir.return_value = tmp_path / ".agent-packages"
 
         skill_content = "# My Skill\nOriginal content."
         yaml_content = "name: test-pkg\nversion: 1.0.0\n"

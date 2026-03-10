@@ -4,7 +4,7 @@ Scans an existing project for skills, agents, prompts, and instructions
 that are not yet managed by AAM, and packages them into an AAM package
 with interactive artifact selection.
 
-Supports filtering by platform (cursor, copilot, claude, codex) so users
+Supports filtering by platform (cursor, copilot, claude-code, codex) so users
 can pick artifacts from specific source directories like ``.cursor/`` or
 ``.github/``.
 
@@ -18,6 +18,7 @@ sources that have been registered with ``aam source add``.
 #                                                                              #
 ################################################################################
 
+import json
 import logging
 import shutil
 from datetime import UTC, datetime
@@ -36,7 +37,6 @@ from aam_cli.detection.scanner import (
     scan_project,
 )
 from aam_cli.utils.naming import format_invalid_package_name_message, validate_package_name
-from aam_cli.utils.yaml_utils import dump_yaml
 
 ################################################################################
 #                                                                              #
@@ -60,6 +60,7 @@ TYPE_ORDER: list[str] = ["skill", "agent", "prompt", "instruction"]
 PLATFORM_COLORS: dict[str, str] = {
     "cursor": "bright_blue",
     "copilot": "bright_green",
+    "claude-code": "bright_yellow",
     "claude": "bright_yellow",
     "codex": "bright_magenta",
 }
@@ -603,7 +604,7 @@ def _create_from_source(
     # -----
     if dry_run:
         console.print("\n[bold]Would create:[/bold]")
-        console.print("  aam.yaml (with provenance)")
+        console.print("  package.agent.json (with provenance)")
         for art in artifacts:
             art_type = art["type"]
             type_key = art_type + "s"
@@ -612,12 +613,9 @@ def _create_from_source(
             else:
                 console.print(f"  {type_key}/{art['name']}.md")
 
-        import yaml
-        content = yaml.safe_dump(
-            manifest_data, default_flow_style=False, sort_keys=False
-        )
+        content = json.dumps(manifest_data, indent=2, ensure_ascii=False)
         console.print("\n[yellow]\\[Dry run — no files written][/yellow]")
-        console.print(Panel(content, title="aam.yaml", border_style="blue"))
+        console.print(Panel(content, title="package.agent.json", border_style="blue"))
         return
 
     console.print("\n[bold]Creating package from remote source...[/bold]")
@@ -714,11 +712,14 @@ def _create_from_source(
         }
 
     # -----
-    # Step 12: Write aam.yaml manifest
+    # Step 12: Write package.agent.json manifest (UAAPS v0.4.0 default format)
     # -----
-    manifest_path = output_dir / "aam.yaml"
-    dump_yaml(manifest_data, manifest_path)
-    console.print("  [green]✓[/green] Created aam.yaml (with provenance)")
+    manifest_path = output_dir / "package.agent.json"
+    manifest_path.write_text(
+        json.dumps(manifest_data, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    console.print("  [green]✓[/green] Created package.agent.json (with provenance)")
 
     # -----
     # Summary
@@ -776,7 +777,7 @@ def _create_from_source(
     "platforms",
     multiple=True,
     type=click.Choice(sorted(KNOWN_PLATFORMS), case_sensitive=False),
-    help="Filter to artifacts from a specific platform (cursor, copilot, claude, codex)",
+    help="Filter to artifacts from a specific platform (cursor, copilot, claude-code, codex)",
 )
 @click.option(
     "--organize",
@@ -995,11 +996,11 @@ def create_package(
         organize,
     )
 
-    manifest_path = out_dir / "aam.yaml"
+    manifest_path = out_dir / "package.agent.json"
 
     if dry_run:
         console.print("\n[bold]Would create:[/bold]")
-        console.print("  aam.yaml")
+        console.print("  package.agent.json")
         if organize != "reference":
             for art in selected:
                 _copy_artifact(
@@ -1010,11 +1011,9 @@ def create_package(
                     console,
                     dry_run=True,
                 )
-        import yaml
-
-        content = yaml.safe_dump(manifest_data, default_flow_style=False, sort_keys=False)
+        content = json.dumps(manifest_data, indent=2, ensure_ascii=False)
         console.print("\n[yellow]\\[Dry run — no files written][/yellow]")
-        console.print(Panel(content, title="aam.yaml", border_style="blue"))
+        console.print(Panel(content, title="package.agent.json", border_style="blue"))
         return
 
     # -----
@@ -1022,8 +1021,11 @@ def create_package(
     # -----
     console.print("\n[bold]Creating package...[/bold]")
 
-    dump_yaml(manifest_data, manifest_path)
-    console.print("  [green]✓[/green] Created aam.yaml")
+    manifest_path.write_text(
+        json.dumps(manifest_data, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    console.print("  [green]✓[/green] Created package.agent.json")
 
     if organize != "reference":
         for art in selected:

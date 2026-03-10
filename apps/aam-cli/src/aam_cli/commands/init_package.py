@@ -9,6 +9,7 @@ Scaffolds a brand-new AAM package interactively using Rich prompts.
 #                                                                              #
 ################################################################################
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,6 @@ from rich.console import Console
 from rich.prompt import Confirm, Prompt
 
 from aam_cli.utils.naming import format_invalid_package_name_message, validate_package_name
-from aam_cli.utils.yaml_utils import dump_yaml
 
 ################################################################################
 #                                                                              #
@@ -35,8 +35,32 @@ logger = logging.getLogger(__name__)
 #                                                                              #
 ################################################################################
 
-ARTIFACT_TYPES: list[str] = ["skills", "agents", "prompts", "instructions"]
-PLATFORM_NAMES: list[str] = ["cursor", "claude", "copilot", "codex"]
+# Artifact types aligned with UAAPS v0.4.0+: skills, agents, instructions,
+# commands (replaces deprecated prompts), and rules.
+ARTIFACT_TYPES: list[str] = ["skills", "agents", "instructions", "commands", "rules"]
+
+################################################################################
+#                                                                              #
+# HELPERS                                                                      #
+#                                                                              #
+################################################################################
+
+
+def _pkg_name_to_dir(pkg_name: str) -> str:
+    """Convert a package name to a filesystem-safe directory name.
+
+    Strips the leading ``@`` and replaces ``/`` with ``_`` so that
+    ``@org/my-pkg`` becomes ``org_my-pkg``.
+
+    Args:
+        pkg_name: The full package name (e.g. ``"@org/my-pkg"`` or
+            ``"my-pkg"``).
+
+    Returns:
+        A filesystem-safe directory name.
+    """
+    return pkg_name.lstrip("@").replace("/", "_")
+
 
 ################################################################################
 #                                                                              #
@@ -51,7 +75,7 @@ PLATFORM_NAMES: list[str] = ["cursor", "claude", "copilot", "codex"]
 def init_package(ctx: click.Context, name: str | None) -> None:
     """Scaffold a new AAM package interactively.
 
-    Creates an ``aam.yaml`` manifest and artifact directories.
+    Creates a ``package.agent.json`` manifest and artifact directories.
 
     Examples::
 
@@ -88,29 +112,20 @@ def init_package(ctx: click.Context, name: str | None) -> None:
             selected_types.append(atype)
 
     # -----
-    # Step 3: Select platforms
+    # Step 3: Create directory structure
     # -----
-    console.print("\n[bold]Which platforms should this package support?[/bold]")
-    selected_platforms: list[str] = []
-
-    for pname in PLATFORM_NAMES:
-        default = pname == "cursor"
-        if Confirm.ask(f"  {pname.capitalize()}", default=default):
-            selected_platforms.append(pname)
-
-    # -----
-    # Step 4: Create directory structure
-    # -----
-    pkg_dir = Path.cwd() / pkg_name.split("/")[-1] if name else Path.cwd()
-
     if name:
+        dir_name = _pkg_name_to_dir(pkg_name)
+        pkg_dir = Path.cwd() / dir_name
         pkg_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        pkg_dir = Path.cwd()
 
     for atype in selected_types:
         (pkg_dir / atype).mkdir(parents=True, exist_ok=True)
 
     # -----
-    # Step 5: Generate aam.yaml
+    # Step 4: Generate package.agent.json
     # -----
     manifest_data: dict[str, Any] = {
         "name": pkg_name,
@@ -124,28 +139,13 @@ def init_package(ctx: click.Context, name: str | None) -> None:
         manifest_data["license"] = license_str
 
     manifest_data["artifacts"] = {atype: [] for atype in ARTIFACT_TYPES}
-
     manifest_data["dependencies"] = {}
 
-    platforms_config: dict[str, Any] = {}
-    if "cursor" in selected_platforms:
-        platforms_config["cursor"] = {
-            "skill_scope": "project",
-            "deploy_instructions_as": "rules",
-        }
-    if "claude" in selected_platforms:
-        platforms_config["claude"] = {"merge_instructions": True}
-    if "copilot" in selected_platforms:
-        platforms_config["copilot"] = {"merge_instructions": True}
-    if "codex" in selected_platforms:
-        platforms_config["codex"] = {"skill_scope": "project"}
-
-    manifest_data["platforms"] = platforms_config
-
-    dump_yaml(manifest_data, pkg_dir / "aam.yaml")
+    manifest_path = pkg_dir / "package.agent.json"
+    manifest_path.write_text(json.dumps(manifest_data, indent=2) + "\n", encoding="utf-8")
 
     # -----
-    # Step 6: Register default community sources
+    # Step 5: Register default community sources
     # -----
     try:
         from aam_cli.services.source_service import register_default_sources
@@ -168,12 +168,12 @@ def init_package(ctx: click.Context, name: str | None) -> None:
         logger.warning(f"Failed to register default sources: {e}")
 
     # -----
-    # Step 7: Summary
+    # Step 6: Summary
     # -----
-    display_name = pkg_name.split("/")[-1] if "/" in pkg_name else pkg_name
+    dir_label = _pkg_name_to_dir(pkg_name) if name else "."
 
-    console.print(f"\nCreated {display_name}/")
-    console.print("  ├── aam.yaml")
+    console.print(f"\nCreated {dir_label}/")
+    console.print("  ├── package.agent.json")
     for idx, atype in enumerate(selected_types):
         prefix = "└──" if idx == len(selected_types) - 1 else "├──"
         console.print(f"  {prefix} {atype}/")

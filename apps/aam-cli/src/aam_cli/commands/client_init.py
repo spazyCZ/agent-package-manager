@@ -23,6 +23,7 @@ from aam_cli.services.client_init_service import (
     ClientInitResult,
     detect_platform,
     orchestrate_init,
+    orchestrate_project_init,
 )
 from aam_cli.utils.deprecation import print_deprecation_warning
 
@@ -50,12 +51,20 @@ logger = logging.getLogger(__name__)
     is_flag=True,
     help="Non-interactive: use defaults for all prompts",
 )
+@click.option(
+    "--project",
+    is_flag=True,
+    help="Create a project-level .aam/config.yaml instead of the global config",
+)
 @click.pass_context
-def client_init(ctx: click.Context, name: str | None, yes: bool) -> None:
+def client_init(ctx: click.Context, name: str | None, yes: bool, project: bool) -> None:
     """Set up AAM for your project.
 
     Configures the default AI platform and registers community
     artifact sources. Run this once in a new project to get started.
+
+    Use ``--project`` to create a project-level ``.aam/config.yaml``
+    that overrides the global configuration for this directory.
 
     If called with a NAME argument, delegates to ``aam pkg init``
     for backward compatibility (deprecated).
@@ -64,6 +73,8 @@ def client_init(ctx: click.Context, name: str | None, yes: bool) -> None:
 
         aam init
         aam init --yes
+        aam init --project
+        aam init --project --yes
     """
     console: Console = ctx.obj["console"]
 
@@ -81,7 +92,102 @@ def client_init(ctx: click.Context, name: str | None, yes: bool) -> None:
         ctx.invoke(init_package, name=name)
         return
 
-    logger.info(f"Client init invoked: yes={yes}")
+    logger.info(f"Client init invoked: yes={yes}, project={project}")
+
+    if project:
+        _init_project(ctx, console, yes)
+    else:
+        _init_global(ctx, console, yes)
+
+
+def _init_project(
+    ctx: click.Context,
+    console: Console,
+    yes: bool,
+) -> None:
+    """Handle ``aam init --project`` to create a project-level config."""
+    from aam_cli.utils.paths import get_project_config_path
+
+    config_path = get_project_config_path()
+
+    # -----
+    # Step 1: Check for existing project config
+    # -----
+    if config_path.exists() and not yes:
+        console.print(
+            "[yellow]Project config already exists.[/yellow] "
+            f"Config: {config_path}"
+        )
+        if not click.confirm("Overwrite?", default=False):
+            console.print("[dim]Aborted.[/dim]")
+            return
+
+    # -----
+    # Step 2: Detect or ask for platform
+    # -----
+    detected = detect_platform()
+
+    if yes:
+        platform = detected or "cursor"
+    else:
+        if detected:
+            console.print(
+                f"\n  Detected platform: [bold cyan]{detected}[/bold cyan]"
+            )
+
+        platform = click.prompt(
+            "Choose default platform",
+            type=click.Choice(SUPPORTED_PLATFORMS, case_sensitive=False),
+            default=detected or "cursor",
+        )
+
+    # -----
+    # Step 3: Ask for active platforms
+    # -----
+    if yes:
+        active_platforms = [platform]
+    else:
+        console.print(
+            f"\n  Active platforms (comma-separated, default: {platform}):"
+        )
+        raw = click.prompt(
+            "Active platforms",
+            default=platform,
+        )
+        active_platforms = [p.strip() for p in raw.split(",") if p.strip()]
+
+    console.print(f"\n  Platform:         [bold]{platform}[/bold]")
+    console.print(f"  Active platforms: [bold]{', '.join(active_platforms)}[/bold]")
+
+    # -----
+    # Step 4: Orchestrate
+    # -----
+    result: ClientInitResult = orchestrate_project_init(
+        platform=platform,
+        active_platforms=active_platforms,
+    )
+
+    # -----
+    # Step 5: Display summary
+    # -----
+    console.print()
+
+    if result.is_reconfigure:
+        console.print("[green]✓[/green] Project config updated.")
+    else:
+        console.print("[green]✓[/green] Project config created.")
+
+    console.print(f"  Config: {result.config_path}")
+
+    logger.info("Project init flow completed")
+
+
+def _init_global(
+    ctx: click.Context,
+    console: Console,
+    yes: bool,
+) -> None:
+    """Handle ``aam init`` (global config initialization)."""
 
     # -----
     # Step 1: Check for existing config

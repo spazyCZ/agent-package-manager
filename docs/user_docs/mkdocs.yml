@@ -2,7 +2,7 @@ site_name: AAM - Agent Artifact Manager
 site_url: https://aam.dev/docs
 site_description: >-
   The package manager for AI agent artifacts.
-  Package, share, and deploy skills, agents, prompts, and instructions
+  Package, share, and deploy skills, agents, commands, and instructions
   across Cursor, Claude, GitHub Copilot, and Codex.
 site_author: AAM Team
 repo_url: https://github.com/spazyCZ/agent-package-manager
@@ -145,6 +145,13 @@ nav:
       - aam search: cli/search.md
       - aam list: cli/list.md
       - aam info: cli/info.md
+    - Dependency Management:
+      - aam tree: cli/tree.md
+      - aam why: cli/why.md
+      - aam check: cli/check.md
+      - aam audit: cli/audit.md
+      - aam dedupe: cli/dedupe.md
+      - aam prune: cli/prune.md
     - Package Integrity:
       - aam verify: cli/verify.md
       - aam diff: cli/diff.md
@@ -172,6 +179,16 @@ nav:
       - aam config set: cli/config-set.md
       - aam config get: cli/config-get.md
       - aam config list: cli/config-list.md
+    - Quality & Testing:
+      - aam test: cli/test.md
+      - aam eval: cli/eval.md
+    - Authentication:
+      - aam login: cli/login.md
+      - aam logout: cli/logout.md
+      - aam whoami: cli/whoami.md
+    - Cache:
+      - aam cache clean: cli/cache-clean.md
+      - aam cache ls: cli/cache-ls.md
     - Utilities:
       - aam doctor: cli/doctor.md
       - aam convert: cli/convert.md
@@ -182,7 +199,7 @@ nav:
     - configuration/index.md
     - Global Config: configuration/global.md
     - Project Config: configuration/project.md
-    - aam.yaml Manifest: configuration/manifest.md
+    - Package Manifest: configuration/manifest.md
     - Lock Files: configuration/lock-files.md
     - Security Policy: configuration/security.md
   - Platform Guides:

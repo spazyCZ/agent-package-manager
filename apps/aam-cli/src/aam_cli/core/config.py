@@ -91,6 +91,28 @@ class SourceEntry(BaseModel):
     default: bool = False  # True if AAM-shipped default source
 
 
+class GovernanceInstallPolicy(BaseModel):
+    """Client-side install governance rules."""
+
+    allowed_scopes: list[str] = []  # empty = allow all
+    require_signature: bool = False
+    require_tag: str | None = None
+    blocked_packages: list[str] = []  # fnmatch glob patterns
+
+
+class GovernancePublishPolicy(BaseModel):
+    """Client-side publish governance rules."""
+
+    require_signature: bool = False
+
+
+class GovernanceConfig(BaseModel):
+    """Complete governance configuration."""
+
+    install_policy: GovernanceInstallPolicy = GovernanceInstallPolicy()
+    publish_policy: GovernancePublishPolicy = GovernancePublishPolicy()
+
+
 class AamConfig(BaseModel):
     """Complete AAM configuration (merged global + project + CLI overrides).
 
@@ -104,6 +126,11 @@ class AamConfig(BaseModel):
     security: SecurityConfig = SecurityConfig()
     author: AuthorConfig = AuthorConfig()
     publish: PublishConfig = PublishConfig()
+
+    # -----
+    # Governance fields (spec 006)
+    # -----
+    governance: GovernanceConfig = GovernanceConfig()
 
     # -----
     # Source management fields (spec 003)
@@ -244,7 +271,33 @@ def save_global_config(config: AamConfig) -> None:
     logger.info(f"Saving global config: path='{global_path}'")
 
     data = config.model_dump(mode="json")
-    # Convert RegistrySource list of models to list of dicts
     dump_yaml(data, global_path)
 
     logger.info("Global config saved successfully")
+
+
+def save_project_config(
+    data: dict[str, Any],
+    project_dir: Path | None = None,
+) -> Path:
+    """Save a project-level configuration file.
+
+    Creates the ``.aam/`` directory if it does not exist and writes
+    only the provided keys (project configs are typically sparse
+    overrides, not a full dump).
+
+    Args:
+        data: Configuration keys to persist.
+        project_dir: Project root directory. Defaults to cwd.
+
+    Returns:
+        Absolute path to the written config file.
+    """
+    project_path = get_project_config_path(project_dir)
+    project_path.parent.mkdir(parents=True, exist_ok=True)
+
+    logger.info(f"Saving project config: path='{project_path}'")
+    dump_yaml(data, project_path)
+    logger.info("Project config saved successfully")
+
+    return project_path

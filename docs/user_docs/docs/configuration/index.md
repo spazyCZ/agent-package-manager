@@ -60,7 +60,7 @@ Deep merging applies to nested structures like `registries`, `security`, and `pl
 
 ### Project Configuration (`.aam/config.yaml`)
 
-Located in the `.aam/` directory at your project root. Created automatically by `aam init`.
+Located in the `.aam/` directory at your project root. Create it with `aam init --project`.
 
 ## Quick Reference: All Configuration Keys
 

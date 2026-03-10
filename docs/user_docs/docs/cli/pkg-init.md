@@ -10,7 +10,7 @@ aam pkg init [NAME]
 
 ## Description
 
-Scaffold a new AAM package interactively. Creates an `aam.yaml` manifest and directory structure for artifacts. This command guides you through selecting artifact types and target platforms.
+Scaffold a new AAM package interactively. Creates a `package.agent.json` manifest and directory structure for artifacts. This command guides you through selecting which artifact types to include.
 
 Use this when starting a brand-new package from scratch. If you have existing artifacts, use [`aam pkg create`](create-package.md) instead.
 
@@ -42,20 +42,16 @@ License [Apache-2.0]: Apache-2.0
 What artifacts will this package contain?
   Skills [Y/n]: y
   Agents [Y/n]: y
-  Prompts [Y/n]: y
-  Instructions [Y/n]: n
-
-Which platforms should this package support?
-  Cursor [Y/n]: y
-  Claude [Y/n]: n
-  Copilot [Y/n]: n
-  Codex [Y/n]: n
+  Instructions [Y/n]: y
+  Commands [Y/n]: y
+  Rules [Y/n]: n
 
 Created my-package/
-  ├── aam.yaml
+  ├── package.agent.json
   ├── skills/
   ├── agents/
-  └── prompts/
+  ├── instructions/
+  └── commands/
 
 ✓ Package initialized: my-package
 ```
@@ -74,6 +70,8 @@ Starts interactive prompts with `my-custom-agent` as the default package name.
 aam pkg init @author/my-package
 ```
 
+The package directory is created as `author_my-package` (the `@` is stripped and `/` is replaced with `_`).
+
 ## Exit Codes
 
 | Code | Meaning |
@@ -87,12 +85,15 @@ After initialization, your package contains:
 
 ```
 my-package/
-├── aam.yaml              # Package manifest
+├── package.agent.json    # Package manifest
 ├── skills/               # Directory for skills (if selected)
 ├── agents/               # Directory for agents (if selected)
-├── prompts/               # Directory for prompts (if selected)
-└── instructions/         # Directory for instructions (if selected)
+├── instructions/         # Directory for instructions (if selected)
+├── commands/             # Directory for commands (if selected)
+└── rules/                # Directory for rules (if selected)
 ```
+
+For scoped packages (e.g. `@author/my-package`), the directory name uses an underscore instead of `/` and strips the `@`: `author_my-package/`.
 
 ## Related Commands
 
@@ -108,6 +109,6 @@ my-package/
 After initialization:
 
 1. Add artifact files to the appropriate directories
-2. Update `aam.yaml` to declare your artifacts
+2. Update `package.agent.json` to declare your artifacts
 3. Run `aam pkg validate` to check correctness
 4. Run `aam pkg pack` to build distributable archive

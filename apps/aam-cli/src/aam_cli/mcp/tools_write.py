@@ -16,20 +16,29 @@ from pathlib import Path
 from typing import Any
 
 from fastmcp import FastMCP
-
+from aam_cli.services.upgrade_service import run_upgrade
 from aam_cli.core.config import load_config
+from aam_cli.mcp.error_boundary import mcp_error_boundary
+from aam_cli.services import cache_service
+from aam_cli.services.client_init_service import SUPPORTED_PLATFORMS, orchestrate_init
 from aam_cli.services.config_service import set_config
+from aam_cli.services.convert_service import run_conversion
+from aam_cli.services.eval_service import run_evals
 from aam_cli.services.init_service import init_package
 from aam_cli.services.install_service import install_packages
-from aam_cli.services.package_service import create_package, uninstall_package
+from aam_cli.services.package_service import (
+    create_package,
+    create_package_from_source,
+    uninstall_package,
+)
 from aam_cli.services.publish_service import publish_package
 from aam_cli.services.registry_service import add_registry
 from aam_cli.services.source_service import (
     add_source,
     remove_source,
-    scan_source,
     update_source,
 )
+from aam_cli.services.test_service import run_hook_tests, run_skill_tests
 
 ################################################################################
 #                                                                              #
@@ -54,11 +63,19 @@ def register_write_tools(mcp: FastMCP) -> None:
     """
 
     @mcp.tool(tags={"write"})
+    @mcp_error_boundary
     def aam_install(
         packages: list[str],
         platform: str | None = None,
         force: bool = False,
         no_deploy: bool = False,
+        frozen: bool = False,
+        minimal: bool = False,
+        latest: bool = False,
+        dry_run: bool = False,
+        install_system_deps: bool = False,
+        skip_checks: bool = False,
+        install_mode: str | None = None,
     ) -> dict[str, Any]:
         """Install AAM packages from registries or local sources.
 
@@ -70,6 +87,13 @@ def register_write_tools(mcp: FastMCP) -> None:
             platform: Target platform override (default: from config).
             force: Reinstall even if already present.
             no_deploy: Download only, skip deployment.
+            frozen: Use exact versions from the lock file.
+            minimal: Select the lowest satisfying version.
+            latest: Use the newest available version.
+            dry_run: Resolve and check without installing.
+            install_system_deps: Auto-install missing system dependencies.
+            skip_checks: Skip system dependency pre-flight checks (for CI).
+            install_mode: Override install mode ("uaaps" or "plugin").
 
         Returns:
             Install result with lists of installed, already_installed,
@@ -83,9 +107,17 @@ def register_write_tools(mcp: FastMCP) -> None:
             platform=platform,
             force=force,
             no_deploy=no_deploy,
+            frozen=frozen,
+            minimal=minimal,
+            latest=latest,
+            dry_run=dry_run,
+            install_system_deps=install_system_deps,
+            skip_checks=skip_checks,
+            install_mode=install_mode,
         )
 
     @mcp.tool(tags={"write"})
+    @mcp_error_boundary
     def aam_uninstall(package_name: str) -> dict[str, Any]:
         """Uninstall an AAM package and remove deployed artifacts.
 
@@ -103,6 +135,7 @@ def register_write_tools(mcp: FastMCP) -> None:
         return uninstall_package(package_name=package_name)
 
     @mcp.tool(tags={"write"})
+    @mcp_error_boundary
     def aam_publish(
         registry: str | None = None,
         tag: str = "latest",
@@ -126,6 +159,7 @@ def register_write_tools(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"write"})
+    @mcp_error_boundary
     def aam_create_package(
         path: str = ".",
         name: str | None = None,
@@ -167,40 +201,13 @@ def register_write_tools(mcp: FastMCP) -> None:
         )
 
         if from_source:
-            # -----
-            # Source-based package creation
-            # -----
-            scan_result = scan_source(from_source)
-            source_artifacts = scan_result.get("artifacts", [])
-
-            # Filter by artifact names if specified
-            if artifacts:
-                source_artifacts = [
-                    a for a in source_artifacts
-                    if a.get("name") in artifacts
-                ]
-
-            # Filter by type if specified
-            if artifact_types:
-                source_artifacts = [
-                    a for a in source_artifacts
-                    if a.get("type") in artifact_types
-                ]
-
-            return {
-                "package_name": name or from_source.replace("/", "-"),
-                "version": version or "1.0.0",
-                "from_source": from_source,
-                "artifacts": source_artifacts,
-                "artifact_count": len(source_artifacts),
-                "provenance": {
-                    "source_type": "git",
-                    "source_name": from_source,
-                    "source_url": scan_result.get("source_url", ""),
-                    "source_ref": scan_result.get("source_ref", ""),
-                    "source_commit": scan_result.get("last_commit", ""),
-                },
-            }
+            return create_package_from_source(
+                source_name=from_source,
+                name=name,
+                version=version,
+                artifact_types=artifact_types,
+                artifacts=artifacts,
+            )
 
         return create_package(
             path=Path(path),
@@ -212,6 +219,7 @@ def register_write_tools(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"write"})
+    @mcp_error_boundary
     def aam_config_set(key: str, value: str) -> dict[str, Any]:
         """Set an AAM configuration value.
 
@@ -228,6 +236,7 @@ def register_write_tools(mcp: FastMCP) -> None:
         return set_config(key=key, value=value)
 
     @mcp.tool(tags={"write"})
+    @mcp_error_boundary
     def aam_registry_add(
         name: str,
         url: str,
@@ -251,6 +260,7 @@ def register_write_tools(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"write"})
+    @mcp_error_boundary
     def aam_init_package(
         name: str,
         path: str | None = None,
@@ -264,7 +274,7 @@ def register_write_tools(mcp: FastMCP) -> None:
         """Scaffold a brand-new AAM package with directories and manifest.
 
         Creates a package directory with artifact subdirectories
-        (skills/, agents/, prompts/, instructions/) and a pre-populated
+        (skills/, agents/, commands/, instructions/) and a pre-populated
         aam.yaml manifest. Use this when starting a new package from scratch,
         as opposed to aam_create_package which scans existing files.
 
@@ -277,7 +287,7 @@ def register_write_tools(mcp: FastMCP) -> None:
             author: Package author or organisation.
             license_name: SPDX licence identifier (default: "Apache-2.0").
             artifact_types: Artifact directories to scaffold. Choices:
-                skills, agents, prompts, instructions. Default: all four.
+                skills, agents, commands, instructions. Default: all four.
             platforms: Target platforms to configure. Choices:
                 cursor, claude, copilot, codex. Default: ["cursor"].
 
@@ -304,6 +314,7 @@ def register_write_tools(mcp: FastMCP) -> None:
     ############################################################################
 
     @mcp.tool(tags={"write"})
+    @mcp_error_boundary
     def aam_source_add(
         source: str,
         ref: str | None = None,
@@ -345,6 +356,7 @@ def register_write_tools(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"write"})
+    @mcp_error_boundary
     def aam_source_remove(
         source_name: str,
         purge_cache: bool = False,
@@ -376,6 +388,7 @@ def register_write_tools(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"write"})
+    @mcp_error_boundary
     def aam_source_update(
         source_name: str | None = None,
         update_all: bool = False,
@@ -414,6 +427,7 @@ def register_write_tools(mcp: FastMCP) -> None:
     ############################################################################
 
     @mcp.tool(tags={"write"})
+    @mcp_error_boundary
     def aam_upgrade(
         package_name: str | None = None,
         dry_run: bool = False,
@@ -435,72 +449,15 @@ def register_write_tools(mcp: FastMCP) -> None:
             Upgrade result dict with upgraded, skipped, and failed
             package lists.
         """
-        from rich.console import Console
-
-        from aam_cli.commands.outdated import check_outdated
-        from aam_cli.commands.upgrade import upgrade_packages
-        from aam_cli.core.workspace import read_lock_file
-
         logger.info(
             f"MCP tool aam_upgrade: package={package_name}, "
             f"dry_run={dry_run}, force={force}"
         )
-
-        config = load_config()
-        project_dir = Path.cwd()
-        lock = read_lock_file(project_dir)
-
-        # -----
-        # Step 1: Check outdated
-        # -----
-        outdated_result = check_outdated(lock, config)
-
-        if not outdated_result.outdated:
-            return {
-                "upgraded": [],
-                "skipped": [],
-                "failed": [],
-                "total_upgraded": 0,
-                "message": "All packages are up to date.",
-            }
-
-        # -----
-        # Step 2: Filter targets
-        # -----
-        targets = outdated_result.outdated
-        if package_name:
-            targets = [o for o in targets if o.name == package_name]
-            if not targets:
-                return {
-                    "upgraded": [],
-                    "skipped": [],
-                    "failed": [],
-                    "total_upgraded": 0,
-                    "message": (
-                        f"Package '{package_name}' is not outdated "
-                        f"or not installed from a source."
-                    ),
-                }
-
-        # -----
-        # Step 3: Execute upgrade
-        # -----
-        console = Console(quiet=True)
-        result = upgrade_packages(
-            targets=targets,
-            config=config,
-            project_dir=project_dir,
-            force=force,
+        return run_upgrade(
+            package_name=package_name,
             dry_run=dry_run,
-            console=console,
+            force=force,
         )
-
-        return {
-            "upgraded": result.upgraded,
-            "skipped": result.skipped,
-            "failed": result.failed,
-            "total_upgraded": result.total_upgraded,
-        }
 
     ############################################################################
     #                                                                          #
@@ -509,6 +466,7 @@ def register_write_tools(mcp: FastMCP) -> None:
     ############################################################################
 
     @mcp.tool(tags={"write"})
+    @mcp_error_boundary
     def aam_init(
         platform: str,
         skip_sources: bool = False,
@@ -528,11 +486,6 @@ def register_write_tools(mcp: FastMCP) -> None:
             Init result dict with platform, config_path,
             sources_added, and is_reconfigure flag.
         """
-        from aam_cli.services.client_init_service import (
-            SUPPORTED_PLATFORMS,
-            orchestrate_init,
-        )
-
         logger.info(
             f"MCP tool aam_init: platform='{platform}', "
             f"skip_sources={skip_sources}"
@@ -563,4 +516,158 @@ def register_write_tools(mcp: FastMCP) -> None:
             "is_reconfigure": result.is_reconfigure,
         }
 
-    logger.info("Registered 12 write MCP tools")
+    ############################################################################
+    #                                                                          #
+    # TEST, EVAL & CACHE TOOLS (UAAPS v0.5.0)                                 #
+    #                                                                          #
+    ############################################################################
+
+    @mcp.tool(tags={"write"})
+    @mcp_error_boundary
+    def aam_test(
+        skill_name: str | None = None,
+        hooks: bool = False,
+        event: str | None = None,
+    ) -> dict[str, Any]:
+        """Run deterministic tests for skills or hooks in the current package.
+
+        Args:
+            skill_name: Optional specific skill to test.
+            hooks: If True, run hook tests instead of skill tests.
+            event: Filter hook tests by event name.
+
+        Returns:
+            Dict with test results.
+        """
+        logger.info(
+            f"MCP tool aam_test: skill_name={skill_name}, "
+            f"hooks={hooks}, event={event}"
+        )
+
+        package_dir = Path.cwd().resolve()
+
+        if hooks:
+            suites = run_hook_tests(package_dir, event_name=event)
+        else:
+            suites = run_skill_tests(package_dir, skill_name=skill_name)
+
+        return {"suites": [s.to_dict() for s in suites]}
+
+    @mcp.tool(tags={"write"})
+    @mcp_error_boundary
+    def aam_eval(
+        target: str | None = None,
+        engine: str = "claude-code",
+        dry_run: bool = True,
+    ) -> dict[str, Any]:
+        """Run LLM-judged evaluations for skills in the current package.
+
+        Args:
+            target: Optional specific skill to evaluate.
+            engine: Eval engine to use (default: claude-code).
+            dry_run: If True, parse and preview cases without executing.
+
+        Returns:
+            Dict with eval results.
+        """
+        logger.info(
+            f"MCP tool aam_eval: target={target}, "
+            f"engine='{engine}', dry_run={dry_run}"
+        )
+
+        package_dir = Path.cwd().resolve()
+
+        suites = run_evals(
+            package_dir,
+            target=target,
+            engine=engine,
+            dry_run=dry_run,
+        )
+
+        return {"suites": [s.to_dict() for s in suites]}
+
+    @mcp.tool(tags={"write"})
+    @mcp_error_boundary
+    def aam_cache_clean(
+        package_spec: str | None = None,
+    ) -> dict[str, Any]:
+        """Clean the package download cache.
+
+        Args:
+            package_spec: Optional ``pkg@version`` to remove a specific entry.
+                If omitted, removes all cached packages.
+
+        Returns:
+            Dict with cleanup result.
+        """
+        logger.info(f"MCP tool aam_cache_clean: package_spec={package_spec}")
+
+        if package_spec and "@" in package_spec:
+            parts = package_spec.rsplit("@", 1)
+            if len(parts) == 2:
+                removed = cache_service.clean(parts[0], parts[1])
+                return {"removed": removed, "target": package_spec}
+
+        removed = cache_service.clean()
+        return {"removed": removed, "target": "all"}
+
+    ############################################################################
+    #                                                                          #
+    # CONVERT TOOL (UAAPS v0.4.0)                                             #
+    #                                                                          #
+    ############################################################################
+
+    @mcp.tool(tags={"write"})
+    @mcp_error_boundary
+    def aam_convert(
+        from_platform: str,
+        to_platform: str,
+        path: str = ".",
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Convert artifacts between AI platform formats.
+
+        Scans the project directory for artifacts belonging to
+        ``from_platform`` and writes equivalent files for ``to_platform``.
+        Supports instruction, agent, prompt, and skill artifact types.
+
+        Args:
+            from_platform: Source platform (cursor, copilot, claude, codex).
+            to_platform: Target platform (cursor, copilot, claude, codex).
+            path: Project root directory (default: current directory).
+            dry_run: If True, preview changes without writing files.
+
+        Returns:
+            Dict with source_platform, target_platform, converted_count,
+            failed_count, skipped_count, warning_count, and results list.
+        """
+        logger.info(
+            f"MCP tool aam_convert: from='{from_platform}', "
+            f"to='{to_platform}', path='{path}', dry_run={dry_run}"
+        )
+        report = run_conversion(
+            project_root=Path(path).resolve(),
+            source_platform=from_platform,
+            target_platform=to_platform,
+            dry_run=dry_run,
+        )
+
+        return {
+            "source_platform": report.source_platform,
+            "target_platform": report.target_platform,
+            "converted_count": report.converted_count,
+            "failed_count": report.failed_count,
+            "skipped_count": report.skipped_count,
+            "warning_count": report.warning_count,
+            "results": [
+                {
+                    "source_path": r.source_path,
+                    "target_path": r.target_path,
+                    "artifact_type": r.artifact_type,
+                    "warnings": r.warnings,
+                    "error": r.error,
+                    "skipped": r.skipped,
+                }
+                for r in report.results
+            ],
+        }

@@ -116,7 +116,7 @@ def pkg_create(
     """Create an AAM package from an existing project or remote source.
 
     Scans the project for artifacts, lets you pick which to include,
-    then generates ``aam.yaml`` and copies files into an AAM package.
+    then generates ``package.agent.json`` and copies files into an AAM package.
 
     Examples::
 

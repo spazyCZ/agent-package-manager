@@ -91,7 +91,7 @@ class TestAamInitWriteTool:
         # (the tool imports it lazily inside the function body)
         # -----
         with patch(
-            "aam_cli.services.client_init_service.orchestrate_init",
+            "aam_cli.mcp.tools_write.orchestrate_init",
             return_value=fake_result,
         ) as mock_orchestrate:
             result = tool_fn(platform="cursor", skip_sources=False)
@@ -122,7 +122,7 @@ class TestAamInitWriteTool:
         tool_fn = mock_mcp._tools["aam_init"]
 
         fake_result = ClientInitResult(
-            platform="claude",
+            platform="claude-code",
             registry_created=False,
             registry_name=None,
             sources_added=[],
@@ -131,16 +131,16 @@ class TestAamInitWriteTool:
         )
 
         with patch(
-            "aam_cli.services.client_init_service.orchestrate_init",
+            "aam_cli.mcp.tools_write.orchestrate_init",
             return_value=fake_result,
         ) as mock_orchestrate:
-            result = tool_fn(platform="claude", skip_sources=True)
+            result = tool_fn(platform="claude-code", skip_sources=True)
 
-        assert result["platform"] == "claude"
+        assert result["platform"] == "claude-code"
         assert result["sources_added"] == []
         assert result["is_reconfigure"] is True
         mock_orchestrate.assert_called_once_with(
-            platform="claude",
+            platform="claude-code",
             skip_sources=True,
         )
 
@@ -177,7 +177,7 @@ class TestAamInitInfoReadTool:
         mock_config.return_value = config
 
         with patch(
-            "aam_cli.services.client_init_service.detect_platform",
+            "aam_cli.mcp.tools_read.detect_platform",
             return_value="cursor",
         ):
             result = tool_fn()
@@ -201,7 +201,7 @@ class TestAamInitInfoReadTool:
         mock_config.return_value = config
 
         with patch(
-            "aam_cli.services.client_init_service.detect_platform",
+            "aam_cli.mcp.tools_read.detect_platform",
             return_value=None,
         ):
             result = tool_fn()

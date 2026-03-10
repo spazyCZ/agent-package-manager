@@ -367,11 +367,17 @@ def update(
     mat = result.get("materialization", {})
     if mat:
         pkg_count = mat.get("packages_created", 0)
+        skipped = mat.get("skipped_duplicates", 0)
         mat_errors = mat.get("errors", [])
         if pkg_count > 0:
             console.print(
                 f"  [green]✓[/green] Materialized {pkg_count} "
                 f"installable packages"
+            )
+        if skipped > 0:
+            console.print(
+                f"  [dim]ℹ[/dim] Skipped {skipped} cross-source "
+                f"duplicates (first source wins)"
             )
         for err in mat_errors:
             console.print(f"  [yellow]⚠[/yellow] {err}")

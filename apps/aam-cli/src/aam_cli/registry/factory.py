@@ -53,10 +53,17 @@ def create_registry(source: RegistrySource) -> Registry:
         local_path = parse_file_url(source.url)
         return LocalRegistry(name=source.name, root=local_path)
 
+    if source.type in ("http", "https"):
+        from aam_cli.commands.auth import get_token
+        from aam_cli.registry.http import HttpRegistry
+
+        token = get_token(source.url)
+        return HttpRegistry(url=source.url, token=token)
+
     # -----
     # Unsupported types raise immediately — no fallbacks
     # -----
     raise ValueError(
         f"Unsupported registry type '{source.type}'. "
-        "Only 'local' registries are supported in this version."
+        "Supported types: 'local', 'http', 'https'."
     )

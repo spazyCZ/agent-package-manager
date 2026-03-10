@@ -22,11 +22,14 @@ The doctor command performs the following checks:
    syntax and schema are valid.
 3. **Configuration validity** -- loads the merged configuration
    (global + project + defaults) and verifies it parses successfully.
-4. **Registry accessibility** -- checks that each configured registry
+4. **Default platform** -- reports the configured `default_platform`
+   and `active_platforms`. Warns if the platform is not a recognised
+   value (cursor, copilot, claude, codex).
+5. **Registry accessibility** -- checks that each configured registry
    path exists (local registries) or is reachable (HTTP registries).
-5. **Package integrity** -- verifies that every locked package has a
+6. **Package integrity** -- verifies that every locked package has a
    valid directory and a parseable manifest.
-6. **Incomplete installations** -- detects leftover staging directories
+7. **Incomplete installations** -- detects leftover staging directories
    from interrupted installs.
 
 ## Options
@@ -49,11 +52,12 @@ AAM Environment Diagnostics
   ✓ Global config: /home/user/.aam/config.yaml (valid)
   ✓ Project config: /home/user/my-project/.aam/config.yaml (not found, using defaults)
   ✓ Configuration loaded (1 registry configured)
+  ✓ Default platform: cursor — active: cursor
   ✓ Registry 'local' accessible at /home/user/.aam/registry
   ✓ Package 'code-review@1.0.0' — manifest valid, 3 artifacts
   ✓ No incomplete installations detected
 
-✓ 7/7 checks passed
+✓ 8/8 checks passed
 ```
 
 ### Example 2: Config file with errors
@@ -73,9 +77,10 @@ AAM Environment Diagnostics
   ✗ Global config: /home/user/.aam/config.yaml (invalid YAML: ...)
   ✓ Project config: /home/user/my-project/.aam/config.yaml (valid)
   ✗ Failed to load configuration: ...
+  ⚠ Could not determine default platform (config failed to load)
   ✓ No incomplete installations detected
 
-✗ 3/5 checks passed, 2 failures
+✗ 3/6 checks passed, 1 warnings, 2 failures
 ```
 
 ### Example 3: Missing package directory
@@ -92,10 +97,11 @@ AAM Environment Diagnostics
   ✓ Global config: /home/user/.aam/config.yaml (valid)
   ✓ Project config: /home/user/my-project/.aam/config.yaml (not found, using defaults)
   ✓ Configuration loaded (0 registries configured)
+  ✓ Default platform: cursor — active: cursor
   ⚠ Package 'my-agent' directory not found: ...
   ✓ No incomplete installations detected
 
-✓ 5/6 checks passed, 1 warnings
+✓ 6/7 checks passed, 1 warnings
 ```
 
 ## Checks reference
@@ -110,6 +116,8 @@ AAM Environment Diagnostics
 | Project config | fail | File exists but has invalid YAML or schema errors |
 | Configuration | pass | Merged configuration loaded successfully |
 | Configuration | fail | Merged configuration could not be parsed |
+| Default platform | pass | Platform is recognised and active platforms listed |
+| Default platform | warn | Platform not recognised, or config failed to load |
 | Registry | pass | Registry path exists or HTTP URL configured |
 | Registry | warn | Registry path not found on disk |
 | Package | pass | Package directory and manifest are valid |

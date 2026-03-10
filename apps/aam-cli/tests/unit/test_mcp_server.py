@@ -43,12 +43,14 @@ class TestMCPServerFactory:
 
     @pytest.mark.asyncio
     async def test_unit_create_server_read_only(self) -> None:
-        """Verify only 17 read tools listed when allow_write=False.
+        """Verify only 24 read tools listed when allow_write=False.
 
         7 spec-002 read tools + 6 spec-003 read tools
         + 2 spec-004 read tools (outdated, available)
         + 1 spec-004 init info tool
-        + 1 spec-005 recommend tool = 17.
+        + 1 spec-005 recommend tool
+        + 6 UAAPS v0.4.0 read tools (tree/why/check/audit/dedupe/prune)
+        + 1 cache_ls = 24.
         """
         server = create_mcp_server(allow_write=False)
         # -----
@@ -57,7 +59,7 @@ class TestMCPServerFactory:
         async with Client(server) as client:
             tools = await client.list_tools()
             tool_names = [t.name for t in tools]
-            assert len(tool_names) == 17
+            assert len(tool_names) == 24
             # -----
             # Spec 002 read-only tools
             # -----
@@ -94,16 +96,17 @@ class TestMCPServerFactory:
 
     @pytest.mark.asyncio
     async def test_unit_create_server_allow_write(self) -> None:
-        """Verify all 29 tools listed when allow_write=True.
+        """Verify all 40 tools listed when allow_write=True.
 
-        17 read tools + 7 spec-002 write + 3 spec-003 write
-        + 1 spec-004 upgrade + 1 spec-004 init = 29.
+        24 read tools + 7 spec-002 write + 3 spec-003 write
+        + 1 spec-004 upgrade + 1 spec-004 init
+        + 3 v0.5.0 write (test/eval/cache_clean) + 1 convert = 40.
         """
         server = create_mcp_server(allow_write=True)
         async with Client(server) as client:
             tools = await client.list_tools()
             tool_names = [t.name for t in tools]
-            assert len(tool_names) == 29
+            assert len(tool_names) == 40
             # -----
             # Check spec 002 write tools present
             # -----

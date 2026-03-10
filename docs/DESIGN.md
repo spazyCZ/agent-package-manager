@@ -2,8 +2,29 @@
 
 ## Detailed Design Document
 
-**Version:** 0.1.0-draft
-**Date:** 2026-02-05
+**Version:** 0.3.0 (UAAPS v0.5.0)
+**Date:** 2026-02-23
+
+> **Note:** This document covers the original 0.1.0 design. The canonical
+> package format specification for UAAPS v0.5.0 (the current implementation)
+> is maintained in
+> [`specs/006-uaaps-update/universal_package_specification.md`](
+> ../specs/006-uaaps-update/universal_package_specification.md).
+> Key changes introduced in UAAPS v0.5.0 (cumulative from v0.4.0):
+> - `package.agent.json` replaces `aam.yaml` as the primary manifest format
+> - `package.agent.lock` (JSON) replaces `aam-lock.yaml`
+> - `.agent-packages/` replaces `.aam/packages/`
+> - New artifact types: `commands`, `rules`, `hooks`, `mcp`
+> - **Prompts merged into commands** — there is no separate "prompt" artifact type; commands cover both parameterized templates and prompt-style artifacts
+> - New dependency types: `optionalDependencies`, `peerDependencies`
+> - System dependency declarations and pre-flight checks
+> - Client-side governance policies
+> - Six new dependency management CLI commands
+> - Structured permissions (`fs.read`, `fs.write`, `network.hosts`, `network.schemes`, `shell.allow`, `shell.binaries`)
+> - `installMode` field (`link` or `copy`) for controlling installation behavior
+> - New CLI commands: `aam test`, `aam eval`, `aam login`, `aam logout`, `aam whoami`, `aam cache clean`, `aam cache ls`
+> - Global lock file at `~/.aam/global.lock`
+> - Registry format uses JSON instead of YAML
 
 ---
 
@@ -68,22 +89,27 @@ AI practitioners create reusable artifacts (skills, prompts, agent configuration
 
 ### 2.1 Artifact Types
 
-AAM manages four artifact types:
+AAM manages the following artifact types:
 
 | Type | Description | Example |
 |------|-------------|---------|
 | **skill** | A workflow/capability package — SKILL.md with optional scripts, references, assets | `asvc-report` — generates ASVC audit reports |
 | **agent** | An AI agent definition — system prompt, personality, tool config, skill references | `asvc-audit` — an agent configured for ASVC auditing |
-| **prompt** | A reusable prompt template with optional variables | `audit-finding-prompt` — structured prompt for audit findings |
+| **command** | A parameterized template with variables and execution modes; subsumes the former "prompt" type | `audit-finding` — structured template for documenting audit findings |
 | **instruction** | Platform-specific rules, conventions, or guidelines | `python-standards` — coding rules for Python projects |
+| **rule** | Scoped configuration rules (globs, always-apply, agent-requested) | `python-lint` — linting rule for Python files |
+| **hook** | Lifecycle event handlers triggered by platform events | `pre-commit-check` — runs before commit |
+| **mcp** | MCP server declarations bundled with the package | `filesystem` — filesystem MCP server |
+
+> **Note:** The `prompt` artifact type from earlier versions has been merged into `command`. Commands support parameterized templates with variables, which covers the same use case as the former prompt type.
 
 ### 2.2 Package
 
 A **package** is a distributable unit that bundles one or more artifacts together. Every package has:
 
-- A **manifest** (`aam.yaml`) describing contents, metadata, and dependencies
+- A **manifest** (`package.agent.json` or `aam.yaml`) describing contents, metadata, and dependencies
 - **Artifact files** organized by type
-- An optional **lock file** (`aam-lock.yaml`) for reproducible installs
+- An optional **lock file** (`package.agent.lock`) for reproducible installs
 
 ### 2.3 Registry
 
@@ -146,13 +172,13 @@ artifacts:
       path: skills/asvc-report/
       description: "Skill for generating ASVC audit reports"
 
-  prompts:
+  commands:
     - name: audit-finding
-      path: prompts/audit-finding.md
-      description: "Structured prompt for documenting audit findings"
+      path: commands/audit-finding.md
+      description: "Structured command template for documenting audit findings"
     - name: audit-summary
-      path: prompts/audit-summary.md
-      description: "Prompt for generating executive audit summaries"
+      path: commands/audit-summary.md
+      description: "Command template for generating executive audit summaries"
 
   instructions:
     - name: asvc-coding-standards
@@ -205,8 +231,14 @@ keywords: list[string]
 artifacts:
   agents: list[ArtifactRef]
   skills: list[ArtifactRef]
-  prompts: list[ArtifactRef]
+  commands: list[ArtifactRef]    # Includes parameterized templates (formerly "prompts")
   instructions: list[ArtifactRef]
+  rules: list[ArtifactRef]
+  hooks: list[ArtifactRef]
+  mcp: list[ArtifactRef]
+
+# Install mode (optional)
+installMode: string          # "copy" (default) or "link" — controls how artifacts are placed
 
 # ArtifactRef schema:
 #   name: string        — artifact identifier (required)
@@ -261,7 +293,7 @@ asvc-auditor/
 │       │   └── generate_report.py
 │       └── references/
 │           └── asvc-framework.md
-├── prompts/
+├── commands/
 │   ├── audit-finding.md
 │   └── audit-summary.md
 └── instructions/
@@ -445,8 +477,8 @@ skills:
   - asvc-report          # from this package
   - generic-auditor      # from dependency
 
-# Prompts this agent uses
-prompts:
+# Commands (parameterized templates) this agent uses
+commands:
   - audit-finding        # from this package
   - audit-summary        # from this package
 
@@ -481,9 +513,9 @@ configurations, and documentation against ASVC framework requirements.
 4. Generate actionable remediation guidance
 ```
 
-### 4.3 Prompt
+### 4.3 Command (formerly Prompt)
 
-A **prompt** is a reusable prompt template with optional variable interpolation.
+A **command** is a parameterized template with variables and execution modes. Commands subsume the former "prompt" artifact type — any prompt template is now expressed as a command.
 
 **File format:** Markdown with YAML frontmatter.
 
@@ -665,6 +697,19 @@ Configuration:
   registry list                  List configured registries
   registry remove <name>         Remove a registry source
 
+Quality:
+  test                           Run all package tests declared in quality.tests
+  eval                           Run all package evals declared in quality.evals
+
+Authentication:
+  login                          Authenticate with an HTTP registry
+  logout                         Remove stored credentials for a registry
+  whoami                         Show the currently authenticated user
+
+Cache:
+  cache clean                    Remove all cached packages
+  cache ls                       List cached package archives
+
 Utilities:
   mcp serve                      Start MCP stdio server for IDE integration
   doctor                         Check environment and diagnose issues
@@ -736,10 +781,10 @@ Deploying to cursor...
   → skill: asvc-report        → .cursor/skills/author--asvc-report/
   → skill: generic-auditor    → .cursor/skills/author--generic-auditor/
   → agent: asvc-audit         → .cursor/rules/agent-author--asvc-audit.mdc
-  → prompt: audit-finding     → .cursor/prompts/audit-finding.md
+  → command: audit-finding    → .cursor/prompts/audit-finding.md
   → instruction: asvc-standards → .cursor/rules/asvc-standards.mdc
 
-Installed 3 packages (2 skills, 1 agent, 2 prompts, 1 instruction)
+Installed 3 packages (2 skills, 1 agent, 2 commands, 1 instruction)
 ```
 
 #### `aam pkg create [path]`
@@ -782,10 +827,10 @@ Detection patterns:
     ─ agents/*/agent.yaml                (AAM convention)
     ─ .cursor/rules/agent-*.mdc          (Cursor agent rules)
 
-  Prompts:
-    ─ prompts/*.md                       (AAM convention)
-    ─ .cursor/prompts/*.md               (Cursor prompts)
-    ─ .github/prompts/*.md               (Copilot prompts)
+  Commands (including former prompts):
+    ─ commands/*.md                      (AAM convention)
+    ─ .cursor/prompts/*.md               (Cursor prompts → commands)
+    ─ .github/prompts/*.md               (Copilot prompts → commands)
 
   Instructions:
     ─ instructions/*.md                  (AAM convention)
@@ -902,10 +947,10 @@ Arguments:
 
 Options:
   --all                      Include all detected artifacts without interactive selection
-  --type TYPE                Filter detection to specific types (repeatable: skills, agents, prompts, instructions)
+  --type TYPE                Filter detection to specific types (repeatable: skills, agents, commands, instructions)
   --organize MODE            File organization: copy (default), reference, move
   --include PATH             Manually include a file/directory (repeatable)
-  --include-as TYPE          Artifact type for --include (skill, agent, prompt, instruction)
+  --include-as TYPE          Artifact type for --include (skill, agent, command, instruction)
   --name NAME                Package name (skip interactive prompt)
   --version VERSION          Package version (skip interactive prompt)
   --description DESC         Package description (skip interactive prompt)
@@ -959,7 +1004,7 @@ Created asvc-auditor/
   ├── aam.yaml
   ├── agents/
   ├── skills/
-  └── prompts/
+  └── commands/
 ```
 
 #### `aam deploy`
@@ -1028,7 +1073,7 @@ aam registry init ~/my-packages --default
 ```bash
 $ aam list
 Installed packages:
-  asvc-auditor     1.0.0   3 artifacts (1 agent, 1 skill, 2 prompts)
+  asvc-auditor     1.0.0   3 artifacts (1 agent, 1 skill, 2 commands)
   generic-auditor  1.2.3   1 artifact  (1 skill)
   report-templates 2.1.0   2 artifacts (1 skill, 1 instruction)
 
@@ -1051,8 +1096,8 @@ asvc-auditor@1.0.0
   Artifacts:
     agent: asvc-audit           — Agent configured for ASVC compliance auditing
     skill: asvc-report          — Skill for generating ASVC audit reports
-    prompt: audit-finding       — Structured prompt for documenting audit findings
-    prompt: audit-summary       — Prompt for generating executive audit summaries
+    command: audit-finding      — Structured template for documenting audit findings
+    command: audit-summary      — Template for generating executive audit summaries
 
   Dependencies:
     generic-auditor  >=1.0.0  (installed: 1.2.3)
@@ -1079,7 +1124,7 @@ aam convert -s codex -t cursor --force
 **Options:**
 - `--source-platform` / `-s` (required): Source platform
 - `--target-platform` / `-t` (required): Target platform
-- `--type`: Filter by artifact type (`instruction`, `agent`, `prompt`, `skill`)
+- `--type`: Filter by artifact type (`instruction`, `agent`, `command`, `skill`)
 - `--dry-run`: Preview conversions without writing files
 - `--force`: Overwrite existing targets (creates `.bak` backup)
 - `--verbose`: Show detailed workaround instructions for lossy conversions
@@ -1088,7 +1133,7 @@ aam convert -s codex -t cursor --force
 - Skills: Direct copy (universal `SKILL.md` format)
 - Instructions: Field mapping (e.g. Cursor `globs` → Copilot `applyTo`)
 - Agents: Metadata filtering (platform-specific fields dropped with warnings)
-- Prompts: Frontmatter stripping or addition as needed
+- Commands: Frontmatter stripping or addition as needed
 
 See `docs/specs/SPEC-convert-command.md` for the full conversion matrix.
 
@@ -1138,7 +1183,7 @@ mcp = FastMCP(
     name="aam",
     instructions=(
         "AAM (Agent Artifact Manager) — package manager for AI agent artifacts. "
-        "Search, install, publish, and manage skills, agents, prompts, and instructions "
+        "Search, install, publish, and manage skills, agents, commands, and instructions "
         "across platforms like Cursor, Claude, GitHub Copilot, and Codex."
     ),
     version="0.1.0",
@@ -1226,7 +1271,7 @@ def aam_search(
     Args:
         query: Search terms to match against package names and descriptions.
         limit: Maximum number of results to return (default: 10).
-        package_type: Filter by artifact type (skill, agent, prompt, instruction).
+        package_type: Filter by artifact type (skill, agent, command, instruction).
 
     Returns:
         List of matching packages with name, version, description, and author.
@@ -1363,7 +1408,7 @@ def aam_create_package(
         name: Package name (auto-detected if not provided).
         version: Package version (default: '0.1.0').
         description: Package description.
-        artifact_types: Filter to specific types (skill, agent, prompt, instruction).
+        artifact_types: Filter to specific types (skill, agent, command, instruction).
         include_all: Include all detected artifacts without interactive selection.
 
     Returns:
@@ -1660,7 +1705,7 @@ packages:
     description: "ASVC audit agent with reporting capabilities"
     latest: 1.1.0
     keywords: [audit, asvc, compliance]
-    artifacts: [agent, skill, prompt]
+    artifacts: [agent, skill, command]
   - name: "@author/generic-auditor"
     description: "General-purpose code auditing skill"
     latest: 1.2.3
@@ -1727,7 +1772,7 @@ packages:
     description: "ASVC compliance auditor agent"
     latest: "1.1.0"
     keywords: [audit, compliance]
-    artifact_types: [agent, skill, prompt]
+    artifact_types: [agent, skill, command]
     updated_at: "2026-02-07T14:00:00Z"
   - name: shared-skills
     description: "Reusable utility skills"
@@ -2089,7 +2134,7 @@ class PlatformAdapter(Protocol):
 
     def deploy_skill(self, skill_path: Path, skill_ref: ArtifactRef, config: dict) -> Path
     def deploy_agent(self, agent_path: Path, agent_ref: ArtifactRef, config: dict) -> Path
-    def deploy_prompt(self, prompt_path: Path, prompt_ref: ArtifactRef, config: dict) -> Path
+    def deploy_command(self, cmd_path: Path, cmd_ref: ArtifactRef, config: dict) -> Path
     def deploy_instruction(self, instr_path: Path, instr_ref: ArtifactRef, config: dict) -> Path
     def undeploy(self, artifact_name: str, artifact_type: str) -> None
     def list_deployed(self) -> list[tuple[str, str, Path]]  # (name, type, path)
@@ -2119,7 +2164,7 @@ This convention applies to all platforms (Cursor, Copilot, Claude, Codex) and al
 |---------------|----------------|--------|
 | skill | `.cursor/skills/<fs-name>/` or `~/.cursor/skills/<fs-name>/` | SKILL.md (as-is) |
 | agent | `.cursor/rules/agent-<fs-name>.mdc` | Converted to rule with `alwaysApply: true` |
-| prompt | `.cursor/prompts/<fs-name>.md` | Stored as markdown (referenced by skills/agents) |
+| command | `.cursor/prompts/<fs-name>.md` | Stored as markdown (parameterized templates) |
 | instruction | `.cursor/rules/<fs-name>.mdc` | Converted to `.mdc` rule with appropriate `globs` |
 
 > **Note:** `<fs-name>` is the filesystem-safe name. For scoped packages, `@author/asvc-report` becomes `author--asvc-report`. See [Section 8.0](#80-scoped-name-filesystem-mapping) for the mapping convention.
@@ -2142,7 +2187,7 @@ alwaysApply: true
 - asvc-report: Generate ASVC audit reports
 - generic-auditor: General-purpose code auditing
 
-## Available Prompts
+## Available Commands
 - audit-finding: Use for documenting individual findings
 - audit-summary: Use for executive summaries
 ```
@@ -2167,7 +2212,7 @@ alwaysApply: {{true if no globs, false otherwise}}
 |---------------|-----------------|--------|
 | skill | `.github/skills/<name>/SKILL.md` | SKILL.md (as-is, Copilot supports this) |
 | agent | `.github/agents/<name>.agent.md` | Discrete markdown file |
-| prompt | `.github/prompts/<name>.md` | Stored as markdown |
+| command | `.github/prompts/<name>.md` | Stored as markdown (parameterized templates) |
 | instruction | `.github/instructions/<name>.instructions.md` | Discrete markdown file |
 
 **Agent deployment:**
@@ -2198,7 +2243,7 @@ Each instruction is deployed as a discrete `.instructions.md` file in `.github/i
 |---------------|----------------|--------|
 | skill | `.claude/skills/<name>/SKILL.md` | SKILL.md (as-is) |
 | agent | `.claude/agents/<name>.md` | Discrete markdown file |
-| prompt | `.claude/prompts/<name>.md` | Stored as markdown |
+| command | `.claude/commands/<name>.md` | Stored as markdown (parameterized templates) |
 | instruction | `CLAUDE.md` (appended section) | Markdown section |
 
 **Agent deployment:**
@@ -2232,7 +2277,7 @@ AAM uses the `<!-- BEGIN AAM -->` / `<!-- END AAM -->` markers to manage its own
 |---------------|---------------|--------|
 | skill | `~/.codex/skills/<name>/` | SKILL.md (as-is, native format) |
 | agent | `AGENTS.md` (appended section) | Markdown section |
-| prompt | `~/.codex/prompts/<name>.md` | Stored as markdown |
+| command | `~/.codex/commands/<name>.md` | Stored as markdown (parameterized templates) |
 | instruction | `AGENTS.md` (appended section) | Markdown section |
 
 ### 8.5 Adapter Summary
@@ -2246,9 +2291,9 @@ flowchart TB
     Package --> ClaudeAdapter["Claude Adapter"]
     Package --> CodexAdapter["Codex Adapter"]
     
-    CursorAdapter --> CursorFiles[".cursor/<br/>rules/, skills/, prompts/"]
-    CopilotAdapter --> CopilotFiles[".github/<br/>agents/, instructions/<br/>skills/, prompts/"]
-    ClaudeAdapter --> ClaudeFiles["CLAUDE.md<br/>.claude/agents/, skills/, prompts/"]
+    CursorAdapter --> CursorFiles[".cursor/<br/>rules/, skills/, commands/"]
+    CopilotAdapter --> CopilotFiles[".github/<br/>agents/, instructions/<br/>skills/, commands/"]
+    ClaudeAdapter --> ClaudeFiles["CLAUDE.md<br/>.claude/agents/, skills/, commands/"]
     CodexAdapter --> CodexFiles["AGENTS.md<br/>~/.codex/skills/"]
     
     style Package fill:#e1f5fe
@@ -2341,12 +2386,13 @@ Project (.aam/config.yaml)  >  Global (~/.aam/config.yaml)  >  Defaults
 ~/.aam/
 ├── config.yaml             # Global configuration
 ├── credentials.yaml        # API tokens (chmod 600, never commit)
+├── global.lock             # Global lock file for globally-installed packages
 ├── cache/                  # Downloaded package cache
 │   ├── asvc-auditor-1.0.0.aam
 │   └── generic-auditor-1.2.3.aam
 └── registries/             # Cached registry indexes
     └── aam-central/
-        └── index.yaml
+        └── index.json
 ```
 
 **`credentials.yaml` format (sensitive — chmod 600):**
@@ -2373,7 +2419,7 @@ my-project/
 │       │   │   ├── aam.yaml
 │       │   │   ├── agents/
 │       │   │   ├── skills/
-│       │   │   └── prompts/
+│       │   │   └── commands/
 │       │   └── generic-auditor/
 │       │       ├── aam.yaml
 │       │       └── skills/
@@ -2390,7 +2436,7 @@ my-project/
 │   │   └── asvc-coding-standards.mdc
 │   └── prompts/
 │       ├── audit-finding.md
-│       └── audit-summary.md
+│       └── audit-summary.md          # commands deployed as prompts on Cursor
 ├── CLAUDE.md               # Deployed Claude instructions (sections)
 ├── .claude/
 │   └── agents/             # Deployed Claude agents
@@ -2439,7 +2485,7 @@ aam/
 │   ├── __init__.py
 │   ├── manifest.py         # aam.yaml parsing and validation
 │   ├── package.py          # Package model
-│   ├── artifact.py         # Artifact models (Skill, Agent, Prompt, Instruction)
+│   ├── artifact.py         # Artifact models (Skill, Agent, Command, Instruction)
 │   ├── resolver.py         # Dependency resolution
 │   ├── installer.py        # Download + extract + deploy orchestration
 │   ├── version.py          # Semver parsing and constraint matching
@@ -2565,7 +2611,7 @@ class PlatformAdapter(Protocol):
 
     def deploy_skill(self, skill_path: Path, skill_ref: ArtifactRef, config: dict) -> Path: ...
     def deploy_agent(self, agent_path: Path, agent_ref: ArtifactRef, config: dict) -> Path: ...
-    def deploy_prompt(self, prompt_path: Path, prompt_ref: ArtifactRef, config: dict) -> Path: ...
+    def deploy_command(self, cmd_path: Path, cmd_ref: ArtifactRef, config: dict) -> Path: ...
     def deploy_instruction(self, instr_path: Path, instr_ref: ArtifactRef, config: dict) -> Path: ...
     def undeploy(self, artifact_name: str, artifact_type: str) -> None: ...
     def list_deployed(self) -> list[tuple[str, str, Path]]: ...
@@ -2691,7 +2737,7 @@ description: Generate ASVC compliance audit reports with structured findings, ri
 
 ## Workflow
 1. Analyze target artifacts against ASVC controls
-2. Document findings using the audit-finding prompt
+2. Document findings using the audit-finding command
 3. Run report generation script
 4. Review and finalize
 
@@ -2730,9 +2776,9 @@ Write `agents/asvc-audit/system-prompt.md`:
 You are an ASVC compliance auditor...
 ```
 
-#### Step 4: Create prompts
+#### Step 4: Create commands
 
-Write `prompts/audit-finding.md` and `prompts/audit-summary.md`.
+Write `commands/audit-finding.md` and `commands/audit-summary.md`.
 
 #### Step 5: Declare dependency
 
@@ -2769,8 +2815,8 @@ Deploying to cursor...
   → skill: asvc-report        → .cursor/skills/author--asvc-report/
   → skill: generic-auditor    → .cursor/skills/author--generic-auditor/
   → agent: asvc-audit         → .cursor/rules/agent-author--asvc-audit.mdc
-  → prompt: audit-finding     → .cursor/prompts/audit-finding.md
-  → prompt: audit-summary     → .cursor/prompts/audit-summary.md
+  → command: audit-finding    → .cursor/prompts/audit-finding.md
+  → command: audit-summary    → .cursor/prompts/audit-summary.md
 
 Installed 2 packages, deployed 5 artifacts
 ```
@@ -2838,7 +2884,7 @@ Phase 1 ships a **fully working tool with zero infrastructure requirements**. Al
 - [ ] `aam-lock.yaml` integrity verification
 - [ ] Plugin system for community-contributed adapters
 - [ ] Multi-version dependency support (if needed)
-- [ ] Prompt variable interpolation at deploy time
+- [ ] Command variable interpolation at deploy time
 
 ---
 
@@ -2846,7 +2892,7 @@ Phase 1 ships a **fully working tool with zero infrastructure requirements**. Al
 
 | Feature | AAM | pip | npm | Codex skill-installer |
 |---------|-----|-----|-----|----------------------|
-| Artifact types | 4 (skill, agent, prompt, instruction) | 1 (Python package) | 1 (JS package) | 1 (skill) |
+| Artifact types | 7 (skill, agent, command, instruction, rule, hook, mcp) | 1 (Python package) | 1 (JS package) | 1 (skill) |
 | Multi-platform deploy | Yes (Cursor, Copilot, Claude, Codex) | No | No | No |
 | Dependency resolution | Yes (semver) | Yes | Yes | No |
 | Registry | Git-based + local | PyPI | npm registry | GitHub repo |

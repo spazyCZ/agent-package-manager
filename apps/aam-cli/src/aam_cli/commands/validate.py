@@ -17,7 +17,7 @@ import click
 from pydantic import ValidationError
 from rich.console import Console
 
-from aam_cli.core.manifest import load_manifest
+from aam_cli.core.manifest import load_manifest_universal
 
 ################################################################################
 #                                                                              #
@@ -37,8 +37,9 @@ logger = logging.getLogger(__name__)
 
 @click.command()
 @click.argument("path", default=".", type=click.Path(exists=True))
+@click.option("--permissions", is_flag=True, help="Include permissions security audit")
 @click.pass_context
-def validate(ctx: click.Context, path: str) -> None:
+def validate(ctx: click.Context, path: str, permissions: bool) -> None:
     """Validate the package manifest and artifacts.
 
     Checks that ``aam.yaml`` is syntactically correct, all required fields
@@ -51,23 +52,14 @@ def validate(ctx: click.Context, path: str) -> None:
     """
     console: Console = ctx.obj["console"]
     pkg_path = Path(path).resolve()
-    manifest_file = pkg_path / "aam.yaml" if pkg_path.is_dir() else pkg_path
-
-    if not manifest_file.exists():
-        console.print(
-            "[red]Error:[/red] No aam.yaml found. Run 'aam create-package' or 'aam init' first."
-        )
-        ctx.exit(1)
-        return
 
     errors: list[str] = []
-    pkg_dir = manifest_file.parent
 
     # -----
     # Step 1: Parse and validate the manifest schema
     # -----
     try:
-        manifest = load_manifest(pkg_dir)
+        manifest = load_manifest_universal(pkg_path)
     except FileNotFoundError as exc:
         console.print(f"[red]Error:[/red] {exc}")
         ctx.exit(1)
@@ -85,11 +77,23 @@ def validate(ctx: click.Context, path: str) -> None:
         ctx.exit(1)
         return
     except Exception as exc:
-        console.print(f"[red]Error:[/red] Failed to parse aam.yaml: {exc}")
+        console.print(f"[red]Error:[/red] Failed to parse manifest: {exc}")
         ctx.exit(1)
         return
 
+    pkg_dir = pkg_path if pkg_path.is_dir() else pkg_path.parent
+
     console.print(f"Validating [bold]{manifest.name}@{manifest.version}[/bold]...\n")
+    console.print(f"  [dim]manifest_format: {manifest.manifest_format}[/dim]")
+
+    # -----
+    # Show auto-discovery note when artifacts were not explicitly declared
+    # -----
+    if manifest.artifacts is None:
+        console.print(
+            "  [dim]artifacts_discovered: true "
+            "(no artifacts section — auto-discovery active)[/dim]"
+        )
 
     # -----
     # Step 2: Report manifest field validations
@@ -135,6 +139,21 @@ def validate(ctx: click.Context, path: str) -> None:
             console.print(f"  [green]✓[/green] {dep_name}: {constraint}")
     else:
         console.print("  [green]✓[/green] No dependencies declared")
+
+    # -----
+    # Step 4b: Permissions audit (optional or always shown)
+    # -----
+    if permissions or manifest.permissions is not None:
+        from aam_cli.services.validate_service import _audit_permissions
+
+        perm_warnings = _audit_permissions(manifest)
+
+        console.print("\n[bold]Permissions Audit:[/bold]")
+        if perm_warnings:
+            for warning in perm_warnings:
+                console.print(f"  [yellow]⚠[/yellow] {warning}")
+        else:
+            console.print("  [green]✓[/green] Permissions look reasonable")
 
     # -----
     # Step 5: Summary

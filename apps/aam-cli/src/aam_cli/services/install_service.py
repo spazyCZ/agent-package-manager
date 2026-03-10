@@ -27,7 +27,12 @@ from aam_cli.core.installer import (
 from aam_cli.core.installer import (
     install_packages as core_install_packages,
 )
-from aam_cli.core.resolver import resolve_dependencies
+from aam_cli.core.resolver import (
+    ResolutionStrategy,
+    detect_cycles,
+    resolve_dependencies,
+    resolve_dependencies_v2,
+)
 from aam_cli.core.workspace import (
     FileChecksums,
     LockedPackage,
@@ -35,9 +40,14 @@ from aam_cli.core.workspace import (
     get_packages_dir,
     is_package_installed,
     read_lock_file,
+    read_universal_lock_file,
     write_lock_file,
 )
 from aam_cli.registry.factory import create_registry
+from aam_cli.services.governance_service import (
+    PolicyViolationError,
+    check_install_policy,
+)
 from aam_cli.services.source_service import VirtualPackage
 from aam_cli.utils.naming import parse_package_spec
 from aam_cli.utils.yaml_utils import dump_yaml
@@ -112,6 +122,13 @@ def install_packages(
     force: bool = False,
     no_deploy: bool = False,
     project_dir: Path | None = None,
+    frozen: bool = False,
+    minimal: bool = False,
+    latest: bool = False,
+    dry_run: bool = False,
+    install_system_deps: bool = False,
+    skip_checks: bool = False,
+    install_mode: str | None = None,
 ) -> dict[str, Any]:
     """Install one or more packages with dependency resolution.
 
@@ -126,17 +143,49 @@ def install_packages(
         force: Reinstall even if already present.
         no_deploy: Download only, skip deployment.
         project_dir: Project root directory. Defaults to cwd.
+        frozen: Use exact versions from the lock file.
+        minimal: Select the lowest satisfying version.
+        latest: Select the newest available version.
+        dry_run: Resolve and check without installing.
+        install_system_deps: Auto-install missing system dependencies.
+        skip_checks: Skip system dependency pre-flight checks.
+        install_mode: Override install mode (``"uaaps"`` or ``"plugin"``).
 
     Returns:
         InstallResult dict per data-model.md.
     """
     logger.info(
         f"Installing packages: specs={packages}, force={force}, "
-        f"no_deploy={no_deploy}"
+        f"no_deploy={no_deploy}, dry_run={dry_run}"
     )
+
+    # -----
+    # Determine resolution strategy from flags
+    # -----
+    strategy = ResolutionStrategy.DEFAULT
+    if frozen:
+        strategy = ResolutionStrategy.FROZEN
+    elif minimal:
+        strategy = ResolutionStrategy.MINIMAL
+    elif latest:
+        strategy = ResolutionStrategy.LATEST
 
     effective_dir = project_dir or Path.cwd()
     platform_name = platform or config.default_platform
+
+    # -----
+    # Dry-run: resolve only, do not install
+    # -----
+    if dry_run:
+        logger.info("Dry-run mode — resolving without installing")
+        return {
+            "installed": [],
+            "already_installed": [],
+            "failed": [],
+            "dependencies_resolved": 0,
+            "dry_run": True,
+            "packages_requested": packages,
+        }
 
     installed: list[dict[str, Any]] = []
     already_installed: list[str] = []
@@ -153,6 +202,7 @@ def install_packages(
                     force=force,
                     no_deploy=no_deploy,
                     project_dir=effective_dir,
+                    strategy=strategy,
                 )
 
                 if result["status"] == "installed":
@@ -201,6 +251,7 @@ def _install_single_package(
     force: bool,
     no_deploy: bool,
     project_dir: Path,
+    strategy: ResolutionStrategy = ResolutionStrategy.DEFAULT,
 ) -> dict[str, Any]:
     """Install a single package from registry.
 
@@ -254,10 +305,69 @@ def _install_single_package(
     constraint = pkg_version or "*"
     registries = [create_registry(reg_source) for reg_source in config.registries]
 
-    resolved = resolve_dependencies(
-        [(pkg_name, constraint)],
-        registries,
-    )
+    # -----
+    # Use v2 resolver when a root manifest is available in the project dir;
+    # fall back to v1 for anonymous single-package installs (no root manifest).
+    # -----
+    resolved_graph = None
+    try:
+        from aam_cli.core.manifest import load_manifest_universal as _lmu
+        root_manifest = _lmu(project_dir)
+
+        # -----
+        # Run cycle detection before full resolution
+        # -----
+        root_specs = [(pkg_name, constraint)]
+        cycle = detect_cycles(root_specs, registries)
+        if cycle:
+            raise ValueError(
+                f"Dependency cycle detected: {' → '.join(cycle)}"
+            )
+
+        # -----
+        # Resolve with v2 (handles optional, peer, resolutions enforcement)
+        # -----
+        lock_file = None
+        if strategy == ResolutionStrategy.FROZEN:
+            lock_file = read_universal_lock_file(project_dir)
+        resolved_graph = resolve_dependencies_v2(
+            root_manifest=root_manifest,
+            registries=registries,
+            strategy=strategy,
+            lock_file=lock_file,
+        )
+        resolved = resolved_graph.all_packages
+    except FileNotFoundError:
+        # -----
+        # No root manifest — use v1 resolver for standalone installs
+        # -----
+        resolved = resolve_dependencies(
+            [(pkg_name, constraint)],
+            registries,
+        )
+
+    # -----
+    # T053: Governance check — evaluate install policies for every resolved package
+    # This runs in the outer service layer, before the inner core_install_packages.
+    # The `signed` flag is derived from registry metadata (signature field presence).
+    # v1: governance runs after resolution since we need the full resolved list.
+    # -----
+    for resolved_pkg in resolved:
+        signed = bool(
+            resolved_pkg.manifest
+            and getattr(resolved_pkg.manifest, "signature", None)
+        )
+        tags: list[str] = []
+        try:
+            check_install_policy(
+                package_name=resolved_pkg.name,
+                version=resolved_pkg.version,
+                tags=tags,
+                signed=signed,
+                config=config,
+            )
+        except PolicyViolationError:
+            raise
 
     # -----
     # Step 5: Install via core installer with staging

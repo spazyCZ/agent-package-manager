@@ -198,7 +198,7 @@ Use dots to access nested keys:
 
 `aam config set` modifies the **global** configuration in `~/.aam/config.yaml`.
 
-Project-level configuration (`./.aam/config.yaml`) is not currently supported via CLI but can be created manually.
+Project-level configuration (`./.aam/config.yaml`) is not set by this command. Create project overrides with `aam init --project`, then edit `.aam/config.yaml` directly.
 
 ### Quoting Values
 

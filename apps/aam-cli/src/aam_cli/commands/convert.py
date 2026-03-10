@@ -36,7 +36,8 @@ logger = logging.getLogger(__name__)
 #                                                                              #
 ################################################################################
 
-ARTIFACT_TYPES = ("instruction", "agent", "prompt", "skill")
+# UAAPS v0.4.0 adds rule, hooks, and mcp to the supported artifact types
+ARTIFACT_TYPES = ("instruction", "agent", "prompt", "skill", "rule", "hooks", "mcp")
 
 ################################################################################
 #                                                                              #
@@ -98,11 +99,25 @@ def convert(
     Reads artifacts from one platform's format and writes them in
     another's format. Supports Cursor, Copilot, Claude, and Codex.
 
+    Supported artifact types:
+
+    \b
+      instruction  Convert instruction/rules files
+      agent        Convert agent definition files
+      prompt       Convert prompt files
+      skill        Convert skill directories
+      rule         Convert rule files (UAAPS v0.4.0 — with applyTo/globs mapping)
+      hooks        Convert lifecycle hook config (event name translation)
+      mcp          Convert MCP server config (servers.json ↔ .mcp.json ↔ .vscode/mcp.json)
+
     Examples::
 
         aam convert -s cursor -t copilot
         aam convert -s copilot -t claude --type instruction --dry-run
         aam convert -s codex -t cursor --force
+        aam convert -s copilot -t cursor --type rule
+        aam convert -s claude -t cursor --type hooks --dry-run
+        aam convert -s claude -t copilot --type mcp
     """
     console: Console = ctx.obj["console"]
     project_dir = Path.cwd()

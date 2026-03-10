@@ -2,7 +2,7 @@
 
 All platform adapters (Cursor, Claude, Copilot, Codex) conform to this
 Protocol so that the installer can deploy artifacts to any platform
-through a unified API.
+through a unified API.  UAAPS v0.5.0 merged prompts into commands.
 
 Contracts reference: cli-commands.md Section 9.
 """
@@ -81,24 +81,6 @@ class PlatformAdapter(Protocol):
         """
         ...
 
-    def deploy_prompt(
-        self,
-        prompt_path: Path,
-        prompt_ref: ArtifactRef,
-        config: dict[str, str],
-    ) -> Path:
-        """Deploy a prompt artifact.
-
-        Args:
-            prompt_path: Path to the extracted prompt file.
-            prompt_ref: Artifact reference from the manifest.
-            config: Platform-specific configuration.
-
-        Returns:
-            Path where the prompt was deployed.
-        """
-        ...
-
     def deploy_instruction(
         self,
         instr_path: Path,
@@ -117,12 +99,80 @@ class PlatformAdapter(Protocol):
         """
         ...
 
+    def deploy_command(
+        self,
+        cmd_path: Path,
+        cmd_ref: ArtifactRef,
+        config: dict[str, str],
+    ) -> Path:
+        """Deploy a slash-command artifact.
+
+        Args:
+            cmd_path: Path to the command markdown file.
+            cmd_ref: Artifact reference from the manifest.
+            config: Platform-specific configuration.
+
+        Returns:
+            Path where the command was deployed.
+        """
+        ...
+
+    def deploy_rule(
+        self,
+        rule_path: Path,
+        rule_ref: ArtifactRef,
+        config: dict[str, str],
+    ) -> Path:
+        """Deploy a rule artifact.
+
+        Args:
+            rule_path: Path to the rule markdown file (may have frontmatter).
+            rule_ref: Artifact reference from the manifest.
+            config: Platform-specific configuration.
+
+        Returns:
+            Path where the rule was deployed.
+        """
+        ...
+
+    def deploy_hook(
+        self,
+        hooks_json_path: Path,
+        config: dict[str, str],
+    ) -> Path:
+        """Deploy lifecycle hooks from a hooks.json file.
+
+        Args:
+            hooks_json_path: Path to the package ``hooks/hooks.json`` file.
+            config: Platform-specific configuration including ``package_name``.
+
+        Returns:
+            Path to the platform hooks config file written/updated.
+        """
+        ...
+
+    def deploy_mcp(
+        self,
+        servers_json_path: Path,
+        config: dict[str, str],
+    ) -> Path:
+        """Deploy MCP server configuration from a servers.json file.
+
+        Args:
+            servers_json_path: Path to the package ``mcp/servers.json`` file.
+            config: Platform-specific configuration including ``package_name``.
+
+        Returns:
+            Path to the platform MCP config file written/updated.
+        """
+        ...
+
     def undeploy(self, artifact_name: str, artifact_type: str) -> None:
         """Remove a deployed artifact.
 
         Args:
             artifact_name: Name of the artifact to remove.
-            artifact_type: Type of artifact (skill, agent, prompt, instruction).
+            artifact_type: Type of artifact (skill, agent, command, instruction).
         """
         ...
 

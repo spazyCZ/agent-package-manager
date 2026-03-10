@@ -3,7 +3,9 @@
 Creates the appropriate :class:`PlatformAdapter` implementation based
 on the platform name string from configuration or CLI flags.
 
-Supported platforms: ``cursor``, ``copilot``, ``claude``, ``codex``.
+Supported platforms: ``cursor``, ``copilot``, ``claude-code``, ``codex``.
+
+Legacy alias ``claude`` is accepted and maps to ``claude-code``.
 """
 
 ################################################################################
@@ -32,8 +34,32 @@ logger = logging.getLogger(__name__)
 #                                                                              #
 ################################################################################
 
-# All supported platform names
-SUPPORTED_PLATFORMS: tuple[str, ...] = ("cursor", "copilot", "claude", "codex")
+# Canonical platform identifiers (UAAPS v0.6.0)
+SUPPORTED_PLATFORMS: tuple[str, ...] = ("cursor", "copilot", "claude-code", "codex")
+
+# Legacy aliases accepted for backward compatibility
+PLATFORM_ALIASES: dict[str, str] = {
+    "claude": "claude-code",
+}
+
+################################################################################
+#                                                                              #
+# HELPERS                                                                      #
+#                                                                              #
+################################################################################
+
+
+def normalize_platform(platform_name: str) -> str:
+    """Resolve legacy aliases to canonical platform identifiers.
+
+    Args:
+        platform_name: Platform name (may be a legacy alias).
+
+    Returns:
+        Canonical platform identifier.
+    """
+    return PLATFORM_ALIASES.get(platform_name, platform_name)
+
 
 ################################################################################
 #                                                                              #
@@ -45,9 +71,12 @@ SUPPORTED_PLATFORMS: tuple[str, ...] = ("cursor", "copilot", "claude", "codex")
 def create_adapter(platform_name: str, project_root: Path) -> PlatformAdapter:
     """Create a platform adapter instance for the given platform name.
 
+    Accepts both canonical identifiers (``"claude-code"``) and legacy
+    aliases (``"claude"``).
+
     Args:
-        platform_name: One of ``"cursor"``, ``"copilot"``, ``"claude"``,
-            or ``"codex"``.
+        platform_name: One of ``"cursor"``, ``"copilot"``, ``"claude-code"``,
+            or ``"codex"`` (legacy ``"claude"`` also accepted).
         project_root: Root directory of the user's project.
 
     Returns:
@@ -56,24 +85,29 @@ def create_adapter(platform_name: str, project_root: Path) -> PlatformAdapter:
     Raises:
         ValueError: If the platform name is not supported.
     """
-    logger.info(f"Creating adapter: platform='{platform_name}', root='{project_root}'")
+    canonical = normalize_platform(platform_name)
+    logger.info(
+        f"Creating adapter: platform='{canonical}'"
+        f"{f' (alias from {platform_name!r})' if canonical != platform_name else ''}"
+        f", root='{project_root}'"
+    )
 
-    if platform_name == "cursor":
+    if canonical == "cursor":
         from aam_cli.adapters.cursor import CursorAdapter
 
         return CursorAdapter(project_root)
 
-    if platform_name == "copilot":
+    if canonical == "copilot":
         from aam_cli.adapters.copilot import CopilotAdapter
 
         return CopilotAdapter(project_root)
 
-    if platform_name == "claude":
+    if canonical == "claude-code":
         from aam_cli.adapters.claude import ClaudeAdapter
 
         return ClaudeAdapter(project_root)
 
-    if platform_name == "codex":
+    if canonical == "codex":
         from aam_cli.adapters.codex import CodexAdapter
 
         return CodexAdapter(project_root)
@@ -85,7 +119,7 @@ def create_adapter(platform_name: str, project_root: Path) -> PlatformAdapter:
 
 
 def is_supported_platform(platform_name: str) -> bool:
-    """Check if a platform name is supported.
+    """Check if a platform name is supported (including legacy aliases).
 
     Args:
         platform_name: Platform name to check.
@@ -93,4 +127,4 @@ def is_supported_platform(platform_name: str) -> bool:
     Returns:
         ``True`` if the platform is supported.
     """
-    return platform_name in SUPPORTED_PLATFORMS
+    return normalize_platform(platform_name) in SUPPORTED_PLATFORMS

@@ -74,7 +74,7 @@ class TestDetectPlatform:
     def test_detect_claude(self, tmp_path: Path) -> None:
         """Detect claude when CLAUDE.md file exists."""
         (tmp_path / "CLAUDE.md").write_text("# Claude\n")
-        assert detect_platform(tmp_path) == "claude"
+        assert detect_platform(tmp_path) == "claude-code"
 
     def test_detect_codex(self, tmp_path: Path) -> None:
         """Detect codex when .codex/ dir exists."""
@@ -145,7 +145,7 @@ class TestSupportedPlatforms:
 
     def test_all_platforms_present(self) -> None:
         """Verify all expected platforms are listed."""
-        expected = {"cursor", "copilot", "claude", "codex"}
+        expected = {"cursor", "copilot", "claude-code", "codex"}
         assert set(SUPPORTED_PLATFORMS) == expected
 
     def test_platforms_is_list(self) -> None:
@@ -203,7 +203,7 @@ class TestOrchestrateInit:
         mock_aam_dir.return_value = tmp_path
         mock_load.return_value = MagicMock(default_platform="cursor")
 
-        result = orchestrate_init(platform="claude", skip_sources=True)
+        result = orchestrate_init(platform="claude-code", skip_sources=True)
 
         assert result.sources_added == []
         mock_sources.assert_not_called()
@@ -259,9 +259,9 @@ class TestClientInitCommand:
         from aam_cli.main import cli
 
         mock_aam_dir.return_value = tmp_path
-        mock_detect.return_value = "claude"
+        mock_detect.return_value = "claude-code"
         mock_orchestrate.return_value = ClientInitResult(
-            platform="claude",
+            platform="claude-code",
             registry_created=False,
             registry_name=None,
             config_path=tmp_path / "config.yaml",
@@ -270,7 +270,7 @@ class TestClientInitCommand:
         result = runner.invoke(cli, ["init", "--yes"])
         assert result.exit_code == 0
         mock_orchestrate.assert_called_once_with(
-            platform="claude",
+            platform="claude-code",
             skip_sources=False,
         )
 

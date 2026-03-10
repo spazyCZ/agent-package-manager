@@ -16,12 +16,12 @@ Tests the 6 new read tools:
 ################################################################################
 
 import asyncio
+import json
 import logging
 from unittest.mock import patch
 
 import pytest
 from fastmcp import Client
-from fastmcp.exceptions import ToolError
 
 from aam_cli.mcp.server import create_mcp_server
 
@@ -155,7 +155,7 @@ class TestSourceReadTools:
             self._run_async(check())
 
     def test_unit_aam_source_scan_not_found(self) -> None:
-        """Verify error when source_name not in config."""
+        """Verify error dict when source_name not in config."""
         with patch(
             "aam_cli.mcp.tools_read.scan_source",
             side_effect=ValueError("[AAM_SOURCE_NOT_FOUND] Source 'missing' not found"),
@@ -164,11 +164,13 @@ class TestSourceReadTools:
 
             async def check() -> None:
                 async with Client(server) as client:
-                    with pytest.raises(ToolError, match="AAM_SOURCE_NOT_FOUND"):
-                        await client.call_tool(
-                            "aam_source_scan",
-                            {"source_name": "missing"},
-                        )
+                    result = await client.call_tool(
+                        "aam_source_scan",
+                        {"source_name": "missing"},
+                    )
+                    data = json.loads(result.content[0].text)
+                    assert "error" in data
+                    assert data["error_code"] == "AAM_SOURCE_NOT_FOUND"
 
             self._run_async(check())
 
@@ -253,7 +255,7 @@ class TestSourceReadTools:
             self._run_async(check())
 
     def test_unit_aam_source_diff_not_found(self) -> None:
-        """Verify error when source not found."""
+        """Verify error dict when source not found."""
         with patch(
             "aam_cli.mcp.tools_read.update_source",
             side_effect=ValueError("[AAM_SOURCE_NOT_FOUND] Source 'missing' not found"),
@@ -262,11 +264,13 @@ class TestSourceReadTools:
 
             async def check() -> None:
                 async with Client(server) as client:
-                    with pytest.raises(ToolError, match="AAM_SOURCE_NOT_FOUND"):
-                        await client.call_tool(
-                            "aam_source_diff",
-                            {"source_name": "missing"},
-                        )
+                    result = await client.call_tool(
+                        "aam_source_diff",
+                        {"source_name": "missing"},
+                    )
+                    data = json.loads(result.content[0].text)
+                    assert "error" in data
+                    assert data["error_code"] == "AAM_SOURCE_NOT_FOUND"
 
             self._run_async(check())
 
@@ -331,7 +335,7 @@ class TestSourceReadTools:
             self._run_async(check())
 
     def test_unit_aam_verify_not_installed(self) -> None:
-        """Verify error when package not installed."""
+        """Verify error dict when package not installed."""
         with patch(
             "aam_cli.mcp.tools_read.verify_package",
             side_effect=ValueError(
@@ -342,11 +346,13 @@ class TestSourceReadTools:
 
             async def check() -> None:
                 async with Client(server) as client:
-                    with pytest.raises(ToolError, match="AAM_PACKAGE_NOT_INSTALLED"):
-                        await client.call_tool(
-                            "aam_verify",
-                            {"package_name": "missing"},
-                        )
+                    result = await client.call_tool(
+                        "aam_verify",
+                        {"package_name": "missing"},
+                    )
+                    data = json.loads(result.content[0].text)
+                    assert "error" in data
+                    assert data["error_code"] == "AAM_PACKAGE_NOT_INSTALLED"
 
             self._run_async(check())
 
@@ -387,7 +393,7 @@ class TestSourceReadTools:
             self._run_async(check())
 
     def test_unit_aam_diff_not_installed(self) -> None:
-        """Verify error when package not installed."""
+        """Verify error dict when package not installed."""
         with patch(
             "aam_cli.mcp.tools_read.diff_package",
             side_effect=ValueError(
@@ -398,10 +404,12 @@ class TestSourceReadTools:
 
             async def check() -> None:
                 async with Client(server) as client:
-                    with pytest.raises(ToolError, match="AAM_PACKAGE_NOT_INSTALLED"):
-                        await client.call_tool(
-                            "aam_diff",
-                            {"package_name": "missing"},
-                        )
+                    result = await client.call_tool(
+                        "aam_diff",
+                        {"package_name": "missing"},
+                    )
+                    data = json.loads(result.content[0].text)
+                    assert "error" in data
+                    assert data["error_code"] == "AAM_PACKAGE_NOT_INSTALLED"
 
             self._run_async(check())

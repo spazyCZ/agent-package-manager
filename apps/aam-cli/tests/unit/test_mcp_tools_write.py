@@ -1,6 +1,8 @@
 """Unit tests for MCP write tools."""
 
+import json
 import logging
+from typing import Any
 from unittest.mock import patch
 
 from fastmcp import Client
@@ -8,6 +10,34 @@ from fastmcp import Client
 from aam_cli.mcp.server import create_mcp_server
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_mcp_result(result: Any) -> Any:
+    """Extract parsed data from the MCP call_tool result.
+
+    FastMCP's ``Client.call_tool`` returns a ``CallToolResult``.
+    We prefer parsing ``.content[0].text`` (plain JSON) because
+    ``.data`` may contain Pydantic wrapper objects for list returns.
+    Falls back to ``.data`` for empty collections or dict results.
+
+    Args:
+        result: Raw ``CallToolResult`` from ``client.call_tool``.
+
+    Returns:
+        Parsed data (dict or list) from the tool response.
+    """
+    content = getattr(result, "content", result)
+    if isinstance(content, list) and len(content) > 0:
+        item = content[0]
+        if hasattr(item, "text"):
+            return json.loads(item.text)
+
+    if hasattr(result, "data") and result.data is not None:
+        data = result.data
+        if isinstance(data, (dict, list)):
+            return data
+
+    return {}
 
 
 class TestWriteTools:
@@ -32,6 +62,11 @@ class TestWriteTools:
                     async with Client(server) as client:
                         result = await client.call_tool("aam_install", {"packages": ["test-pkg"]})
                         assert result is not None
+                        data = _parse_mcp_result(result)
+                        assert isinstance(data, dict)
+                        assert len(data["installed"]) == 1
+                        assert data["installed"][0]["name"] == "test-pkg"
+                        assert data["failed"] == []
                 self._run_async(check())
 
     def test_unit_aam_uninstall_success(self) -> None:
@@ -46,6 +81,10 @@ class TestWriteTools:
                 async with Client(server) as client:
                     result = await client.call_tool("aam_uninstall", {"package_name": "test-pkg"})
                     assert result is not None
+                    data = _parse_mcp_result(result)
+                    assert isinstance(data, dict)
+                    assert data["package_name"] == "test-pkg"
+                    assert data["files_removed"] == 3
             self._run_async(check())
 
     def test_unit_aam_publish_success(self) -> None:
@@ -60,6 +99,11 @@ class TestWriteTools:
                 async with Client(server) as client:
                     result = await client.call_tool("aam_publish", {})
                     assert result is not None
+                    data = _parse_mcp_result(result)
+                    assert isinstance(data, dict)
+                    assert data["package_name"] == "test-pkg"
+                    assert data["version"] == "1.0.0"
+                    assert data["registry"] == "local"
             self._run_async(check())
 
     def test_unit_aam_create_package_success(self) -> None:
@@ -74,6 +118,11 @@ class TestWriteTools:
                 async with Client(server) as client:
                     result = await client.call_tool("aam_create_package", {"path": "."})
                     assert result is not None
+                    data = _parse_mcp_result(result)
+                    assert isinstance(data, dict)
+                    assert data["package_name"] == "test"
+                    assert data["total_artifacts"] == 1
+                    assert "manifest_path" in data
             self._run_async(check())
 
     def test_unit_aam_config_set_success(self) -> None:
@@ -85,6 +134,11 @@ class TestWriteTools:
                 async with Client(server) as client:
                     result = await client.call_tool("aam_config_set", {"key": "default_platform", "value": "cursor"})
                     assert result is not None
+                    data = _parse_mcp_result(result)
+                    assert isinstance(data, dict)
+                    assert data["key"] == "default_platform"
+                    assert data["value"] == "cursor"
+                    assert data["source"] == "global"
             self._run_async(check())
 
     def test_unit_aam_registry_add_success(self) -> None:
@@ -99,6 +153,11 @@ class TestWriteTools:
                 async with Client(server) as client:
                     result = await client.call_tool("aam_registry_add", {"name": "new-reg", "url": "file:///tmp/reg"})
                     assert result is not None
+                    data = _parse_mcp_result(result)
+                    assert isinstance(data, dict)
+                    assert data["name"] == "new-reg"
+                    assert data["url"] == "file:///tmp/reg"
+                    assert data["is_default"] is False
             self._run_async(check())
 
     def test_unit_aam_init_package_success(self) -> None:
@@ -119,6 +178,11 @@ class TestWriteTools:
                         "aam_init_package", {"name": "new-pkg"}
                     )
                     assert result is not None
+                    data = _parse_mcp_result(result)
+                    assert isinstance(data, dict)
+                    assert data["package_name"] == "new-pkg"
+                    assert "package_dir" in data
+                    assert "manifest_path" in data
             self._run_async(check())
 
     def test_unit_write_tools_hidden_in_read_only(self) -> None:

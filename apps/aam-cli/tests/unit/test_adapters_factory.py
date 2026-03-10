@@ -53,10 +53,10 @@ class TestAdapterFactory:
         assert adapter.name == "copilot"
 
     def test_unit_create_claude_adapter(self, tmp_path: Path) -> None:
-        """Factory returns ClaudeAdapter for 'claude' platform."""
-        adapter = create_adapter("claude", tmp_path)
+        """Factory returns ClaudeAdapter for 'claude-code' platform."""
+        adapter = create_adapter("claude-code", tmp_path)
         assert isinstance(adapter, ClaudeAdapter)
-        assert adapter.name == "claude"
+        assert adapter.name == "claude-code"
 
     def test_unit_create_codex_adapter(self, tmp_path: Path) -> None:
         """Factory returns CodexAdapter for 'codex' platform."""

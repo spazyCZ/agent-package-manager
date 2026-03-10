@@ -192,7 +192,7 @@ def analyze_repository(path: Path | str | None = None) -> RepoContext:
     if (root / ".github" / "copilot").is_dir():
         ctx.platform = "copilot"
     if (root / "CLAUDE.md").is_file():
-        ctx.platform = "claude"
+        ctx.platform = "claude-code"
 
     # -----
     # General fallbacks

@@ -1,6 +1,8 @@
 # Artifacts
 
-**Artifacts** are the four types of AI agent components that AAM manages: skills, agents, prompts, and instructions. Each artifact type serves a specific purpose and has its own schema, conventions, and deployment rules.
+**Artifacts** are the deployable components that AAM manages. Each
+artifact type serves a specific purpose and has its own schema,
+conventions, and deployment rules.
 
 ## Overview
 
@@ -10,10 +12,15 @@
 | **Agent** | AI agent definition | agent.yaml + system-prompt.md | All (converted per platform) |
 | **Prompt** | Reusable prompt template | Markdown with YAML frontmatter | All |
 | **Instruction** | Rules and guidelines | Markdown with YAML frontmatter | All (merged or separate) |
+| **Command** | User-invoked slash command | Markdown file | Cursor, Claude (converted for others) |
+| **Rule** | Persistent context (coding standards) | RULE.md with frontmatter | Cursor, Copilot (converted for others) |
+| **Hook** | Lifecycle event handler | hooks.json | All (event names translated) |
+| **MCP Server Config** | External tool access definition | servers.json | All (format adapted per platform) |
 
-## ArtifactRef Model
+## ArtifactRef model
 
-All artifacts in `aam.yaml` are declared using the `ArtifactRef` schema:
+All artifacts in `package.agent.json` (or `aam.yaml`) are declared
+using the `ArtifactRef` schema:
 
 ```yaml
 artifacts:
@@ -492,7 +499,154 @@ This allows AAM to manage its sections without disturbing user-written content.
 
 ---
 
-## Artifact Composition
+## Commands
+
+A **command** is a user-invoked slash command — a prompt that the user
+explicitly triggers (as opposed to skills, which the model invokes).
+Commands are stored as markdown files in the `commands/` directory.
+
+### Directory structure
+
+```
+commands/
+├── review.md          # /review command
+├── refactor.md        # /refactor command
+└── explain.md         # /explain command
+```
+
+### Platform deployment
+
+| Platform | Deployment |
+|----------|-----------|
+| **Cursor** | `.cursor/commands/<name>.md` |
+| **Claude** | Registered as slash commands |
+| **Copilot** | No native commands; converted to prompt files |
+| **Codex** | No native commands; appended to `AGENTS.md` |
+
+---
+
+## Rules
+
+A **rule** defines persistent context — coding standards, conventions,
+or guidelines — that is always loaded into the agent's context. Rules
+differ from instructions in that they carry structured metadata
+(`applyTo` globs, `alwaysApply` flags) and are deployed as
+platform-native rule files.
+
+### Directory structure
+
+```
+rules/
+├── python-style/
+│   └── RULE.md        # Rule with frontmatter
+└── security/
+    └── RULE.md
+```
+
+### Platform deployment
+
+| Platform | Deployment |
+|----------|-----------|
+| **Cursor** | `.cursor/rules/<name>.mdc` with frontmatter |
+| **Copilot** | `.github/instructions/<name>.instructions.md` with `applyTo` |
+| **Claude** | Appended to `CLAUDE.md` |
+| **Codex** | Appended to `AGENTS.md` |
+
+---
+
+## Hooks
+
+A **hook** is a lifecycle event handler that runs at zero token cost —
+triggered by events like `onFileCreate`, `onSave`, or `onInstall`.
+Hooks are defined in a single `hooks/hooks.json` file.
+
+### File format
+
+```json
+{
+  "hooks": [
+    {
+      "event": "onFileCreate",
+      "pattern": "**/*.py",
+      "action": "run",
+      "command": "ruff check --fix"
+    },
+    {
+      "event": "onSave",
+      "pattern": "**/*.ts",
+      "action": "run",
+      "command": "prettier --write"
+    }
+  ]
+}
+```
+
+### Platform deployment
+
+Hook event names are translated between platforms during deployment
+and conversion. Not all platforms support all event types.
+
+---
+
+## MCP server configs
+
+An **MCP server config** defines external tool access for AI agents —
+database connections, API endpoints, file system access, and custom
+tool servers.
+
+### File format
+
+```json
+{
+  "servers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-filesystem"],
+      "env": {}
+    }
+  }
+}
+```
+
+### Platform deployment
+
+| Platform | Config location |
+|----------|----------------|
+| **Cursor** | `.cursor/mcp.json` |
+| **Claude** | `claude_desktop_config.json` or `.mcp/servers.json` |
+| **Copilot** | `.vscode/mcp.json` |
+| **Codex** | Codex MCP configuration |
+
+---
+
+## Artifact auto-discovery
+
+When a manifest omits the `artifacts` section, AAM automatically
+discovers artifacts by scanning standard directories:
+
+| Directory | Artifact type |
+|-----------|--------------|
+| `skills/` | Skills |
+| `agents/` | Agents |
+| `commands/` | Commands |
+| `rules/` | Rules |
+| `hooks/hooks.json` | Hooks |
+| `mcp/servers.json` | MCP server configs |
+| `prompts/` | Prompts |
+| `instructions/` | Instructions (legacy) |
+
+Custom paths can be declared in the manifest to override conventions:
+
+```json
+{
+  "skills": "./custom-skills",
+  "commands": "./my-commands"
+}
+```
+
+---
+
+## Artifact composition
 
 Artifacts work together to create complete AI agent capabilities:
 

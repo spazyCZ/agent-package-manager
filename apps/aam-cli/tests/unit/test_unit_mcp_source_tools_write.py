@@ -14,12 +14,12 @@ Tests the 3 new write tools and the extended aam_create_package:
 ################################################################################
 
 import asyncio
+import json
 import logging
 from unittest.mock import patch
 
 import pytest
 from fastmcp import Client
-from fastmcp.exceptions import ToolError
 
 from aam_cli.mcp.server import create_mcp_server
 
@@ -75,7 +75,7 @@ class TestSourceWriteTools:
             self._run_async(check())
 
     def test_unit_aam_source_add_duplicate(self) -> None:
-        """Verify AAM_SOURCE_ALREADY_EXISTS error."""
+        """Verify AAM_SOURCE_ALREADY_EXISTS error dict."""
         with patch(
             "aam_cli.mcp.tools_write.add_source",
             side_effect=ValueError(
@@ -86,16 +86,18 @@ class TestSourceWriteTools:
 
             async def check() -> None:
                 async with Client(server) as client:
-                    with pytest.raises(ToolError, match="AAM_SOURCE_ALREADY_EXISTS"):
-                        await client.call_tool(
-                            "aam_source_add",
-                            {"source": "openai/skills"},
-                        )
+                    result = await client.call_tool(
+                        "aam_source_add",
+                        {"source": "openai/skills"},
+                    )
+                    data = json.loads(result.content[0].text)
+                    assert "error" in data
+                    assert data["error_code"] == "AAM_SOURCE_ALREADY_EXISTS"
 
             self._run_async(check())
 
     def test_unit_aam_source_add_invalid_url(self) -> None:
-        """Verify AAM_SOURCE_URL_INVALID error."""
+        """Verify AAM_SOURCE_URL_INVALID error dict."""
         with patch(
             "aam_cli.mcp.tools_write.add_source",
             side_effect=ValueError(
@@ -106,16 +108,18 @@ class TestSourceWriteTools:
 
             async def check() -> None:
                 async with Client(server) as client:
-                    with pytest.raises(ToolError, match="AAM_SOURCE_URL_INVALID"):
-                        await client.call_tool(
-                            "aam_source_add",
-                            {"source": "not-a-url"},
-                        )
+                    result = await client.call_tool(
+                        "aam_source_add",
+                        {"source": "not-a-url"},
+                    )
+                    data = json.loads(result.content[0].text)
+                    assert "error" in data
+                    assert data["error_code"] == "AAM_SOURCE_URL_INVALID"
 
             self._run_async(check())
 
     def test_unit_aam_source_add_clone_failed(self) -> None:
-        """Verify AAM_GIT_CLONE_FAILED error."""
+        """Verify AAM_GIT_CLONE_FAILED error dict."""
         with patch(
             "aam_cli.mcp.tools_write.add_source",
             side_effect=RuntimeError(
@@ -126,11 +130,13 @@ class TestSourceWriteTools:
 
             async def check() -> None:
                 async with Client(server) as client:
-                    with pytest.raises(ToolError, match="AAM_GIT_CLONE_FAILED"):
-                        await client.call_tool(
-                            "aam_source_add",
-                            {"source": "openai/skills"},
-                        )
+                    result = await client.call_tool(
+                        "aam_source_add",
+                        {"source": "openai/skills"},
+                    )
+                    data = json.loads(result.content[0].text)
+                    assert "error" in data
+                    assert data["error_code"] == "AAM_GIT_CLONE_FAILED"
 
             self._run_async(check())
 
@@ -162,7 +168,7 @@ class TestSourceWriteTools:
             self._run_async(check())
 
     def test_unit_aam_source_remove_not_found(self) -> None:
-        """Verify AAM_SOURCE_NOT_FOUND error."""
+        """Verify AAM_SOURCE_NOT_FOUND error dict."""
         with patch(
             "aam_cli.mcp.tools_write.remove_source",
             side_effect=ValueError(
@@ -173,11 +179,13 @@ class TestSourceWriteTools:
 
             async def check() -> None:
                 async with Client(server) as client:
-                    with pytest.raises(ToolError, match="AAM_SOURCE_NOT_FOUND"):
-                        await client.call_tool(
-                            "aam_source_remove",
-                            {"source_name": "missing"},
-                        )
+                    result = await client.call_tool(
+                        "aam_source_remove",
+                        {"source_name": "missing"},
+                    )
+                    data = json.loads(result.content[0].text)
+                    assert "error" in data
+                    assert data["error_code"] == "AAM_SOURCE_NOT_FOUND"
 
             self._run_async(check())
 
@@ -238,7 +246,7 @@ class TestSourceWriteTools:
             self._run_async(check())
 
     def test_unit_aam_source_update_not_found(self) -> None:
-        """Verify error when source not found."""
+        """Verify error dict when source not found."""
         with patch(
             "aam_cli.mcp.tools_write.update_source",
             side_effect=ValueError(
@@ -249,11 +257,13 @@ class TestSourceWriteTools:
 
             async def check() -> None:
                 async with Client(server) as client:
-                    with pytest.raises(ToolError, match="AAM_SOURCE_NOT_FOUND"):
-                        await client.call_tool(
-                            "aam_source_update",
-                            {"source_name": "missing"},
-                        )
+                    result = await client.call_tool(
+                        "aam_source_update",
+                        {"source_name": "missing"},
+                    )
+                    data = json.loads(result.content[0].text)
+                    assert "error" in data
+                    assert data["error_code"] == "AAM_SOURCE_NOT_FOUND"
 
             self._run_async(check())
 
@@ -291,20 +301,23 @@ class TestSourceWriteTools:
 
     def test_unit_aam_create_package_from_source(self) -> None:
         """Verify from_source + artifacts parameters work."""
-        mock_scan = {
-            "source_name": "openai/skills",
-            "source_url": "https://github.com/openai/skills.git",
-            "source_ref": "main",
-            "last_commit": "abc123",
+        mock_result = {
+            "package_name": "openai-skills",
+            "manifest_path": "/tmp/aam.yaml",
+            "version": "1.0.0",
+            "artifact_count": 1,
             "artifacts": [
-                {"name": "code-review", "type": "skill", "path": "skills/code-review"},
-                {"name": "code-gen", "type": "skill", "path": "skills/code-gen"},
+                {"name": "code-review", "type": "skill"},
             ],
-            "artifact_count": 2,
+            "provenance": {
+                "source_name": "openai/skills",
+                "source_url": "https://github.com/openai/skills.git",
+                "commit": "abc123",
+            },
         }
         with patch(
-            "aam_cli.mcp.tools_write.scan_source",
-            return_value=mock_scan,
+            "aam_cli.mcp.tools_write.create_package_from_source",
+            return_value=mock_result,
         ):
             server = create_mcp_server(allow_write=True)
 

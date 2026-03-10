@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 #                                                                              #
 ################################################################################
 
-SUPPORTED_TARGETS = ["cursor", "copilot", "claude", "codex", "all"]
+SUPPORTED_TARGETS = ["cursor", "copilot", "claude-code", "codex", "all"]
 
 ################################################################################
 #                                                                              #

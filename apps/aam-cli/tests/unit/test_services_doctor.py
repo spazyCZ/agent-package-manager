@@ -14,6 +14,8 @@ import yaml
 
 from aam_cli.services.doctor_service import (
     _check_config_files,
+    _check_default_platform,
+    _check_uaaps_conformance,
     run_diagnostics,
 )
 
@@ -66,6 +68,8 @@ class TestDoctorService:
         """All checks pass when config, lock, and packages are valid."""
         mock_config = MagicMock()
         mock_config.registries = []
+        mock_config.default_platform = "cursor"
+        mock_config.active_platforms = ["cursor"]
 
         mock_lock = MagicMock()
         mock_lock.packages = {}
@@ -110,6 +114,8 @@ class TestDoctorService:
         """Verify that run_diagnostics includes global_config and project_config checks."""
         mock_config = MagicMock()
         mock_config.registries = []
+        mock_config.default_platform = "cursor"
+        mock_config.active_platforms = ["cursor"]
 
         mock_lock = MagicMock()
         mock_lock.packages = {}
@@ -187,11 +193,11 @@ class TestCheckConfigFiles:
         assert "(valid)" in pc["message"]
 
     def test_unit_doctor_config_files_global_only(self, tmp_path) -> None:
-        """Only global config exists; project reports not found."""
+        """Only global config exists; project reports pass (not found is normal)."""
         global_cfg = tmp_path / "global" / "config.yaml"
         project_cfg = tmp_path / "project" / ".aam" / "config.yaml"
 
-        _write_yaml(global_cfg, {"default_platform": "claude"})
+        _write_yaml(global_cfg, {"default_platform": "claude-code"})
 
         with (
             patch(f"{_SVC}.get_global_config_path", return_value=global_cfg),
@@ -206,7 +212,7 @@ class TestCheckConfigFiles:
         assert "(valid)" in gc["message"]
 
         pc = checks[1]
-        assert pc["status"] == "warn"
+        assert pc["status"] == "pass"
         assert "not found, using defaults" in pc["message"]
         assert str(project_cfg) in pc["message"]
 
@@ -234,7 +240,7 @@ class TestCheckConfigFiles:
         assert "(valid)" in pc["message"]
 
     def test_unit_doctor_config_files_neither_exists(self, tmp_path) -> None:
-        """Neither config file exists; global passes, project warns."""
+        """Neither config file exists; both pass (missing config is normal)."""
         global_cfg = tmp_path / "global" / "config.yaml"
         project_cfg = tmp_path / "project" / ".aam" / "config.yaml"
 
@@ -249,7 +255,7 @@ class TestCheckConfigFiles:
         gc, pc = checks[0], checks[1]
         assert gc["status"] == "pass"
         assert "not found, using defaults" in gc["message"]
-        assert pc["status"] == "warn"
+        assert pc["status"] == "pass"
         assert "not found, using defaults" in pc["message"]
 
     def test_unit_doctor_config_files_invalid_yaml(self, tmp_path) -> None:
@@ -272,9 +278,9 @@ class TestCheckConfigFiles:
         assert "invalid YAML" in gc["message"]
         assert gc["suggestion"] is not None
 
-        # Project config does not exist — should still pass
+        # Project config does not exist — pass (missing config is normal)
         pc = checks[1]
-        assert pc["status"] == "warn"
+        assert pc["status"] == "pass"
         assert "not found, using defaults" in pc["message"]
 
     def test_unit_doctor_config_files_invalid_schema(self, tmp_path) -> None:
@@ -320,3 +326,121 @@ class TestCheckConfigFiles:
         assert gc["name"] == "global_config"
         assert gc["status"] == "pass"
         assert "empty, using defaults" in gc["message"]
+
+
+################################################################################
+#                                                                              #
+# UAAPS CONFORMANCE CHECK TESTS                                               #
+#                                                                              #
+################################################################################
+
+
+class TestCheckUaapsConformance:
+    """Tests for the ``_check_uaaps_conformance`` informational check."""
+
+    def test_unit_doctor_uaaps_conformance_pass(self) -> None:
+        """Reports pass with spec version and conformance level."""
+        result = _check_uaaps_conformance()
+
+        assert result["name"] == "uaaps_conformance"
+        assert result["status"] == "pass"
+        assert "0.6.0" in result["message"]
+        assert "Level 2" in result["message"]
+        assert "Installer" in result["message"]
+
+
+################################################################################
+#                                                                              #
+# DEFAULT PLATFORM CHECK TESTS                                                 #
+#                                                                              #
+################################################################################
+
+
+class TestCheckDefaultPlatform:
+    """Tests for the ``_check_default_platform`` diagnostic check."""
+
+    def test_unit_doctor_default_platform_cursor(self, tmp_path) -> None:
+        """Reports pass for the default 'cursor' platform."""
+        mock_config = MagicMock()
+        mock_config.default_platform = "cursor"
+        mock_config.active_platforms = ["cursor"]
+
+        with patch(f"{_SVC}.load_config", return_value=mock_config):
+            result = _check_default_platform(tmp_path)
+
+        assert result["name"] == "default_platform"
+        assert result["status"] == "pass"
+        assert "cursor" in result["message"]
+        assert "active:" in result["message"]
+
+    def test_unit_doctor_default_platform_multiple_active(
+        self, tmp_path
+    ) -> None:
+        """Reports all active platforms in the message."""
+        mock_config = MagicMock()
+        mock_config.default_platform = "copilot"
+        mock_config.active_platforms = ["copilot", "cursor", "claude-code"]
+
+        with patch(f"{_SVC}.load_config", return_value=mock_config):
+            result = _check_default_platform(tmp_path)
+
+        assert result["status"] == "pass"
+        assert "copilot" in result["message"]
+        assert "cursor" in result["message"]
+        assert "claude-code" in result["message"]
+
+    def test_unit_doctor_default_platform_unrecognised(
+        self, tmp_path
+    ) -> None:
+        """Warns when default platform is not a supported value."""
+        mock_config = MagicMock()
+        mock_config.default_platform = "unknown-ide"
+        mock_config.active_platforms = ["unknown-ide"]
+
+        with patch(f"{_SVC}.load_config", return_value=mock_config):
+            result = _check_default_platform(tmp_path)
+
+        assert result["status"] == "warn"
+        assert "unknown-ide" in result["message"]
+        assert "not recognised" in result["message"]
+
+    def test_unit_doctor_default_platform_not_in_active(
+        self, tmp_path
+    ) -> None:
+        """Warns when default_platform is missing from active_platforms."""
+        mock_config = MagicMock()
+        mock_config.default_platform = "claude-code"
+        mock_config.active_platforms = ["cursor"]
+
+        with patch(f"{_SVC}.load_config", return_value=mock_config):
+            result = _check_default_platform(tmp_path)
+
+        assert result["status"] == "warn"
+        assert "claude-code" in result["message"]
+        assert "not in active_platforms" in result["message"]
+        assert result["suggestion"] is not None
+
+    def test_unit_doctor_default_platform_legacy_alias(
+        self, tmp_path
+    ) -> None:
+        """Legacy alias 'claude' is normalized to 'claude-code'."""
+        mock_config = MagicMock()
+        mock_config.default_platform = "claude"
+        mock_config.active_platforms = ["claude"]
+
+        with patch(f"{_SVC}.load_config", return_value=mock_config):
+            result = _check_default_platform(tmp_path)
+
+        assert result["status"] == "pass"
+        assert "claude-code" in result["message"]
+        assert "legacy alias" in result["message"]
+
+    def test_unit_doctor_default_platform_config_failure(
+        self, tmp_path
+    ) -> None:
+        """Reports warn when config cannot be loaded."""
+        with patch(f"{_SVC}.load_config", side_effect=Exception("boom")):
+            result = _check_default_platform(tmp_path)
+
+        assert result["status"] == "warn"
+        assert "Could not determine" in result["message"]

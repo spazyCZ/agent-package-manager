@@ -3,8 +3,11 @@
 Deploys AAM artifacts into the GitHub Copilot filesystem structure:
   - Skills       → ``.github/skills/<fs-name>/``
   - Agents       → ``.github/agents/<fs-name>.agent.md``
-  - Prompts      → ``.github/prompts/<fs-name>.md``
+  - Commands     → ``.github/prompts/<pkg>:<name>.prompt.md`` (simple) or
+                   ``.github/prompts/<name>.md`` (parameterized/template)
   - Instructions → ``.github/instructions/<fs-name>.instructions.md``
+
+UAAPS v0.5.0: prompts merged into commands.
 
 Decision reference: DESIGN.md Section 8.2.
 """
@@ -15,9 +18,11 @@ Decision reference: DESIGN.md Section 8.2.
 #                                                                              #
 ################################################################################
 
+import json
 import logging
 import shutil
 from pathlib import Path
+from typing import Any
 
 from aam_cli.core.manifest import ArtifactRef
 from aam_cli.utils.naming import parse_package_name, to_filesystem_name
@@ -44,7 +49,7 @@ class CopilotAdapter:
     Deploys artifacts to the ``.github/`` directory within the project root:
       - Skills to ``.github/skills/<name>/``
       - Agents to ``.github/agents/<name>.agent.md``
-      - Prompts to ``.github/prompts/<name>.md``
+      - Commands to ``.github/prompts/<name>.prompt.md`` or ``.md``
       - Instructions to ``.github/instructions/<name>.instructions.md``
     """
 
@@ -140,33 +145,6 @@ class CopilotAdapter:
         logger.info(f"Agent deployed: {dest}")
         return dest
 
-    def deploy_prompt(
-        self,
-        prompt_path: Path,
-        prompt_ref: ArtifactRef,
-        _config: dict[str, str],
-    ) -> Path:
-        """Deploy a prompt to ``.github/prompts/<fs-name>.md``.
-
-        Args:
-            prompt_path: Path to the prompt file.
-            prompt_ref: Artifact reference from the manifest.
-            _config: Platform config.
-
-        Returns:
-            Destination path.
-        """
-        fs_name = self._artifact_fs_name(prompt_ref.name)
-        dest = self.github_dir / "prompts" / f"{fs_name}.md"
-
-        logger.info(f"Deploying prompt '{prompt_ref.name}' -> {dest}")
-        dest.parent.mkdir(parents=True, exist_ok=True)
-
-        shutil.copy2(prompt_path, dest)
-
-        logger.info(f"Prompt deployed: {dest}")
-        return dest
-
     def deploy_instruction(
         self,
         instr_path: Path,
@@ -197,6 +175,217 @@ class CopilotAdapter:
         logger.info(f"Instruction deployed: {dest}")
         return dest
 
+    def deploy_prompt(
+        self,
+        prompt_path: Path,
+        prompt_ref: ArtifactRef,
+        _config: dict[str, str],
+    ) -> Path:
+        """Deploy a prompt to ``.github/prompts/<name>.md``.
+
+        Args:
+            prompt_path: Path to the prompt markdown file.
+            prompt_ref: Artifact reference from the manifest.
+            _config: Platform config (unused).
+
+        Returns:
+            Destination path.
+        """
+        fs_name = self._artifact_fs_name(prompt_ref.name)
+        dest = self.github_dir / "prompts" / f"{fs_name}.md"
+
+        logger.info(f"Deploying prompt '{prompt_ref.name}' -> {dest}")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(prompt_path, dest)
+
+        logger.info(f"Prompt deployed: {dest}")
+        return dest
+
+    def deploy_command(
+        self,
+        cmd_path: Path,
+        cmd_ref: ArtifactRef,
+        config: dict[str, str],
+    ) -> Path:
+        """Deploy a command to Copilot.
+
+        Simple commands go to ``.github/prompts/<pkg>:<name>.prompt.md``.
+        Parameterized commands (templates) go to ``.github/prompts/<name>.md``.
+
+        Args:
+            cmd_path: Path to the command markdown file.
+            cmd_ref: Artifact reference from the manifest.
+            config: Platform config; ``package_name`` key used for namespacing.
+
+        Returns:
+            Destination path.
+        """
+        if self._has_variables(cmd_path):
+            fs_name = self._artifact_fs_name(cmd_ref.name)
+            dest = self.github_dir / "prompts" / f"{fs_name}.md"
+            logger.info(f"Deploying parameterized command '{cmd_ref.name}' -> {dest}")
+        else:
+            pkg_name = config.get("package_name", "unknown")
+            safe_pkg = pkg_name.lstrip("@").replace("/", "--")
+            safe_name = self._artifact_fs_name(cmd_ref.name)
+            dest = self.github_dir / "prompts" / f"{safe_pkg}:{safe_name}.prompt.md"
+            logger.info(f"Deploying command '{cmd_ref.name}' -> {dest}")
+
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(cmd_path, dest)
+        logger.info(f"Command deployed: {dest}")
+        return dest
+
+    def deploy_rule(
+        self,
+        rule_path: Path,
+        rule_ref: ArtifactRef,
+        _config: dict[str, str],
+    ) -> Path:
+        """Deploy a rule to ``.github/instructions/<name>.instructions.md``.
+
+        Reads the rule markdown, translating any ``globs`` frontmatter field
+        to the Copilot ``applyTo`` field.
+
+        Args:
+            rule_path: Path to the rule markdown file.
+            rule_ref: Artifact reference from the manifest.
+            _config: Platform config (unused).
+
+        Returns:
+            Destination path.
+        """
+        from aam_cli.converters.frontmatter import generate_frontmatter, parse_frontmatter
+
+        fs_name = self._artifact_fs_name(rule_ref.name)
+        dest = self.github_dir / "instructions" / f"{fs_name}.instructions.md"
+
+        logger.info(f"Deploying rule '{rule_ref.name}' -> {dest}")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+
+        # -----
+        # Parse existing frontmatter; translate globs → applyTo
+        # -----
+        raw = rule_path.read_text(encoding="utf-8")
+        fm, body = parse_frontmatter(raw)
+
+        new_fm: dict[str, Any] = {
+            "name": rule_ref.name,
+            "description": rule_ref.description or "",
+        }
+        # Translate Cursor/UAAPS 'globs' → Copilot 'applyTo'
+        if "globs" in fm:
+            globs = fm["globs"]
+            new_fm["applyTo"] = globs if isinstance(globs, str) else ", ".join(globs)
+
+        content = generate_frontmatter(new_fm, body)
+        dest.write_text(content, encoding="utf-8")
+
+        logger.info(f"Rule deployed: {dest}")
+        return dest
+
+    def deploy_hook(
+        self,
+        hooks_json_path: Path,
+        config: dict[str, str],
+    ) -> Path:
+        """Deploy lifecycle hooks for Copilot (8 events as of VS Code 1.109+).
+
+        Supported events: PreToolUse, PostToolUse, UserPromptSubmit,
+        SessionStart, Stop, SubagentStart, SubagentStop, PreCompact.
+        Unsupported events are logged as warnings and dropped.
+
+        Hook files are written to ``.github/copilot-hooks.json``. VS Code
+        also supports ``.github/hooks/*.json`` as an alternative location.
+
+        Args:
+            hooks_json_path: Path to the package ``hooks/hooks.json``.
+            config: Platform config; ``package_name`` key for namespacing.
+
+        Returns:
+            Path to ``.github/copilot-hooks.json``.
+        """
+        from aam_cli.converters.mappings import (
+            SUPPORTED_HOOK_EVENTS,
+            translate_hook_event,
+        )
+
+        pkg_name = config.get("package_name", "unknown")
+        dest = self.github_dir / "copilot-hooks.json"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"Merging Copilot hooks from '{hooks_json_path}' -> {dest}")
+
+        source_hooks: dict[str, Any] = json.loads(hooks_json_path.read_text(encoding="utf-8"))
+
+        existing: dict[str, Any] = {}
+        if dest.is_file():
+            existing = json.loads(dest.read_text(encoding="utf-8"))
+
+        supported = SUPPORTED_HOOK_EVENTS.get("copilot", set())
+
+        for canonical_event, hook_entries in source_hooks.items():
+            platform_event = translate_hook_event(canonical_event, "copilot")
+            if not platform_event or canonical_event not in supported:
+                logger.warning(
+                    f"Hook event '{canonical_event}' is not supported by Copilot "
+                    f"(supported: {sorted(supported)}) — skipping"
+                )
+                continue
+
+            if platform_event not in existing:
+                existing[platform_event] = []
+
+            for entry in hook_entries if isinstance(hook_entries, list) else [hook_entries]:
+                namespaced = dict(entry)
+                namespaced.setdefault("_aam_package", pkg_name)
+                existing[platform_event].append(namespaced)
+
+        dest.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+        logger.info(f"Copilot hooks written: {dest}")
+        return dest
+
+    def deploy_mcp(
+        self,
+        servers_json_path: Path,
+        config: dict[str, str],
+    ) -> Path:
+        """Write MCP server config to ``.vscode/mcp.json`` (VS Code MCP location).
+
+        Reads a UAAPS ``mcp/servers.json`` and merges namespaced server entries
+        into the VS Code MCP config location used by GitHub Copilot.
+
+        Args:
+            servers_json_path: Path to the package ``mcp/servers.json``.
+            config: Platform config; ``package_name`` key for namespacing.
+
+        Returns:
+            Path to ``.vscode/mcp.json``.
+        """
+        pkg_name = config.get("package_name", "unknown")
+        safe_pkg = pkg_name.lstrip("@").replace("/", "--")
+        dest = self.project_root / ".vscode" / "mcp.json"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"Merging MCP servers from '{servers_json_path}' -> {dest}")
+
+        source: dict[str, Any] = json.loads(servers_json_path.read_text(encoding="utf-8"))
+        servers: dict[str, Any] = source.get("mcpServers", source)
+
+        existing: dict[str, Any] = {"servers": {}}
+        if dest.is_file():
+            existing = json.loads(dest.read_text(encoding="utf-8"))
+        existing.setdefault("servers", {})
+
+        for server_key, server_cfg in servers.items():
+            namespaced_key = f"{safe_pkg}:{server_key}"
+            existing["servers"][namespaced_key] = server_cfg
+            logger.debug(f"Added MCP server: {namespaced_key}")
+
+        dest.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+        logger.info(f"MCP config written: {dest}")
+        return dest
+
     # ------------------------------------------------------------------
     # Undeploy and list
     # ------------------------------------------------------------------
@@ -206,7 +395,8 @@ class CopilotAdapter:
 
         Args:
             artifact_name: Name of the artifact.
-            artifact_type: Type (skill, agent, prompt, instruction).
+            artifact_type: One of skill, agent, prompt, instruction,
+                command, rule, hook, mcp.
         """
         fs_name = self._artifact_fs_name(artifact_name)
 
@@ -230,11 +420,29 @@ class CopilotAdapter:
                 path.unlink()
                 logger.info(f"Removed instruction file: {path}")
 
-        elif artifact_type == "prompt":
-            path = self.github_dir / "prompts" / f"{fs_name}.md"
+        elif artifact_type in ("prompt", "command"):
+            for suffix in [".md", ".prompt.md"]:
+                path = self.github_dir / "prompts" / f"{fs_name}{suffix}"
+                if path.is_file():
+                    path.unlink()
+                    logger.info(f"Removed command: {path}")
+
+        elif artifact_type == "rule":
+            path = self.github_dir / "instructions" / f"{fs_name}.instructions.md"
             if path.is_file():
                 path.unlink()
-                logger.info(f"Removed prompt: {path}")
+                logger.info(f"Removed rule: {path}")
+
+        elif artifact_type == "hook":
+            self._remove_hook_entries(artifact_name)
+
+        elif artifact_type == "mcp":
+            self._remove_mcp_entries(artifact_name)
+
+        else:
+            logger.warning(
+                f"Unknown artifact type '{artifact_type}' for undeploy, skipping"
+            )
 
     def list_deployed(self) -> list[tuple[str, str, Path]]:
         """List all deployed artifacts.
@@ -244,30 +452,40 @@ class CopilotAdapter:
         """
         deployed: list[tuple[str, str, Path]] = []
 
+        # -----
         # Skills
+        # -----
         skills_dir = self.github_dir / "skills"
         if skills_dir.is_dir():
             for entry in skills_dir.iterdir():
                 if entry.is_dir():
                     deployed.append((entry.name, "skill", entry))
 
+        # -----
         # Agents
+        # -----
         agents_dir = self.github_dir / "agents"
         if agents_dir.is_dir():
             for entry in agents_dir.iterdir():
                 if entry.name.endswith(".agent.md"):
-                    # Strip the .agent.md suffix to get the artifact name
                     name = entry.name.removesuffix(".agent.md")
                     deployed.append((name, "agent", entry))
 
-        # Prompts
+        # -----
+        # Commands (from prompts dir)
+        # -----
         prompts_dir = self.github_dir / "prompts"
         if prompts_dir.is_dir():
             for entry in prompts_dir.iterdir():
-                if entry.suffix == ".md":
-                    deployed.append((entry.stem, "prompt", entry))
+                if entry.name.endswith(".prompt.md"):
+                    name = entry.name.removesuffix(".prompt.md")
+                    deployed.append((name, "command", entry))
+                elif entry.suffix == ".md":
+                    deployed.append((entry.stem, "command", entry))
 
+        # -----
         # Instructions
+        # -----
         instructions_dir = self.github_dir / "instructions"
         if instructions_dir.is_dir():
             for entry in instructions_dir.iterdir():
@@ -275,11 +493,142 @@ class CopilotAdapter:
                     name = entry.name.removesuffix(".instructions.md")
                     deployed.append((name, "instruction", entry))
 
+        # -----
+        # Hooks (AAM-namespaced entries in copilot-hooks.json and .github/hooks/)
+        # -----
+        hooks_path = self.github_dir / "copilot-hooks.json"
+        if hooks_path.is_file():
+            deployed.extend(self._list_hook_entries(hooks_path))
+        hooks_dir = self.github_dir / "hooks"
+        if hooks_dir.is_dir():
+            for hook_file in hooks_dir.iterdir():
+                if hook_file.suffix == ".json":
+                    deployed.extend(self._list_hook_entries(hook_file))
+
+        # -----
+        # MCP (AAM-namespaced entries in .vscode/mcp.json)
+        # -----
+        vscode_mcp = self.project_root / ".vscode" / "mcp.json"
+        if vscode_mcp.is_file():
+            deployed.extend(self._list_mcp_entries(vscode_mcp))
+
         return deployed
+
+    # ------------------------------------------------------------------
+    # Hook / MCP JSON helpers
+    # ------------------------------------------------------------------
+
+    def _remove_hook_entries(self, package_name: str) -> None:
+        """Remove AAM-namespaced hook entries from Copilot hooks files.
+
+        Checks both ``copilot-hooks.json`` and ``.github/hooks/`` directory.
+
+        Args:
+            package_name: Package name to match against ``_aam_package``.
+        """
+        hooks_path = self.github_dir / "copilot-hooks.json"
+        if hooks_path.is_file():
+            data: dict[str, Any] = json.loads(
+                hooks_path.read_text(encoding="utf-8")
+            )
+            removed = 0
+            for event_key in list(data.keys()):
+                entries = data[event_key]
+                if isinstance(entries, list):
+                    filtered = [
+                        e for e in entries
+                        if not (isinstance(e, dict) and e.get("_aam_package") == package_name)
+                    ]
+                    removed += len(entries) - len(filtered)
+                    data[event_key] = filtered
+
+            hooks_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            logger.info(
+                f"Removed {removed} hook entries for '{package_name}' from {hooks_path}"
+            )
+
+    def _remove_mcp_entries(self, package_name: str) -> None:
+        """Remove AAM-namespaced MCP entries from ``.vscode/mcp.json``.
+
+        Args:
+            package_name: Package name used for namespace prefix matching.
+        """
+        mcp_path = self.project_root / ".vscode" / "mcp.json"
+        if not mcp_path.is_file():
+            return
+
+        data: dict[str, Any] = json.loads(
+            mcp_path.read_text(encoding="utf-8")
+        )
+        servers = data.get("mcpServers", data.get("servers", {}))
+        safe_pkg = package_name.replace("@", "").replace("/", "-")
+        keys_to_remove = [
+            k for k in servers if k.startswith(f"{safe_pkg}:")
+        ]
+        for key in keys_to_remove:
+            del servers[key]
+
+        mcp_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        logger.info(
+            f"Removed {len(keys_to_remove)} MCP entries for '{package_name}' "
+            f"from {mcp_path}"
+        )
+
+    def _list_hook_entries(
+        self, hooks_path: Path,
+    ) -> list[tuple[str, str, Path]]:
+        """List AAM-tagged hook entries in a JSON file.
+
+        Args:
+            hooks_path: Path to hooks JSON file.
+
+        Returns:
+            List of ``(event_name, "hook", path)`` tuples.
+        """
+        data: dict[str, Any] = json.loads(
+            hooks_path.read_text(encoding="utf-8")
+        )
+        results: list[tuple[str, str, Path]] = []
+        for event_key, entries in data.items():
+            if isinstance(entries, list):
+                for entry in entries:
+                    if isinstance(entry, dict) and "_aam_package" in entry:
+                        results.append((event_key, "hook", hooks_path))
+                        break
+        return results
+
+    def _list_mcp_entries(
+        self, mcp_path: Path,
+    ) -> list[tuple[str, str, Path]]:
+        """List AAM-namespaced MCP server entries.
+
+        Args:
+            mcp_path: Path to MCP JSON file.
+
+        Returns:
+            List of ``(server_key, "mcp", path)`` tuples.
+        """
+        data: dict[str, Any] = json.loads(
+            mcp_path.read_text(encoding="utf-8")
+        )
+        results: list[tuple[str, str, Path]] = []
+        servers = data.get("mcpServers", data.get("servers", {}))
+        for key in servers:
+            if ":" in key:
+                results.append((key, "mcp", mcp_path))
+        return results
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _has_variables(self, cmd_path: Path) -> bool:
+        """Check if a command file has variables in its frontmatter."""
+        from aam_cli.converters.frontmatter import parse_frontmatter
+
+        content = cmd_path.read_text(encoding="utf-8")
+        fm, _ = parse_frontmatter(content)
+        return bool(fm.get("variables"))
 
     def _artifact_fs_name(self, artifact_name: str) -> str:
         """Convert an artifact name to a filesystem-safe name.

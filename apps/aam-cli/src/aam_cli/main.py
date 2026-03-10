@@ -58,10 +58,13 @@ class OrderedGroup(click.Group):
             "info",
         ],
         "Package Integrity": ["verify", "diff"],
+        "Dependency Management": ["tree", "why", "check", "audit", "dedupe", "prune"],
+        "Testing": ["test", "eval"],
         "Package Authoring": ["pkg"],
         "Source Management": ["source"],
         "Configuration": ["config", "registry"],
-        "Utilities": ["mcp", "doctor", "convert"],
+        "Authentication": ["login", "logout", "whoami"],
+        "Utilities": ["mcp", "doctor", "convert", "cache"],
     }
 
     def format_commands(
@@ -145,8 +148,11 @@ from aam_cli.commands import (  # noqa: E402
     registry,
     search,
 )
+from aam_cli.commands.audit import audit  # noqa: E402
+from aam_cli.commands.check import check  # noqa: E402
 from aam_cli.commands.client_init import client_init  # noqa: E402
 from aam_cli.commands.convert import convert  # noqa: E402
+from aam_cli.commands.dedupe import dedupe  # noqa: E402
 from aam_cli.commands.diff import diff_cmd  # noqa: E402
 from aam_cli.commands.doctor import doctor  # noqa: E402
 from aam_cli.commands.list_packages import list_packages  # noqa: E402
@@ -154,12 +160,20 @@ from aam_cli.commands.mcp_serve import mcp  # noqa: E402
 from aam_cli.commands.outdated import outdated  # noqa: E402
 from aam_cli.commands.pack import pack  # noqa: E402
 from aam_cli.commands.pkg import pkg  # noqa: E402
+from aam_cli.commands.prune import prune  # noqa: E402
 from aam_cli.commands.show_package import show_package  # noqa: E402
 from aam_cli.commands.source import source  # noqa: E402
+from aam_cli.commands.tree import tree  # noqa: E402
 from aam_cli.commands.uninstall import uninstall  # noqa: E402
 from aam_cli.commands.upgrade import upgrade  # noqa: E402
 from aam_cli.commands.validate import validate  # noqa: E402
 from aam_cli.commands.verify import verify  # noqa: E402
+from aam_cli.commands.why import why  # noqa: E402
+
+from aam_cli.commands.auth import login, logout, whoami  # noqa: E402
+from aam_cli.commands.cache import cache  # noqa: E402
+from aam_cli.commands.eval import eval_cmd  # noqa: E402
+from aam_cli.commands.test import test  # noqa: E402
 
 ################################################################################
 #                                                                              #
@@ -191,6 +205,21 @@ cli.add_command(show_package)
 
 cli.add_command(verify)
 cli.add_command(diff_cmd)
+cli.add_command(check)
+cli.add_command(audit)
+cli.add_command(tree)
+cli.add_command(why)
+cli.add_command(dedupe)
+cli.add_command(prune)
+
+################################################################################
+#                                                                              #
+# TESTING                                                                      #
+#                                                                              #
+################################################################################
+
+cli.add_command(test)
+cli.add_command(eval_cmd)
 
 ################################################################################
 #                                                                              #
@@ -219,6 +248,16 @@ cli.add_command(registry.registry)
 
 ################################################################################
 #                                                                              #
+# AUTHENTICATION                                                               #
+#                                                                              #
+################################################################################
+
+cli.add_command(login)
+cli.add_command(logout)
+cli.add_command(whoami)
+
+################################################################################
+#                                                                              #
 # UTILITIES                                                                    #
 #                                                                              #
 ################################################################################
@@ -226,6 +265,7 @@ cli.add_command(registry.registry)
 cli.add_command(mcp)
 cli.add_command(doctor)
 cli.add_command(convert)
+cli.add_command(cache)
 
 ################################################################################
 #                                                                              #

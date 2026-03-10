@@ -133,11 +133,11 @@ class TestValidateCommand:
         self.runner = CliRunner()
 
     def test_unit_validate_no_manifest(self) -> None:
-        """Test validate shows error when aam.yaml not found."""
+        """Test validate shows error when no manifest found."""
         with self.runner.isolated_filesystem():
             result = self.runner.invoke(cli, ["validate"])
             assert result.exit_code != 0
-            assert "No aam.yaml found" in result.output
+            assert "No manifest found" in result.output
 
     def test_unit_validate_valid_package(self) -> None:
         """Test validate succeeds on a valid aam.yaml with existing artifacts."""

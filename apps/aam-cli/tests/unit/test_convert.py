@@ -187,7 +187,7 @@ class TestInstructionConversion:
             '---\nglobs:\n  - "**/*.py"\n---\nUse Black formatter.',
         )
 
-        report = run_conversion(tmp_path, "cursor", "claude")
+        report = run_conversion(tmp_path, "cursor", "claude-code")
 
         assert report.converted_count == 1
         target = tmp_path / "CLAUDE.md"
@@ -205,7 +205,7 @@ class TestInstructionConversion:
         """Legacy .cursorrules → Claude CLAUDE.md."""
         _write_file(tmp_path / ".cursorrules", "Be helpful and concise.")
 
-        report = run_conversion(tmp_path, "cursor", "claude")
+        report = run_conversion(tmp_path, "cursor", "claude-code")
 
         assert report.converted_count == 1
         target = tmp_path / "CLAUDE.md"
@@ -248,7 +248,7 @@ class TestInstructionConversion:
         """Claude CLAUDE.md → Codex AGENTS.md."""
         _write_file(tmp_path / "CLAUDE.md", "Always write tests.")
 
-        report = run_conversion(tmp_path, "claude", "codex")
+        report = run_conversion(tmp_path, "claude-code", "codex")
 
         assert report.converted_count == 1
         target = tmp_path / "AGENTS.md"
@@ -302,7 +302,7 @@ class TestAgentConversion:
             "Help with tasks.",
         )
 
-        report = run_conversion(tmp_path, "cursor", "claude")
+        report = run_conversion(tmp_path, "cursor", "claude-code")
 
         agent_results = [r for r in report.results if r.artifact_type == "agent"]
         assert len(agent_results) == 1
@@ -412,7 +412,7 @@ class TestPromptConversion:
             "Review the code changes.",
         )
 
-        report = run_conversion(tmp_path, "cursor", "claude")
+        report = run_conversion(tmp_path, "cursor", "claude-code")
 
         prompt_results = [r for r in report.results if r.artifact_type == "prompt"]
         assert len(prompt_results) == 1
@@ -459,7 +459,7 @@ class TestConflictHandling:
             "Existing content.",
         )
 
-        report = run_conversion(tmp_path, "cursor", "claude", force=False)
+        report = run_conversion(tmp_path, "cursor", "claude-code", force=False)
 
         agent_results = [r for r in report.results if r.artifact_type == "agent"]
         assert len(agent_results) == 1
@@ -480,7 +480,7 @@ class TestConflictHandling:
         target = tmp_path / ".claude" / "agents" / "helper.md"
         _write_file(target, "Old content.")
 
-        report = run_conversion(tmp_path, "cursor", "claude", force=True)
+        report = run_conversion(tmp_path, "cursor", "claude-code", force=True)
 
         agent_results = [r for r in report.results if r.artifact_type == "agent"]
         assert len(agent_results) == 1

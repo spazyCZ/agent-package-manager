@@ -14,8 +14,12 @@ from pathlib import Path
 from typing import Any
 
 from aam_cli.core.config import load_config
-from aam_cli.core.manifest import load_manifest
+from aam_cli.core.manifest import load_manifest_universal
 from aam_cli.registry.factory import create_registry
+from aam_cli.services.governance_service import (
+    PolicyViolationError,
+    check_publish_policy,
+)
 from aam_cli.utils.checksum import calculate_sha256
 
 ################################################################################
@@ -61,15 +65,25 @@ def publish_package(
     pkg_path = project_dir or Path.cwd()
 
     # -----
-    # Step 1: Load manifest
+    # Step 1: Load manifest (universal — supports all three formats)
     # -----
     try:
-        manifest = load_manifest(pkg_path)
+        manifest = load_manifest_universal(pkg_path)
     except FileNotFoundError as exc:
         raise ValueError(
-            "[AAM_MANIFEST_NOT_FOUND] No aam.yaml found. "
-            "Run 'aam init' or 'aam create-package' first."
+            "[AAM_MANIFEST_NOT_FOUND] No manifest found. "
+            "Run 'aam pkg init' first."
         ) from exc
+
+    # -----
+    # T054: Governance check — evaluate publish policy before any file ops
+    # signed=False in v1 (local file .sig verification not yet supported)
+    # -----
+    config_for_governance = load_config()
+    try:
+        check_publish_policy(signed=False, config=config_for_governance)
+    except PolicyViolationError:
+        raise
 
     # -----
     # Step 2: Find the .aam archive
@@ -86,7 +100,7 @@ def publish_package(
     # -----
     # Step 3: Get the target registry
     # -----
-    config = load_config()
+    config = config_for_governance  # reuse already-loaded config
 
     if registry_name:
         reg_source = config.get_registry_by_name(registry_name)

@@ -41,6 +41,7 @@ touch ~/.aam/config.yaml
 | `active_platforms` | list[string] | `["cursor"]` | Platforms to deploy to with `--all` |
 | `registries` | list[RegistrySource] | `[]` | Registry sources for package resolution |
 | `security` | SecurityConfig | See below | Security and verification policies |
+| `governance` | GovernanceConfig | `{}` | Install and publish governance policies |
 | `author` | AuthorConfig | `{}` | Default author information |
 | `publish` | PublishConfig | `{}` | Publishing defaults |
 
@@ -273,6 +274,85 @@ security:
 ```
 
 **Format:** 40-character hexadecimal fingerprint (spaces optional)
+
+## Section: `governance`
+
+**Type:** `GovernanceConfig`
+
+Controls which packages may be installed or published. These
+client-side policies are enforced before any network or filesystem
+operation.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `allowed_scopes` | list[string] | `[]` (allow all) | Scopes allowed for install (empty = no restriction) |
+| `require_signature` | bool | `false` | Block unsigned packages |
+| `require_tag` | string | `null` | Require a specific dist-tag (e.g., `stable`) |
+| `blocked_packages` | list[string] | `[]` | Package names blocked from install |
+| `publish_policy` | PublishPolicy | `{}` | Publish-specific policies |
+
+### Example: Enterprise governance
+
+```yaml
+governance:
+  allowed_scopes:
+    - "@mycompany"
+    - "@approved-vendor"
+  require_signature: true
+  require_tag: "stable"
+  blocked_packages:
+    - "known-malicious-package"
+    - "deprecated-tool"
+  publish_policy:
+    require_signature: true
+```
+
+### Field: `governance.allowed_scopes`
+
+When configured, only packages from listed scopes can be installed.
+An empty list means no restriction.
+
+```yaml
+governance:
+  allowed_scopes:
+    - "@mycompany"
+```
+
+Attempting to install `@other/package` produces:
+
+```
+Error: Package '@other/package' blocked by governance policy:
+  allowed_scopes does not include '@other'
+```
+
+### Field: `governance.blocked_packages`
+
+Package names that are unconditionally blocked from installation.
+
+```yaml
+governance:
+  blocked_packages:
+    - "known-malicious-package"
+```
+
+### Field: `governance.require_tag`
+
+Requires installed packages to carry a specific dist-tag.
+
+```yaml
+governance:
+  require_tag: "stable"
+```
+
+### Publish policy
+
+Controls what is required for `aam pkg publish`:
+
+```yaml
+governance:
+  publish_policy:
+    require_signature: true
+```
 
 ## Section: `author`
 

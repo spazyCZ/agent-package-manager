@@ -11,9 +11,10 @@ with ``aam.yaml`` manifest and artifact subdirectories.
 #                                                                              #
 ################################################################################
 
+import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from aam_cli.utils.naming import format_invalid_package_name_message, validate_package_name
 from aam_cli.utils.yaml_utils import dump_yaml
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 ################################################################################
 
 VALID_ARTIFACT_TYPES: list[str] = ["skills", "agents", "prompts", "instructions"]
-VALID_PLATFORMS: list[str] = ["cursor", "claude", "copilot", "codex"]
+VALID_PLATFORMS: list[str] = ["cursor", "claude-code", "copilot", "codex"]
 
 # Default platform-specific configurations
 DEFAULT_PLATFORM_CONFIGS: dict[str, dict[str, Any]] = {
@@ -41,7 +42,7 @@ DEFAULT_PLATFORM_CONFIGS: dict[str, dict[str, Any]] = {
         "skill_scope": "project",
         "deploy_instructions_as": "rules",
     },
-    "claude": {"merge_instructions": True},
+    "claude-code": {"merge_instructions": True},
     "copilot": {"merge_instructions": True},
     "codex": {"skill_scope": "project"},
 }
@@ -62,6 +63,7 @@ def init_package(
     license_name: str = "Apache-2.0",
     artifact_types: list[str] | None = None,
     platforms: list[str] | None = None,
+    format: Literal["json", "yaml", "legacy"] = "json",
 ) -> dict[str, Any]:
     """Scaffold a brand-new AAM package with directory structure and manifest.
 
@@ -164,10 +166,9 @@ def init_package(
     manifest_data: dict[str, Any] = {
         "name": name,
         "version": version,
+        "description": description or f"Agent package {name}",
     }
 
-    if description:
-        manifest_data["description"] = description
     if author:
         manifest_data["author"] = author
     if license_name:
@@ -186,10 +187,23 @@ def init_package(
     manifest_data["platforms"] = platforms_config
 
     # -----
-    # Step 7: Write aam.yaml
+    # Step 7: Write manifest (JSON or YAML)
     # -----
-    manifest_path = pkg_dir / "aam.yaml"
-    dump_yaml(manifest_data, manifest_path)
+    if format == "json":
+        from aam_cli.core.manifest import PackageManifest
+
+        manifest_obj = PackageManifest.model_validate(manifest_data)
+        manifest_path = pkg_dir / "package.agent.json"
+        manifest_path.write_text(
+            json.dumps(manifest_obj.model_dump(by_alias=True), indent=2) + "\n",
+            encoding="utf-8",
+        )
+    elif format == "yaml":
+        manifest_path = pkg_dir / "package.agent.yaml"
+        dump_yaml(manifest_data, manifest_path)
+    else:
+        manifest_path = pkg_dir / "aam.yaml"
+        dump_yaml(manifest_data, manifest_path)
 
     logger.info(f"Package initialized successfully: manifest='{manifest_path}'")
 

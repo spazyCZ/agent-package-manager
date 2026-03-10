@@ -17,6 +17,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
+from aam_cli.core.manifest import load_manifest_universal
 from aam_cli.services.config_service import get_config
 from aam_cli.services.package_service import (
     get_package_info,
@@ -28,7 +29,6 @@ from aam_cli.services.source_service import (
     list_sources,
     scan_source,
 )
-from aam_cli.utils.yaml_utils import load_yaml_optional
 
 ################################################################################
 #                                                                              #
@@ -121,27 +121,25 @@ def register_resources(mcp: FastMCP) -> None:
 
     @mcp.resource("aam://manifest")
     def resource_manifest() -> dict[str, Any] | None:
-        """Read the aam.yaml manifest from the current directory.
+        """Read the package manifest from the current directory.
 
-        Returns the parsed manifest contents, or None if no aam.yaml
-        exists in the current working directory.
+        Loads from ``package.agent.json``, ``package.agent.yaml``, or
+        ``aam.yaml`` (in that precedence order) using the universal
+        manifest loader.
 
         Returns:
             Parsed manifest dict, or None if not found.
         """
         logger.debug("MCP resource aam://manifest accessed")
 
-        manifest_path = Path.cwd() / "aam.yaml"
-
-        if not manifest_path.exists():
-            return None
-
         try:
-            data = load_yaml_optional(manifest_path)
-            return data
+            manifest = load_manifest_universal(Path.cwd())
+            return manifest.model_dump(by_alias=True)
+        except FileNotFoundError:
+            return None
         except Exception as exc:
-            logger.warning(f"Failed to parse aam.yaml: {exc}")
-            return {"error": f"Failed to parse aam.yaml: {exc}"}
+            logger.warning(f"Failed to parse manifest: {exc}")
+            return {"error": f"Failed to parse manifest: {exc}"}
 
     ############################################################################
     #                                                                          #

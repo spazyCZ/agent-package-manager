@@ -1,0 +1,141 @@
+################################################################################
+#                                                                              #
+#  GITHUB ACTIONS — PUBLISH AAM CLI TO PYPI                                   #
+#                                                                              #
+################################################################################
+#
+# Builds and publishes the aam-cli Python package to PyPI (pypi.org).
+#
+# Triggers:
+#   - Push of version tags: aam-cli-v* (example: aam-cli-v0.1.0)
+#   - Manual dispatch (workflow_dispatch)
+#
+# Required secret:
+#   PYPI_API_TOKEN — API token from https://pypi.org/manage/account/token/
+#
+################################################################################
+
+name: Publish aam-cli to PyPI
+
+on:
+  push:
+    tags:
+      - "aam-cli-v*"
+  workflow_dispatch:
+
+jobs:
+  # ==========================================================================
+  #  TEST — Run lint and tests before publishing
+  # ==========================================================================
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # -----
+      # Step 1: Checkout repository
+      # -----
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----
+      # Step 2: Set up Node.js (required for Nx)
+      # -----
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # -----
+      # Step 3: Install workspace dependencies
+      # -----
+      - name: Install npm dependencies
+        run: npm ci
+
+      # -----
+      # Step 4: Set up Python
+      # -----
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/aam-cli/pyproject.toml
+
+      # -----
+      # Step 5: Install aam-cli with dev dependencies
+      # -----
+      - name: Install aam-cli with dev dependencies
+        run: pip install -e ".[dev]"
+        working-directory: apps/aam-cli
+
+      # -----
+      # Step 6: Lint and test aam-cli
+      # -----
+      - name: Lint and test aam-cli
+        run: npx nx run-many -t lint,test -p aam-cli --verbose
+
+  # ==========================================================================
+  #  BUILD & PUBLISH — Build wheels/sdist and upload to PyPI
+  # ==========================================================================
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # -----
+      # Step 1: Checkout repository
+      # -----
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----
+      # Step 2: Set up Python
+      # -----
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # -----
+      # Step 3: Validate tag matches pyproject version
+      # -----
+      - name: Validate tag version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#aam-cli-v}"
+          PROJECT_VERSION="$(python -c "import tomllib; print(tomllib.load(open('apps/aam-cli/pyproject.toml', 'rb'))['project']['version'])")"
+
+          if [ "${TAG_VERSION}" != "${PROJECT_VERSION}" ]; then
+            echo "Tag version (${TAG_VERSION}) does not match pyproject version (${PROJECT_VERSION})."
+            exit 1
+          fi
+
+      # -----
+      # Step 4: Install build tools
+      # -----
+      - name: Install build tools
+        run: pip install build twine
+
+      # -----
+      # Step 5: Build aam-cli package
+      # -----
+      - name: Build aam-cli
+        run: python -m build
+        working-directory: apps/aam-cli
+
+      # -----
+      # Step 6: Verify built package metadata
+      # -----
+      - name: Check distributions
+        run: twine check apps/aam-cli/dist/*
+
+      # -----
+      # Step 7: Publish aam-cli to PyPI
+      # -----
+      - name: Publish aam-cli to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: apps/aam-cli/dist/
+          password: ${{ secrets.PYPI_API_TOKEN }}

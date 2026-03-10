@@ -60,3 +60,25 @@ def print_deprecation_warning(
         bold=True,
     )
     click.echo(warning, err=True)
+
+
+def log_deprecation(
+    feature: str,
+    replacement: str,
+    package_name: str | None = None,
+) -> None:
+    """Log a deprecation warning at WARNING level via the logging module.
+
+    Used by library code (not CLI handlers) to warn about deprecated
+    manifest fields or artifact types without requiring a Rich console.
+
+    Args:
+        feature: The deprecated feature name (e.g., ``"artifacts.instructions"``).
+        replacement: The recommended replacement (e.g., ``"artifacts.rules"``).
+        package_name: Optional package name for context.
+    """
+    ctx = f" in package '{package_name}'" if package_name else ""
+    logger.warning(
+        f"Deprecated feature '{feature}' used{ctx}. "
+        f"Use '{replacement}' instead."
+    )

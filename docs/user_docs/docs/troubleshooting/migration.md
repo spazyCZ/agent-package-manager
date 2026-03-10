@@ -1,6 +1,81 @@
 # Migration Guide
 
-This guide covers migrating between AAM versions, platforms, and from manual artifact management to AAM.
+This guide covers migrating between AAM versions, platforms, and from
+manual artifact management to AAM.
+
+## UAAPS v0.4.0 migration
+
+AAM now implements the UAAPS v0.4.0 specification. This introduces
+several changes to file paths and formats. Existing projects continue
+to work without forced migration, but you should migrate to take
+advantage of new features.
+
+### What changed
+
+| Component | Old | New |
+|-----------|-----|-----|
+| Manifest | `aam.yaml` | `package.agent.json` |
+| Lock file | `.aam/aam-lock.yaml` | `package.agent.lock` |
+| Install root | `.aam/packages/` | `.agent-packages/` |
+| Lock format | YAML | JSON |
+
+### Manifest migration
+
+The old `aam.yaml` format is fully supported. AAM reads it without
+changes. To migrate to `package.agent.json`:
+
+```bash
+# AAM auto-detects aam.yaml and can convert
+aam pkg validate  # Works with both formats
+```
+
+You can also manually convert your manifest to JSON format. The schema
+is the same; the file format changes from YAML to JSON.
+
+### Install root migration
+
+When AAM detects packages installed at `.aam/packages/`, it offers
+a one-step migration:
+
+```bash
+aam install my-package
+# AAM detects .aam/packages/ and prompts:
+# "Found packages at .aam/packages/. Migrate to .agent-packages/? [Y/n]"
+```
+
+After migration, update your `.gitignore`:
+
+```gitignore
+# Old (remove)
+.aam/packages/
+
+# New (add)
+.agent-packages/
+```
+
+### Lock file migration
+
+AAM detects the old `.aam/aam-lock.yaml` and offers to convert it
+to `package.agent.lock` (JSON format). You can also regenerate it:
+
+```bash
+rm .aam/aam-lock.yaml
+aam install
+# Generates new package.agent.lock
+git add package.agent.lock
+git commit -m "Migrate to package.agent.lock"
+```
+
+### New `.gitignore` entries
+
+After migration, your `.gitignore` should include:
+
+```gitignore
+.agent-packages/
+# Keep package.agent.lock tracked (do NOT ignore it)
+```
+
+---
 
 ## CLI command changes (pkg subcommand)
 
@@ -16,7 +91,7 @@ If you used older AAM commands, note these changes:
 | `aam publish` | `aam pkg publish` | Publish to registry. |
 | `aam build` | `aam pkg build` | Build package (e.g. platform-specific). |
 
-**Summary:** `aam init` with no arguments is for **client setup** (creating `~/.aam/`, config, sources). Use `aam pkg init <name>` to **scaffold a new package** in the current directory.
+**Summary:** `aam init` with no arguments is for **global client setup** (creating `~/.aam/`, config, sources). Use `aam init --project` for **project-level** `.aam/config.yaml`, and use `aam pkg init <name>` to **scaffold a new package** in the current directory.
 
 ## Migrating from Manual Skills to AAM
 

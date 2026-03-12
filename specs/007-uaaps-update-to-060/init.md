@@ -25,6 +25,27 @@ The implementation is organized into 10 phases. Phase 1 (Manifest & Schema) unbl
 
 ---
 
+## Implementation Status (audited 2026-03-12)
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Manifest & Schema Finalization | **NOT STARTED** |
+| 2 | Validation Rules | **NOT STARTED** (only `--permissions` flag pre-exists from 006) |
+| 3 | Resolution Algorithm | **NOT STARTED** |
+| 4 | Package Lifecycle Commands | **NOT STARTED** |
+| 5 | Platform Capability Negotiation | **NOT STARTED** |
+| 6 | Workspace / Monorepo Support | **NOT STARTED** |
+| 7 | SLSA Provenance Attestation | **NOT STARTED** |
+| 8 | Permission Composition Engine | **NOT STARTED** |
+| 9 | Registry Protocol Updates | **NOT STARTED** |
+| 10 | Finalization | **NOT STARTED** |
+
+**Notes**:
+- Current `__version__` is `"0.1.0"` — the 006 spec's bump to `"0.5.0"` was never applied.
+- The `aam validate --permissions` flag and `_audit_permissions()` function exist from a prior implementation, but the new `permissionGrants`-specific audit logic from this spec is not yet implemented.
+
+---
+
 ## Technical Context
 
 **Language/Version**: Python 3.11+
@@ -206,7 +227,7 @@ PLATFORM_CAPABILITIES_FILE = ".agent-packages/.platform-capabilities.json"
 **Goal**: Implement §16 validation rules and YAML round-trip checks.
 
 **Files changed**:
-- `services/validate_service.py` — add 8 new validation rules
+- `services/validate_service.py` — add 7 new validation rules, extend existing `--permissions` audit
 
 **New validation rules in `validate_package()`**:
 
@@ -219,7 +240,7 @@ PLATFORM_CAPABILITIES_FILE = ".agent-packages/.platform-capabilities.json"
 | `permissionGrants` keys | Every key in `permissionGrants` must exist in `dependencies` | ERROR |
 | `deprecated.message` required | If `deprecated` is present but `message` is missing or empty | ERROR |
 | Forward-compat | No-op for validation (already handled by Pydantic `extra="ignore"`) — but add explicit test | INFO |
-| `aam validate --permissions` | Warn when `permissionGrants` grants `shell.allow: true` without a `binaries` list | WARN |
+| `aam validate --permissions` (**flag already exists** — extend `_audit_permissions()`) | Extend existing audit to also warn when `permissionGrants` grants `shell.allow: true` without a `binaries` list | WARN |
 
 **YAML round-trip validator** (new helper function):
 ```python
@@ -875,8 +896,8 @@ def get_audit_log(self, name: str, **filters) -> Iterator[dict]: ...
 
 **Tasks**:
 
-1. **Version bump** (`core/version.py`):
-   - Update `__version__` from `"0.5.0"` to `"0.6.0"`
+1. **Version bump** (`core/version.py` / `aam_cli/__init__.py`):
+   - Update `__version__` from `"0.1.0"` to `"0.6.0"` (current version is `0.1.0`; the 006 spec's bump to `0.5.0` was never applied)
    - Requires human review per AGENTS.md
 
 2. **`aam platform info` conformance**:

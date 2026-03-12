@@ -23,9 +23,9 @@ implementation phase includes test verification steps.
 
 **Independent Test**: `git diff docs/DESIGN.md` shows updated module structure tree; no broken links
 
-- [ ] T001 Update `docs/DESIGN.md` section 11.1 "Module Structure" (line 2465): replace the conceptual `aam/cli/` tree with the actual target layout from `plan.md` — show real `aam_cli/commands/` tree with groups-as-directories convention, add explanatory note: "every group is a directory, every filename matches its CLI name"
-- [ ] T002 [P] Scan `docs/USER_GUIDE.md` for any internal file path references (e.g. `client_init.py`, `list_packages.py`, `show_package.py`, `source.py`, `config.py`, `mcp_serve.py`) and update them to reflect the target layout; CLI command names are unchanged so user-facing command reference sections need no changes
-- [ ] T003 [P] Add a "Commands Layout Convention" subsection to `docs/DESIGN.md` section 11.1 describing the two rules: (1) every filename matches its CLI command name, (2) every group with 2+ subcommands is a `group/` directory with `__init__.py` + one file per subcommand
+- [X] T001 Update `docs/DESIGN.md` section 11.1 "Module Structure" (line 2465): replace the conceptual `aam/cli/` tree with the actual target layout from `plan.md` — show real `aam_cli/commands/` tree with groups-as-directories convention, add explanatory note: "every group is a directory, every filename matches its CLI name"
+- [X] T002 [P] Scan `docs/USER_GUIDE.md` for any internal file path references (e.g. `client_init.py`, `list_packages.py`, `show_package.py`, `source.py`, `config.py`, `mcp_serve.py`) and update them to reflect the target layout; CLI command names are unchanged so user-facing command reference sections need no changes
+- [X] T003 [P] Add a "Commands Layout Convention" subsection to `docs/DESIGN.md` section 11.1 describing the two rules: (1) every filename matches its CLI command name, (2) every group with 2+ subcommands is a `group/` directory with `__init__.py` + one file per subcommand
 
 **Checkpoint**: Docs updated and reviewed. No source code touched yet.
 
@@ -51,15 +51,15 @@ npx nx test aam-cli
 
 ### Test suite — Phase 2 import updates
 
-- [ ] T004 [US1] Run `rg 'aam_cli\.commands\.(client_init|list_packages|show_package)' apps/aam-cli/tests/` to enumerate all test files referencing the old module paths. For each match, update the import to use the new path (`commands.init`, `commands.list`, `commands.info` respectively). Known file: `test_unit_client_init.py`. Function names are unchanged (`client_init`, `list_packages`, `show_package`). Acceptance: zero matches when the `rg` scan is re-run after edits.
+- [X] T004 [US1] Run `rg 'aam_cli\.commands\.(client_init|list_packages|show_package)' apps/aam-cli/tests/` to enumerate all test files referencing the old module paths. For each match, update the import to use the new path (`commands.init`, `commands.list`, `commands.info` respectively). Known file: `test_unit_client_init.py`. Function names are unchanged (`client_init`, `list_packages`, `show_package`). Acceptance: zero matches when the `rg` scan is re-run after edits.
 
 ### Implementation — Phase 2
 
-- [ ] T005 [US1] Rename `commands/client_init.py` → `commands/init.py` (git mv to preserve history)
-- [ ] T006 [US1] Rename `commands/list_packages.py` → `commands/list.py` (git mv)
-- [ ] T007 [US1] Rename `commands/show_package.py` → `commands/info.py` (git mv)
-- [ ] T008 [US1] Update `main.py` import block: replace `from aam_cli.commands.client_init import client_init` → `from aam_cli.commands.init import client_init`, `from aam_cli.commands.list_packages import list_packages` → `from aam_cli.commands.list import list_packages`, `from aam_cli.commands.show_package import show_package` → `from aam_cli.commands.info import show_package` (function names unchanged)
-- [ ] T009 [US1] Run `npx nx test aam-cli` and confirm all tests pass; run `aam init --help`, `aam list --help`, `aam info --help`
+- [X] T005 [US1] Rename `commands/client_init.py` → `commands/init.py` (git mv to preserve history)
+- [X] T006 [US1] Rename `commands/list_packages.py` → `commands/list.py` (git mv)
+- [X] T007 [US1] Rename `commands/show_package.py` → `commands/info.py` (git mv)
+- [X] T008 [US1] Update `main.py` import block: replace `from aam_cli.commands.client_init import client_init` → `from aam_cli.commands.init import client_init`, `from aam_cli.commands.list_packages import list_packages` → `from aam_cli.commands.list import list_packages`, `from aam_cli.commands.show_package import show_package` → `from aam_cli.commands.info import show_package` (function names unchanged)
+- [X] T009 [US1] Run `npx nx test aam-cli` and confirm all tests pass; run `aam init --help`, `aam list --help`, `aam info --help`
 
 **Checkpoint**: US1 complete. Developer can navigate to any renamed command by CLI name. All tests green.
 
@@ -83,20 +83,20 @@ npx nx test aam-cli
 
 ### Test suite — Phase 3 import updates
 
-- [ ] T010 [US2] Update `apps/aam-cli/tests/unit/test_unit_create_from_source.py` line 22: change `from aam_cli.commands.create_package import create_package` → `from aam_cli.commands.pkg.create import pkg_create`; update all references to `create_package` in the file to use `pkg_create`; update the class/test docstrings if they reference the old module path
+- [X] T010 [US2] Update `apps/aam-cli/tests/unit/test_unit_create_from_source.py` line 22: change `from aam_cli.commands.create_package import create_package` → `from aam_cli.commands.pkg.create import pkg_create`; update all references to `create_package` in the file to use `pkg_create`; update the class/test docstrings if they reference the old module path
 
 ### Implementation — Phase 3
 
-- [ ] T011 [US2] Consolidate `commands/pkg/create.py`: read `commands/create_package.py` (1058 lines) and replace the `ctx.invoke(create_package, ...)` delegation at the top of `pkg/create.py` with the full implementation body; keep function name `pkg_create` and decorator `@click.command("create")`; remove the `from aam_cli.commands.create_package import create_package` import
-- [ ] T012 [US2] Consolidate `commands/pkg/init.py`: the file already contains `--migrate` logic (lines 69-92); replace the `ctx.invoke(init_package, name=name)` call (approx line 97) with the inline body from `commands/init_package.py`; remove `from aam_cli.commands.init_package import init_package`
-- [ ] T013 [P] [US2] Consolidate `commands/pkg/build.py`: replace the `ctx.invoke` wrapper with full body from `commands/build.py` (~96 lines); keep function name `pkg_build`
-- [ ] T014 [P] [US2] Consolidate `commands/pkg/pack.py`: replace wrapper with full body from `commands/pack.py` (~161 lines); keep function name `pkg_pack`
-- [ ] T015 [P] [US2] Consolidate `commands/pkg/publish.py`: replace wrapper with full body from `commands/publish.py` (~150 lines); keep function name `pkg_publish`
-- [ ] T016 [P] [US2] Consolidate `commands/pkg/validate.py`: replace wrapper with full body from `commands/validate.py` (~165 lines, including `--permissions` flag); keep function name `pkg_validate`
-- [ ] T017 [US2] Update `commands/init.py` (renamed from `client_init.py`): change `from aam_cli.commands.init_package import init_package` → `from aam_cli.commands.pkg.init import pkg_init`; change `ctx.invoke(init_package, name=name)` → `ctx.invoke(pkg_init, name=name)`
-- [ ] T018 [US2] Delete top-level originals: `commands/create_package.py`, `commands/init_package.py`, `commands/build.py`, `commands/pack.py`, `commands/publish.py`, `commands/validate.py`
-- [ ] T019 [US2] Update `main.py`: remove imports of `build`, `create_package`, `publish`, `pack`, `validate` modules from the bulk import block (lines 142-150 area); these will be handled by deprecated aliases in Phase 6
-- [ ] T020 [US2] Run `npx nx test aam-cli` and confirm all tests pass; run all 6 `aam pkg <subcommand> --help` commands
+- [X] T011 [US2] Consolidate `commands/pkg/create.py`: read `commands/create_package.py` (1058 lines) and replace the `ctx.invoke(create_package, ...)` delegation at the top of `pkg/create.py` with the full implementation body; keep function name `pkg_create` and decorator `@click.command("create")`; remove the `from aam_cli.commands.create_package import create_package` import
+- [X] T012 [US2] Consolidate `commands/pkg/init.py`: the file already contains `--migrate` logic (lines 69-92); replace the `ctx.invoke(init_package, name=name)` call (approx line 97) with the inline body from `commands/init_package.py`; remove `from aam_cli.commands.init_package import init_package`
+- [X] T013 [P] [US2] Consolidate `commands/pkg/build.py`: replace the `ctx.invoke` wrapper with full body from `commands/build.py` (~96 lines); keep function name `pkg_build`
+- [X] T014 [P] [US2] Consolidate `commands/pkg/pack.py`: replace wrapper with full body from `commands/pack.py` (~161 lines); keep function name `pkg_pack`
+- [X] T015 [P] [US2] Consolidate `commands/pkg/publish.py`: replace wrapper with full body from `commands/publish.py` (~150 lines); keep function name `pkg_publish`
+- [X] T016 [P] [US2] Consolidate `commands/pkg/validate.py`: replace wrapper with full body from `commands/validate.py` (~165 lines, including `--permissions` flag); keep function name `pkg_validate`
+- [X] T017 [US2] Update `commands/init.py` (renamed from `client_init.py`): change `from aam_cli.commands.init_package import init_package` → `from aam_cli.commands.pkg.init import pkg_init`; change `ctx.invoke(init_package, name=name)` → `ctx.invoke(pkg_init, name=name)`
+- [X] T018 [US2] Delete top-level originals: `commands/create_package.py`, `commands/init_package.py`, `commands/build.py`, `commands/pack.py`, `commands/publish.py`, `commands/validate.py`
+- [X] T019 [US2] Update `main.py`: remove imports of `build`, `create_package`, `publish`, `pack`, `validate` modules from the bulk import block (lines 142-150 area); these will be handled by deprecated aliases in Phase 6
+- [X] T020 [US2] Run `npx nx test aam-cli` and confirm all tests pass; run all 6 `aam pkg <subcommand> --help` commands
 
 **Checkpoint**: US2 complete. Zero duplicated implementations. All pkg subcommands work. All tests green.
 
@@ -122,16 +122,16 @@ npx nx test aam-cli
 
 ### Implementation — Phase 4
 
-- [ ] T021 [US3] Create `commands/source/__init__.py`: define `@click.group()` function `source` with console context setup (copy lines 36-48 from current `source.py`); import and register all 7 subcommands via `source.add_command(fn, "name")` following the exact pattern in `pkg/__init__.py`
-- [ ] T022 [P] [US3] Create `commands/source/add.py`: extract `add()` function (approx lines 81-161 of `source.py`); change `@source.command()` → `@click.command()`; bring all needed imports (services, Rich, etc.) into the file
-- [ ] T023 [P] [US3] Create `commands/source/scan.py`: extract `scan()` function (approx lines 170-253); change decorator; bring imports
-- [ ] T024 [P] [US3] Create `commands/source/update.py`: extract `update()` function (approx lines 263-385); change decorator; bring imports
-- [ ] T025 [P] [US3] Create `commands/source/list.py`: extract `list_cmd()` function (approx lines 395-466); register as `"list"` in `__init__.py`; change decorator; bring imports
-- [ ] T026 [P] [US3] Create `commands/source/remove.py`: extract `remove()` function (approx lines 476-513); change decorator; bring imports
-- [ ] T027 [P] [US3] Create `commands/source/candidates.py`: extract `candidates()` function (approx lines 523-599); change decorator; bring imports
-- [ ] T028 [P] [US3] Create `commands/source/enable_defaults.py`: extract `enable_defaults()` function (approx lines 609-716); register as `"enable-defaults"` in `__init__.py`; change decorator; bring imports
-- [ ] T029 [US3] Delete `commands/source.py`; verify `from aam_cli.commands.source import source` in `main.py` is unchanged (now resolves to `source/__init__.py`)
-- [ ] T030 [US3] Run `npx nx test aam-cli` and confirm all tests pass; smoke-test all 7 `aam source <subcommand> --help` commands
+- [X] T021 [US3] Create `commands/source/__init__.py`: define `@click.group()` function `source` with console context setup (copy lines 36-48 from current `source.py`); import and register all 7 subcommands via `source.add_command(fn, "name")` following the exact pattern in `pkg/__init__.py`
+- [X] T022 [P] [US3] Create `commands/source/add.py`: extract `add()` function (approx lines 81-161 of `source.py`); change `@source.command()` → `@click.command()`; bring all needed imports (services, Rich, etc.) into the file
+- [X] T023 [P] [US3] Create `commands/source/scan.py`: extract `scan()` function (approx lines 170-253); change decorator; bring imports
+- [X] T024 [P] [US3] Create `commands/source/update.py`: extract `update()` function (approx lines 263-385); change decorator; bring imports
+- [X] T025 [P] [US3] Create `commands/source/list.py`: extract `list_cmd()` function (approx lines 395-466); register as `"list"` in `__init__.py`; change decorator; bring imports
+- [X] T026 [P] [US3] Create `commands/source/remove.py`: extract `remove()` function (approx lines 476-513); change decorator; bring imports
+- [X] T027 [P] [US3] Create `commands/source/candidates.py`: extract `candidates()` function (approx lines 523-599); change decorator; bring imports
+- [X] T028 [P] [US3] Create `commands/source/enable_defaults.py`: extract `enable_defaults()` function (approx lines 609-716); register as `"enable-defaults"` in `__init__.py`; change decorator; bring imports
+- [X] T029 [US3] Delete `commands/source.py`; verify `from aam_cli.commands.source import source` in `main.py` is unchanged (now resolves to `source/__init__.py`)
+- [X] T030 [US3] Run `npx nx test aam-cli` and confirm all tests pass; smoke-test all 7 `aam source <subcommand> --help` commands
 
 **Checkpoint**: source/ split complete. All 7 subcommands work. All tests green.
 
@@ -157,45 +157,45 @@ npx nx test aam-cli
 
 ### Implementation — Phase 5a: config/ (214 lines, 3 subcommands)
 
-- [ ] T031 [US3] Create `commands/config/__init__.py`: group definition `@click.group()`, register 3 subcommands via `config.add_command()`
-- [ ] T032 [P] [US3] Create `commands/config/set.py`: extract `config_set()` (approx lines 51-106 of `config.py`); `@click.command()`; bring imports
-- [ ] T033 [P] [US3] Create `commands/config/get.py`: extract `config_get()` (approx lines 115-154); `@click.command()`; bring imports
-- [ ] T034 [P] [US3] Create `commands/config/list.py`: extract `config_list()` (approx lines 164-214); `@click.command()`; bring imports
-- [ ] T035 [US3] Delete `commands/config.py`; update `main.py` import: `from aam_cli.commands import config` → `from aam_cli.commands.config import config`; update registration: `cli.add_command(config.config)` → `cli.add_command(config)`
+- [X] T031 [US3] Create `commands/config/__init__.py`: group definition `@click.group()`, register 3 subcommands via `config.add_command()`
+- [X] T032 [P] [US3] Create `commands/config/set.py`: extract `config_set()` (approx lines 51-106 of `config.py`); `@click.command()`; bring imports
+- [X] T033 [P] [US3] Create `commands/config/get.py`: extract `config_get()` (approx lines 115-154); `@click.command()`; bring imports
+- [X] T034 [P] [US3] Create `commands/config/list.py`: extract `config_list()` (approx lines 164-214); `@click.command()`; bring imports
+- [X] T035 [US3] Delete `commands/config.py`; update `main.py` import: `from aam_cli.commands import config` → `from aam_cli.commands.config import config`; update registration: `cli.add_command(config.config)` → `cli.add_command(config)`
 
 ### Implementation — Phase 5b: registry/ (280 lines, 4 subcommands)
 
-- [ ] T036 [US3] Create `commands/registry/__init__.py`: group definition, register 4 subcommands
-- [ ] T037 [P] [US3] Create `commands/registry/init.py`: extract `registry_init()` from `registry.py`; `@click.command()`; bring imports
-- [ ] T038 [P] [US3] Create `commands/registry/add.py`: extract `registry_add()`; `@click.command()`; bring imports
-- [ ] T039 [P] [US3] Create `commands/registry/list.py`: extract `registry_list()`; `@click.command()`; bring imports
-- [ ] T040 [P] [US3] Create `commands/registry/remove.py`: extract `registry_remove()`; `@click.command()`; bring imports
-- [ ] T041 [US3] Delete `commands/registry.py`; update `main.py` import: `from aam_cli.commands import registry` → `from aam_cli.commands.registry import registry`; update registration: `cli.add_command(registry.registry)` → `cli.add_command(registry)`
+- [X] T036 [US3] Create `commands/registry/__init__.py`: group definition, register 4 subcommands
+- [X] T037 [P] [US3] Create `commands/registry/init.py`: extract `registry_init()` from `registry.py`; `@click.command()`; bring imports
+- [X] T038 [P] [US3] Create `commands/registry/add.py`: extract `registry_add()`; `@click.command()`; bring imports
+- [X] T039 [P] [US3] Create `commands/registry/list.py`: extract `registry_list()`; `@click.command()`; bring imports
+- [X] T040 [P] [US3] Create `commands/registry/remove.py`: extract `registry_remove()`; `@click.command()`; bring imports
+- [X] T041 [US3] Delete `commands/registry.py`; update `main.py` import: `from aam_cli.commands import registry` → `from aam_cli.commands.registry import registry`; update registration: `cli.add_command(registry.registry)` → `cli.add_command(registry)`
 
 ### Implementation — Phase 5c: auth/ (152 lines, 3 commands + helpers) ⚠️ Special case
 
-- [ ] T042 [US3] Create `commands/auth/__init__.py`: copy `AUTH_FILE`, `_load_auth()`, `_save_auth()`, `get_token()` helper functions directly into this file (NOT into subfiles); add group definition if needed; add re-exports: `from aam_cli.commands.auth.login import login`, `from aam_cli.commands.auth.logout import logout`, `from aam_cli.commands.auth.whoami import whoami` — this preserves `from aam_cli.commands.auth import get_token` used by `aam_cli/registry/factory.py` line 57
-- [ ] T043 [P] [US3] Create `commands/auth/login.py`: extract `login()` command from `auth.py`; import helpers from `aam_cli.commands.auth` (the `__init__.py`); `@click.command()`
-- [ ] T044 [P] [US3] Create `commands/auth/logout.py`: extract `logout()` command; import helpers from `aam_cli.commands.auth`; `@click.command()`
-- [ ] T045 [P] [US3] Create `commands/auth/whoami.py`: extract `whoami()` command; import helpers from `aam_cli.commands.auth`; `@click.command()`
-- [ ] T046 [US3] Delete `commands/auth.py`; verify `from aam_cli.commands.auth import get_token` resolves correctly: `python -c "from aam_cli.commands.auth import get_token; print('OK')"`; verify `from aam_cli.commands.auth import login, logout, whoami` still works from `main.py`
+- [X] T042 [US3] Create `commands/auth/__init__.py`: copy `AUTH_FILE`, `_load_auth()`, `_save_auth()`, `get_token()` helper functions directly into this file (NOT into subfiles); add group definition if needed; add re-exports: `from aam_cli.commands.auth.login import login`, `from aam_cli.commands.auth.logout import logout`, `from aam_cli.commands.auth.whoami import whoami` — this preserves `from aam_cli.commands.auth import get_token` used by `aam_cli/registry/factory.py` line 57
+- [X] T043 [P] [US3] Create `commands/auth/login.py`: extract `login()` command from `auth.py`; import helpers from `aam_cli.commands.auth` (the `__init__.py`); `@click.command()`
+- [X] T044 [P] [US3] Create `commands/auth/logout.py`: extract `logout()` command; import helpers from `aam_cli.commands.auth`; `@click.command()`
+- [X] T045 [P] [US3] Create `commands/auth/whoami.py`: extract `whoami()` command; import helpers from `aam_cli.commands.auth`; `@click.command()`
+- [X] T046 [US3] Delete `commands/auth.py`; verify `from aam_cli.commands.auth import get_token` resolves correctly: `python -c "from aam_cli.commands.auth import get_token; print('OK')"`; verify `from aam_cli.commands.auth import login, logout, whoami` still works from `main.py`
 
 ### Implementation — Phase 5d: cache/ (93 lines, 2 subcommands)
 
-- [ ] T047 [US3] Create `commands/cache/__init__.py`: group definition, register 2 subcommands
-- [ ] T048 [P] [US3] Create `commands/cache/clean.py`: extract `cache_clean()` (approx lines 42-66 of `cache.py`); `@click.command()`; bring imports
-- [ ] T049 [P] [US3] Create `commands/cache/ls.py`: extract `cache_ls()` (approx lines 69-93); `@click.command()`; bring imports
-- [ ] T050 [US3] Delete `commands/cache.py`; no `main.py` import changes needed (already imports `from aam_cli.commands.cache import cache`)
+- [X] T047 [US3] Create `commands/cache/__init__.py`: group definition, register 2 subcommands
+- [X] T048 [P] [US3] Create `commands/cache/clean.py`: extract `cache_clean()` (approx lines 42-66 of `cache.py`); `@click.command()`; bring imports
+- [X] T049 [P] [US3] Create `commands/cache/ls.py`: extract `cache_ls()` (approx lines 69-93); `@click.command()`; bring imports
+- [X] T050 [US3] Delete `commands/cache.py`; no `main.py` import changes needed (already imports `from aam_cli.commands.cache import cache`)
 
 ### Implementation — Phase 5e: mcp/ (214 lines, 1 subcommand)
 
-- [ ] T051 [US3] Create `commands/mcp/__init__.py`: define `@click.group()` function `mcp` with context setup; register `serve` subcommand via `mcp.add_command(serve, "serve")`
-- [ ] T052 [US3] Create `commands/mcp/serve.py`: extract `_configure_logging()` helper + `serve()` command (full 214-line body) from `mcp_serve.py`; change `@mcp.command("serve")` → `@click.command("serve")`; bring all imports
-- [ ] T053 [US3] Delete `commands/mcp_serve.py`; update `main.py` import: `from aam_cli.commands.mcp_serve import mcp` → `from aam_cli.commands.mcp import mcp`
+- [X] T051 [US3] Create `commands/mcp/__init__.py`: define `@click.group()` function `mcp` with context setup; register `serve` subcommand via `mcp.add_command(serve, "serve")`
+- [X] T052 [US3] Create `commands/mcp/serve.py`: extract `_configure_logging()` helper + `serve()` command (full 214-line body) from `mcp_serve.py`; change `@mcp.command("serve")` → `@click.command("serve")`; bring all imports
+- [X] T053 [US3] Delete `commands/mcp_serve.py`; update `main.py` import: `from aam_cli.commands.mcp_serve import mcp` → `from aam_cli.commands.mcp import mcp`
 
 ### Test suite — Phase 5 verification
 
-- [ ] T054 [US3] Run `npx nx test aam-cli` and confirm all tests pass after all group splits; verify `auth.get_token()` public interface; run `--help` for each new group directory
+- [X] T054 [US3] Run `npx nx test aam-cli` and confirm all tests pass after all group splits; verify `auth.get_token()` public interface; run `--help` for each new group directory
 
 **Checkpoint**: US3 complete. All 6 inline group files split. Zero monolithic command files. All tests green.
 
@@ -216,9 +216,9 @@ rg 'from aam_cli\.commands import (build|create_package|publish|pack|validate)' 
 
 ### Implementation — Phase 6
 
-- [ ] T055 [US4] Rewrite `main.py` import block (lines 142-176): replace with the clean uniform style from `plan.md` — first block is `# Groups (from package __init__)` with 7 imports; second block is `# Top-level commands (direct function imports)` with 20 imports; remove all deprecated module-level imports of `build`, `create_package`, `publish`, `pack`, `validate`
-- [ ] T056 [US4] Update command registrations in `main.py`: change `cli.add_command(install.install)` → `cli.add_command(install)`, `cli.add_command(search.search)` → `cli.add_command(search)`, `cli.add_command(config.config)` → `cli.add_command(config)`, `cli.add_command(registry.registry)` → `cli.add_command(registry)`
-- [ ] T057 [US4] Run `aam --help` and verify all 10 help sections render correctly (Getting Started, Package Management, Package Integrity, Dependency Management, Testing, Package Authoring, Source Management, Configuration, Authentication, Utilities)
+- [X] T055 [US4] Rewrite `main.py` import block (lines 142-176): replace with the clean uniform style from `plan.md` — first block is `# Groups (from package __init__)` with 7 imports; second block is `# Top-level commands (direct function imports)` with 20 imports; remove all deprecated module-level imports of `build`, `create_package`, `publish`, `pack`, `validate`
+- [X] T056 [US4] Update command registrations in `main.py`: change `cli.add_command(install.install)` → `cli.add_command(install)`, `cli.add_command(search.search)` → `cli.add_command(search)`, `cli.add_command(config.config)` → `cli.add_command(config)`, `cli.add_command(registry.registry)` → `cli.add_command(registry)`
+- [X] T057 [US4] Run `aam --help` and verify all 10 help sections render correctly (Getting Started, Package Management, Package Integrity, Dependency Management, Testing, Package Authoring, Source Management, Configuration, Authentication, Utilities)
 
 **Checkpoint**: US4 complete. `main.py` imports are clean and uniform. `aam --help` renders all sections.
 
@@ -243,9 +243,9 @@ aam update --help          # shows hidden alias for aam upgrade
 
 ### Implementation — Phase 7
 
-- [ ] T058 [US5] Create `commands/_deprecated.py`: define `register_deprecated_aliases(cli: click.Group) -> None` function; move all 6 alias definitions (`deprecated_create_package`, `deprecated_validate`, `deprecated_pack`, `deprecated_publish`, `deprecated_build`, `update_alias`) from `main.py` into this function; update each alias to use lazy imports inside the alias body (e.g. `from aam_cli.commands.pkg.create import pkg_create`) instead of module-level imports; add module-level docstring and logger
-- [ ] T059 [US5] Update `main.py`: remove the entire deprecated aliases block (lines 279-365); replace with two lines: `from aam_cli.commands._deprecated import register_deprecated_aliases` and `register_deprecated_aliases(cli)`
-- [ ] T060 [US5] Run all 6 deprecated alias commands and verify each displays the deprecation warning message and delegates correctly; run `npx nx test aam-cli`
+- [X] T058 [US5] Create `commands/_deprecated.py`: define `register_deprecated_aliases(cli: click.Group) -> None` function; move all 6 alias definitions (`deprecated_create_package`, `deprecated_validate`, `deprecated_pack`, `deprecated_publish`, `deprecated_build`, `update_alias`) from `main.py` into this function; update each alias to use lazy imports inside the alias body (e.g. `from aam_cli.commands.pkg.create import pkg_create`) instead of module-level imports; add module-level docstring and logger
+- [X] T059 [US5] Update `main.py`: remove the entire deprecated aliases block (lines 279-365); replace with two lines: `from aam_cli.commands._deprecated import register_deprecated_aliases` and `register_deprecated_aliases(cli)`
+- [X] T060 [US5] Run all 6 deprecated alias commands and verify each displays the deprecation warning message and delegates correctly; run `npx nx test aam-cli`
 
 **Checkpoint**: US5 complete. Aliases centralized. `main.py` is clean.
 
@@ -255,20 +255,20 @@ aam update --help          # shows hidden alias for aam upgrade
 
 **Purpose**: Confirm zero orphaned imports, full test suite green, complete CLI smoke test.
 
-- [ ] T061 Run orphan import scan — **acceptance: both commands exit with code 1 (no matches)**:
+- [X] T061 Run orphan import scan — **acceptance: both commands exit with code 1 (no matches)**:
   ```bash
   rg 'aam_cli\.commands\.(client_init|list_packages|show_package|create_package|init_package|mcp_serve)' apps/aam-cli/
   rg 'from aam_cli\.commands import (build|pack|publish|validate)' apps/aam-cli/src/
   ```
   If either returns matches, the phase is not complete — fix the stale import before proceeding.
-- [ ] T062 Run full test suite: `npx nx test aam-cli` — confirm 0 failures, 0 errors
-- [ ] T063 [P] Run complete CLI smoke test for all 20 top-level commands — **acceptance: all 20 print "OK"**, zero failures:
+- [X] T062 Run full test suite: `npx nx test aam-cli` — confirm 0 failures, 0 errors
+- [X] T063 [P] Run complete CLI smoke test for all 20 top-level commands — **acceptance: all 20 print "OK"**, zero failures:
   ```bash
   for cmd in init install uninstall upgrade outdated search list info verify diff tree why check audit dedupe prune test eval doctor convert; do
     aam $cmd --help > /dev/null && echo "OK: aam $cmd" || echo "FAIL: aam $cmd"
   done
   ```
-- [ ] T064 [P] Run complete CLI smoke test for all 23 group subcommands — **acceptance: all 23 print "OK"**, zero failures:
+- [X] T064 [P] Run complete CLI smoke test for all 23 group subcommands — **acceptance: all 23 print "OK"**, zero failures:
   ```bash
   for c in "pkg init" "pkg create" "pkg validate" "pkg pack" "pkg publish" "pkg build" \
     "source add" "source scan" "source update" "source list" "source remove" "source candidates" "source enable-defaults" \
@@ -278,13 +278,13 @@ aam update --help          # shows hidden alias for aam upgrade
     aam $c --help > /dev/null && echo "OK: aam $c" || echo "FAIL: aam $c"
   done
   ```
-- [ ] T065 [P] Run all 6 deprecated alias smoke tests — **acceptance: each prints deprecation warning AND shows help text** (exit code 0):
+- [X] T065 [P] Run all 6 deprecated alias smoke tests — **acceptance: each prints deprecation warning AND shows help text** (exit code 0):
   ```bash
   for alias in create-package validate pack publish build update; do
     aam $alias --help 2>&1 | head -5 && echo "OK: aam $alias" || echo "FAIL: aam $alias"
   done
   ```
-- [ ] T066 Verify final file tree matches target layout:
+- [X] T066 Verify final file tree matches target layout:
   ```bash
   find apps/aam-cli/src/aam_cli/commands/ -name '*.py' | sort
   ```

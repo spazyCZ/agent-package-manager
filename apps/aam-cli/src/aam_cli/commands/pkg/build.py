@@ -14,8 +14,7 @@ Reference: spec 004 US7.
 import logging
 
 import click
-
-from aam_cli.commands.build import build
+from rich.console import Console
 
 ################################################################################
 #                                                                              #
@@ -69,9 +68,24 @@ def pkg_build(ctx: click.Context, target: str, output: str) -> None:
         aam pkg build --target copilot --output ./releases/
         aam pkg build --target all
     """
-    logger.info(f"pkg build invoked: target='{target}'")
+    console: Console = ctx.obj["console"]
 
     # -----
-    # Delegate to the existing build command handler
+    # Log command invocation
     # -----
-    ctx.invoke(build, target=target, output=output)
+    logger.info(f"Building portable bundle: target='{target}', output='{output}'")
+
+    # -----
+    # Step 1: Validate that we are inside a valid AAM package
+    # -----
+    console.print(f"[bold blue]Building bundle[/bold blue] for target: [bold]{target}[/bold]")
+
+    # TODO: Parse aam.yaml from current directory
+    # TODO: Resolve all dependencies
+    # TODO: Run platform adapter to compile artifacts for the target
+    # TODO: Package compiled artifacts + bundle.json into .bundle.aam
+    # TODO: Write output to the specified directory
+
+    console.print(
+        f"\n[dim]Bundle build is not yet implemented. Output would be written to: {output}/[/dim]"
+    )

@@ -2464,68 +2464,115 @@ AAM auto-generates appropriate `.gitignore` entries.
 
 ### 11.1 Module Structure
 
-```
-aam/
+The CLI implementation lives in `apps/aam-cli/src/aam_cli/`. The most
+important rule is that the `commands/` directory mirrors the public CLI
+surface: top-level commands use one file per command, and multi-command groups
+use one directory per group.
+
+```text
+apps/aam-cli/src/aam_cli/
 ├── __init__.py
-├── __main__.py             # Entry point: python -m aam
-├── cli/
+├── main.py                        # Click CLI entry point
+├── commands/
 │   ├── __init__.py
-│   ├── main.py             # Click/Typer CLI app
-│   ├── pkg/               # aam pkg command group (create, validate, pack, publish, build)
-│   ├── install.py          # aam install command
-│   ├── init.py             # aam init command
-│   ├── deploy.py           # aam deploy command
-│   ├── publish.py          # aam pkg publish command
-│   ├── search.py           # aam search command
-│   ├── config.py           # aam config command
-│   ├── register.py         # aam register command (HTTP registry)
-│   ├── login.py            # aam login / logout commands
-│   └── yank.py             # aam yank command
-├── core/
-│   ├── __init__.py
-│   ├── manifest.py         # aam.yaml parsing and validation
-│   ├── package.py          # Package model
-│   ├── artifact.py         # Artifact models (Skill, Agent, Command, Instruction)
-│   ├── resolver.py         # Dependency resolution
-│   ├── installer.py        # Download + extract + deploy orchestration
-│   ├── version.py          # Semver parsing and constraint matching
-│   └── auth.py             # Token management and credentials
-├── signing/
-│   ├── __init__.py
-│   ├── checksum.py         # SHA-256 calculation and verification
-│   ├── sigstore.py         # Sigstore signing/verification
-│   └── gpg.py              # GPG signing/verification
-├── registry/
-│   ├── __init__.py
-│   ├── base.py             # Registry interface
-│   ├── git.py              # Git-based registry
-│   ├── http.py             # HTTP registry client
-│   └── local.py            # Local filesystem registry
-├── mcp/
-│   ├── __init__.py
-│   ├── server.py           # FastMCP server instance and entry point
-│   ├── tools.py            # @mcp.tool definitions (wrapping CLI core logic)
-│   └── resources.py        # @mcp.resource definitions (read-only data providers)
-├── adapters/
-│   ├── __init__.py
-│   ├── base.py             # Platform adapter interface
-│   ├── cursor.py           # Cursor deployment
-│   ├── copilot.py          # GitHub Copilot deployment
-│   ├── claude.py           # Claude deployment
-│   └── codex.py            # OpenAI Codex deployment
-└── utils/
-    ├── __init__.py
-    ├── archive.py          # .aam archive creation/extraction
-    ├── yaml_utils.py       # YAML helpers
-    └── paths.py            # Path resolution utilities
+│   ├── _deprecated.py             # Deprecated aliases
+│   │
+│   ├── init.py                    # aam init
+│   ├── install.py                 # aam install
+│   ├── uninstall.py               # aam uninstall
+│   ├── upgrade.py                 # aam upgrade
+│   ├── outdated.py                # aam outdated
+│   ├── search.py                  # aam search
+│   ├── list.py                    # aam list
+│   ├── info.py                    # aam info
+│   ├── verify.py                  # aam verify
+│   ├── diff.py                    # aam diff
+│   ├── tree.py                    # aam tree
+│   ├── why.py                     # aam why
+│   ├── check.py                   # aam check
+│   ├── audit.py                   # aam audit
+│   ├── dedupe.py                  # aam dedupe
+│   ├── prune.py                   # aam prune
+│   ├── test.py                    # aam test
+│   ├── eval.py                    # aam eval
+│   ├── doctor.py                  # aam doctor
+│   ├── convert.py                 # aam convert
+│   │
+│   ├── pkg/                       # aam pkg <subcommand>
+│   │   ├── __init__.py
+│   │   ├── init.py
+│   │   ├── create.py
+│   │   ├── validate.py
+│   │   ├── pack.py
+│   │   ├── publish.py
+│   │   └── build.py
+│   │
+│   ├── source/                    # aam source <subcommand>
+│   │   ├── __init__.py
+│   │   ├── add.py
+│   │   ├── scan.py
+│   │   ├── update.py
+│   │   ├── list.py
+│   │   ├── remove.py
+│   │   ├── candidates.py
+│   │   └── enable_defaults.py
+│   │
+│   ├── config/                    # aam config <subcommand>
+│   │   ├── __init__.py
+│   │   ├── set.py
+│   │   ├── get.py
+│   │   └── list.py
+│   │
+│   ├── registry/                  # aam registry <subcommand>
+│   │   ├── __init__.py
+│   │   ├── init.py
+│   │   ├── add.py
+│   │   ├── list.py
+│   │   └── remove.py
+│   │
+│   ├── auth/                      # Shared auth helpers + top-level auth cmds
+│   │   ├── __init__.py
+│   │   ├── login.py               # aam login
+│   │   ├── logout.py              # aam logout
+│   │   └── whoami.py              # aam whoami
+│   │
+│   ├── cache/                     # aam cache <subcommand>
+│   │   ├── __init__.py
+│   │   ├── clean.py
+│   │   └── ls.py
+│   │
+│   └── mcp/                       # aam mcp <subcommand>
+│       ├── __init__.py
+│       └── serve.py
+├── core/                          # Workspace, config, and manifest logic
+├── registry/                      # Registry client and backend adapters
+├── services/                      # CLI service layer
+├── adapters/                      # Cursor, Claude, Copilot, Codex deployers
+├── converters/                    # Format conversion helpers
+├── detection/                     # Local artifact discovery
+├── mcp/                           # MCP server implementation
+└── utils/                         # Shared utilities
 ```
+
+#### 11.1.1 Commands layout convention
+
+The command layout uses two conventions so you can locate command
+implementations quickly.
+
+1. Every top-level command filename matches the CLI command name. For example,
+   `aam info` maps to `commands/info.py`, and `aam list` maps to
+   `commands/list.py`.
+2. Every command group with two or more subcommands is a directory with an
+   `__init__.py` registration module and one file per subcommand. For example,
+   `aam source add` maps to `commands/source/add.py`, while
+   `aam registry remove` maps to `commands/registry/remove.py`.
 
 ### 11.2 Technology Stack
 
 | Component | Choice | Rationale |
 |-----------|--------|-----------|
 | Language | Python 3.11+ | Matches target audience, easy to install via pip |
-| CLI framework | Typer | Modern, type-annotated CLI with auto-generated help |
+| CLI framework | Click | Stable CLI framework with explicit groups, commands, and help generation |
 | YAML parsing | PyYAML + pydantic | Schema validation with pydantic models |
 | Archive format | tar.gz (renamed .aam) | Simple, universal, transparent |
 | Version parsing | packaging library | Standard Python semver implementation |

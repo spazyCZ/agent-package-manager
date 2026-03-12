@@ -87,9 +87,9 @@ def client_init(ctx: click.Context, name: str | None, yes: bool, project: bool) 
             "aam init <name>",
             "aam pkg init <name>",
         )
-        from aam_cli.commands.init_package import init_package
+        from aam_cli.commands.pkg.init import pkg_init
 
-        ctx.invoke(init_package, name=name)
+        ctx.invoke(pkg_init, name=name)
         return
 
     logger.info(f"Client init invoked: yes={yes}, project={project}")

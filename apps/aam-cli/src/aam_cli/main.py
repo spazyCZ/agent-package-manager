@@ -18,7 +18,6 @@ import click
 from rich.console import Console
 
 from aam_cli import __version__
-from aam_cli.utils.deprecation import print_deprecation_warning
 
 ################################################################################
 #                                                                              #
@@ -139,41 +138,37 @@ def cli(ctx: click.Context, verbose: bool) -> None:
 #                                                                              #
 ################################################################################
 
-from aam_cli.commands import (  # noqa: E402
-    build,
-    config,
-    create_package,
-    install,
-    publish,
-    registry,
-    search,
-)
-from aam_cli.commands.audit import audit  # noqa: E402
-from aam_cli.commands.check import check  # noqa: E402
-from aam_cli.commands.client_init import client_init  # noqa: E402
-from aam_cli.commands.convert import convert  # noqa: E402
-from aam_cli.commands.dedupe import dedupe  # noqa: E402
-from aam_cli.commands.diff import diff_cmd  # noqa: E402
-from aam_cli.commands.doctor import doctor  # noqa: E402
-from aam_cli.commands.list_packages import list_packages  # noqa: E402
-from aam_cli.commands.mcp_serve import mcp  # noqa: E402
-from aam_cli.commands.outdated import outdated  # noqa: E402
-from aam_cli.commands.pack import pack  # noqa: E402
+# Groups (from package __init__)
 from aam_cli.commands.pkg import pkg  # noqa: E402
-from aam_cli.commands.prune import prune  # noqa: E402
-from aam_cli.commands.show_package import show_package  # noqa: E402
 from aam_cli.commands.source import source  # noqa: E402
-from aam_cli.commands.tree import tree  # noqa: E402
+from aam_cli.commands.config import config  # noqa: E402
+from aam_cli.commands.registry import registry  # noqa: E402
+from aam_cli.commands.auth import login, logout, whoami  # noqa: E402
+from aam_cli.commands._deprecated import register_deprecated_aliases  # noqa: E402
+from aam_cli.commands.cache import cache  # noqa: E402
+from aam_cli.commands.mcp import mcp  # noqa: E402
+
+# Top-level commands (direct function imports)
+from aam_cli.commands.init import client_init  # noqa: E402
+from aam_cli.commands.install import install  # noqa: E402
 from aam_cli.commands.uninstall import uninstall  # noqa: E402
 from aam_cli.commands.upgrade import upgrade  # noqa: E402
-from aam_cli.commands.validate import validate  # noqa: E402
+from aam_cli.commands.outdated import outdated  # noqa: E402
+from aam_cli.commands.search import search  # noqa: E402
+from aam_cli.commands.list import list_packages  # noqa: E402
+from aam_cli.commands.info import show_package  # noqa: E402
 from aam_cli.commands.verify import verify  # noqa: E402
+from aam_cli.commands.diff import diff_cmd  # noqa: E402
+from aam_cli.commands.tree import tree  # noqa: E402
 from aam_cli.commands.why import why  # noqa: E402
-
-from aam_cli.commands.auth import login, logout, whoami  # noqa: E402
-from aam_cli.commands.cache import cache  # noqa: E402
-from aam_cli.commands.eval import eval_cmd  # noqa: E402
+from aam_cli.commands.check import check  # noqa: E402
+from aam_cli.commands.audit import audit  # noqa: E402
+from aam_cli.commands.dedupe import dedupe  # noqa: E402
+from aam_cli.commands.prune import prune  # noqa: E402
 from aam_cli.commands.test import test  # noqa: E402
+from aam_cli.commands.eval import eval_cmd  # noqa: E402
+from aam_cli.commands.doctor import doctor  # noqa: E402
+from aam_cli.commands.convert import convert  # noqa: E402
 
 ################################################################################
 #                                                                              #
@@ -189,11 +184,11 @@ cli.add_command(client_init)
 #                                                                              #
 ################################################################################
 
-cli.add_command(install.install)
+cli.add_command(install)
 cli.add_command(uninstall)
 cli.add_command(upgrade)
 cli.add_command(outdated)
-cli.add_command(search.search)
+cli.add_command(search)
 cli.add_command(list_packages)
 cli.add_command(show_package)
 
@@ -243,8 +238,8 @@ cli.add_command(source)
 #                                                                              #
 ################################################################################
 
-cli.add_command(config.config)
-cli.add_command(registry.registry)
+cli.add_command(config)
+cli.add_command(registry)
 
 ################################################################################
 #                                                                              #
@@ -275,93 +270,7 @@ cli.add_command(cache)
 #                                                                              #
 ################################################################################
 
-
-@cli.command("create-package", hidden=True)
-@click.argument(
-    "path",
-    default=".",
-    type=click.Path(exists=True, file_okay=False, resolve_path=True),
-)
-@click.option("--all", "include_all", is_flag=True)
-@click.option("--type", "-t", "artifact_types", multiple=True)
-@click.option("--platform", "-p", "platforms", multiple=True)
-@click.option("--organize", default="copy")
-@click.option("--include", "includes", multiple=True, type=click.Path())
-@click.option("--include-as", default=None)
-@click.option("--name", "pkg_name", default=None)
-@click.option("--scope", "pkg_scope", default=None)
-@click.option("--version", "pkg_version", default=None)
-@click.option("--description", "pkg_description", default=None)
-@click.option("--author", "pkg_author", default=None)
-@click.option("--dry-run", is_flag=True)
-@click.option("--output-dir", type=click.Path(file_okay=False, resolve_path=True), default=None)
-@click.option("-y", "--yes", is_flag=True)
-@click.option("--from-source", "from_source", default=None)
-@click.option("--artifacts", "artifact_names", multiple=True)
-@click.pass_context
-def deprecated_create_package(ctx: click.Context, /, **kwargs: object) -> None:
-    """(Deprecated) Use 'aam pkg create' instead."""
-    print_deprecation_warning("aam create-package", "aam pkg create")
-    ctx.invoke(create_package.create_package, **kwargs)
-
-
-@cli.command("validate", hidden=True)
-@click.argument("path", default=".", type=click.Path(exists=True))
-@click.pass_context
-def deprecated_validate(ctx: click.Context, path: str) -> None:
-    """(Deprecated) Use 'aam pkg validate' instead."""
-    print_deprecation_warning("aam validate", "aam pkg validate")
-    ctx.invoke(validate, path=path)
-
-
-@cli.command("pack", hidden=True)
-@click.argument("path", default=".", type=click.Path(exists=True))
-@click.pass_context
-def deprecated_pack(ctx: click.Context, path: str) -> None:
-    """(Deprecated) Use 'aam pkg pack' instead."""
-    print_deprecation_warning("aam pack", "aam pkg pack")
-    ctx.invoke(pack, path=path)
-
-
-@cli.command("publish", hidden=True)
-@click.option("--registry", "registry_name", default=None)
-@click.option("--tag", default="latest")
-@click.option("--dry-run", is_flag=True)
-@click.pass_context
-def deprecated_publish(
-    ctx: click.Context,
-    registry_name: str | None,
-    tag: str,
-    dry_run: bool,
-) -> None:
-    """(Deprecated) Use 'aam pkg publish' instead."""
-    print_deprecation_warning("aam publish", "aam pkg publish")
-    ctx.invoke(publish.publish, registry_name=registry_name, tag=tag, dry_run=dry_run)
-
-
-@cli.command("build", hidden=True)
-@click.option("--target", "-t", required=True)
-@click.option("--output", "-o", default="dist", type=click.Path())
-@click.pass_context
-def deprecated_build(ctx: click.Context, target: str, output: str) -> None:
-    """(Deprecated) Use 'aam pkg build' instead."""
-    print_deprecation_warning("aam build", "aam pkg build")
-    ctx.invoke(build.build, target=target, output=output)
-
-
-@cli.command("update", hidden=True)
-@click.argument("package", required=False)
-@click.option("--dry-run", is_flag=True)
-@click.option("--force", "-f", is_flag=True)
-@click.pass_context
-def update_alias(
-    ctx: click.Context,
-    package: str | None,
-    dry_run: bool,
-    force: bool,
-) -> None:
-    """(Hidden alias) Synonym for 'aam upgrade' — npm convention."""
-    ctx.invoke(upgrade, package=package, dry_run=dry_run, force=force)
+register_deprecated_aliases(cli)
 
 
 ################################################################################

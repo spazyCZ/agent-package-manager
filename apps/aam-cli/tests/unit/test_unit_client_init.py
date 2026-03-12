@@ -244,8 +244,8 @@ class TestOrchestrateInit:
 class TestClientInitCommand:
     """Tests for the ``aam init`` Click command."""
 
-    @patch("aam_cli.commands.client_init.orchestrate_init")
-    @patch("aam_cli.commands.client_init.detect_platform")
+    @patch("aam_cli.commands.init.orchestrate_init")
+    @patch("aam_cli.commands.init.detect_platform")
     @patch("aam_cli.utils.paths.get_global_aam_dir")
     def test_yes_flag_uses_defaults(
         self,
@@ -274,8 +274,8 @@ class TestClientInitCommand:
             skip_sources=False,
         )
 
-    @patch("aam_cli.commands.client_init.orchestrate_init")
-    @patch("aam_cli.commands.client_init.detect_platform")
+    @patch("aam_cli.commands.init.orchestrate_init")
+    @patch("aam_cli.commands.init.detect_platform")
     @patch("aam_cli.utils.paths.get_global_aam_dir")
     def test_yes_flag_cursor_default_no_detection(
         self,
@@ -325,8 +325,8 @@ class TestClientInitCommand:
         assert "init" in result.output
         assert "Getting Started" in result.output
 
-    @patch("aam_cli.commands.client_init.orchestrate_init")
-    @patch("aam_cli.commands.client_init.detect_platform")
+    @patch("aam_cli.commands.init.orchestrate_init")
+    @patch("aam_cli.commands.init.detect_platform")
     @patch("aam_cli.utils.paths.get_global_aam_dir")
     def test_reconfigure_summary(
         self,
@@ -353,8 +353,8 @@ class TestClientInitCommand:
         assert result.exit_code == 0
         assert "reconfigured" in result.output.lower()
 
-    @patch("aam_cli.commands.client_init.orchestrate_init")
-    @patch("aam_cli.commands.client_init.detect_platform")
+    @patch("aam_cli.commands.init.orchestrate_init")
+    @patch("aam_cli.commands.init.detect_platform")
     @patch("aam_cli.utils.paths.get_global_aam_dir")
     def test_next_steps_displayed(
         self,

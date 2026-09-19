@@ -15,6 +15,7 @@ import logging
 from pathlib import Path
 
 import pytest
+import yaml
 from click.testing import CliRunner
 
 from aam_cli.main import cli
@@ -356,6 +357,26 @@ class TestConfigCommand:
             )
             assert result.exit_code == 0
             assert "Set default_platform" in result.output
+
+    def test_unit_config_set_active_platforms_coerces_to_list(self) -> None:
+        """Test config set stores active_platforms as a YAML list."""
+        with self.runner.isolated_filesystem() as tmpdir:
+            result = self.runner.invoke(
+                cli,
+                ["config", "set", "active_platforms", "claude"],
+                env={"HOME": tmpdir},
+            )
+
+            assert result.exit_code == 0
+            assert "Pydantic serializer warnings" not in result.output
+
+            config_path = Path(tmpdir) / ".aam" / "config.yaml"
+            assert config_path.exists()
+
+            with config_path.open("r", encoding="utf-8") as config_file:
+                data = yaml.safe_load(config_file)
+
+            assert data["active_platforms"] == ["claude"]
 
 
 ################################################################################

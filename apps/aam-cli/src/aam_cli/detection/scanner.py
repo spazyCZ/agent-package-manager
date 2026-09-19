@@ -130,8 +130,11 @@ def _detect_skills(root: Path) -> list[DetectedArtifact]:
 
     Patterns:
       - ``**/SKILL.md`` (any location — parent dir is the skill)
-      - ``.cursor/skills/*/SKILL.md`` (Cursor convention)
-      - ``.codex/skills/*/SKILL.md`` (Codex convention)
+      - ``.cursor/skills/**/SKILL.md`` (Cursor convention)
+      - ``.github/skills/**/SKILL.md`` (Copilot convention)
+      - ``.claude/skills/**/SKILL.md`` (Claude Code convention)
+      - ``.agents/skills/**/SKILL.md`` (Codex / shared convention)
+      - ``.codex/skills/**/SKILL.md`` (Codex legacy convention)
     """
     artifacts: list[DetectedArtifact] = []
 
@@ -153,6 +156,21 @@ def _detect_skills(root: Path) -> list[DetectedArtifact]:
         if str_path.startswith(".cursor/skills/") or str_path.startswith(".cursor/"):
             platform = "cursor"
             source_dir = ".cursor"
+        elif str_path.startswith(".github/skills/") or str_path.startswith(
+            ".github/"
+        ):
+            platform = "copilot"
+            source_dir = ".github"
+        elif str_path.startswith(".claude/skills/") or str_path.startswith(
+            ".claude/"
+        ):
+            platform = "claude-code"
+            source_dir = ".claude"
+        elif str_path.startswith(".agents/skills/") or str_path.startswith(
+            ".agents/"
+        ):
+            platform = "codex"
+            source_dir = ".agents"
         elif str_path.startswith(".codex/skills/") or str_path.startswith(".codex/"):
             platform = "codex"
             source_dir = ".codex"

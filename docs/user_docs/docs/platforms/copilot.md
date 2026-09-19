@@ -54,7 +54,9 @@ Skills are copied as-is to `.github/skills/`. The entire skill directory structu
     └── template.md
 ```
 
-**Note:** GitHub Copilot has experimental support for SKILL.md files in `.github/skills/`.
+**Note:** GitHub Copilot discovers Agent Skills from `.github/skills/`,
+`.claude/skills/`, and `.agents/skills/`. AAM deploys Copilot skills to
+`.github/skills/`.
 
 ### Agents
 
@@ -483,7 +485,9 @@ GitHub Copilot reads `.github/instructions/` files and uses them to guide code s
 
 **Cause:** GitHub Copilot's skill support is experimental and may not be fully functional.
 
-**Note:** Copilot's SKILL.md support is limited. AAM deploys skills to `.github/skills/` for future compatibility, but Copilot may not use them yet.
+**Note:** Copilot loads Agent Skills from `.github/skills/` (and also
+discovers `.claude/skills/` and `.agents/skills/`). AAM deploys Copilot
+skills to `.github/skills/`.
 
 **Workaround:**
 

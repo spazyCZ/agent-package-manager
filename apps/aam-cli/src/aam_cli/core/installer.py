@@ -719,6 +719,21 @@ def _deploy_package(
     config_dict: dict[str, str] = {"package_name": manifest.name}
 
     # -----
+    # Pass skill_scope from package manifest platforms.<adapter.name>
+    # Default remains "project" when the platform block is missing.
+    # -----
+    platform_cfg = manifest.platforms.get(adapter.name)
+    if platform_cfg is not None:
+        config_dict["skill_scope"] = platform_cfg.skill_scope
+    else:
+        config_dict["skill_scope"] = "project"
+
+    logger.debug(
+        f"Deploy config for {adapter.name}: "
+        f"skill_scope={config_dict['skill_scope']}"
+    )
+
+    # -----
     # Resolve artifacts via auto-discovery if not explicitly declared
     # -----
     resolved_artifacts = discover_artifacts(package_dir, manifest)

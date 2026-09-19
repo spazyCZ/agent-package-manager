@@ -135,7 +135,27 @@ Verbose mode includes detailed workaround text for each warning:
 ### Skills
 
 Skills use a universal `SKILL.md` format and are **directly copied** between
-all platforms. Only the deployment path changes.
+all platforms. Frontmatter is not rewritten. Only the deployment path and
+nesting layout change:
+
+| Source → Target | Layout |
+|-----------------|--------|
+| Any → Cursor or Codex | Preserve nesting under the skills root (for example `shipping/land-it/`) |
+| Any → Copilot or Claude | Flatten to the `SKILL.md` parent folder name (for example `land-it/`) |
+
+**Discovery roots** (recursive `SKILL.md` search):
+
+| Platform | Roots |
+|----------|-------|
+| Cursor | `.cursor/skills/`, `.agents/skills/` |
+| Copilot | `.github/skills/`, `.agents/skills/` |
+| Claude | `.claude/skills/` |
+| Codex | `.agents/skills/`, legacy `.codex/skills/` |
+
+When the same relative path exists under both a platform-specific root and
+`.agents/skills/`, the converter prefers the platform-specific root and
+skips the duplicate with a warning. Flatten collisions (two nested skills
+with the same folder name) skip the later skill with a warning.
 
 ### Rules (UAAPS v0.4.0)
 

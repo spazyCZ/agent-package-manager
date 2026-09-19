@@ -2,7 +2,7 @@
 
 ## Overview
 
-**OpenAI Codex** is OpenAI's code generation platform that powers tools like GitHub Copilot. Projects using Codex typically use an `AGENTS.md` file for agent and instruction definitions. AAM integrates with Codex by merging agents and instructions into `AGENTS.md` using marker-based sections, while deploying skills to `.codex/skills/` or `~/.codex/skills/`.
+**OpenAI Codex** is OpenAI's code generation platform that powers tools like GitHub Copilot. Projects using Codex typically use an `AGENTS.md` file for agent and instruction definitions. AAM integrates with Codex by merging agents and instructions into `AGENTS.md` using marker-based sections, while deploying skills to `.agents/skills/` or `~/.agents/skills/`.
 
 **Key features:**
 - Native SKILL.md support
@@ -15,7 +15,7 @@
 
 | Artifact Type | Codex Location | Format | Merging |
 |---------------|----------------|--------|---------|
-| **Skill** | `.codex/skills/<fs-name>/` or `~/.codex/skills/<fs-name>/` | SKILL.md (as-is) | No |
+| **Skill** | `.agents/skills/<fs-name>/` or `~/.agents/skills/<fs-name>/` | SKILL.md (as-is) | No |
 | **Agent** | `AGENTS.md` | Markdown section | Yes (markers) |
 | **Prompt** | `.codex/prompts/<fs-name>.md` | Markdown (as-is) | No |
 | **Instruction** | `AGENTS.md` | Markdown section | Yes (markers) |
@@ -26,7 +26,12 @@
 
 ### Skills
 
-Skills are copied as-is to `.codex/skills/` or `~/.codex/skills/`. The entire skill directory structure is preserved.
+Skills are copied as-is to `.agents/skills/` or `~/.agents/skills/`. The entire
+skill directory structure is preserved.
+
+> **Note:** Older installs may still live under `~/.codex/skills/`. AAM
+> continues to find and remove skills there on undeploy, but new deploys
+> use `.agents/skills/` (or `~/.agents/skills/` for user scope).
 
 **Source structure:**
 
@@ -44,7 +49,7 @@ Skills are copied as-is to `.codex/skills/` or `~/.codex/skills/`. The entire sk
 **Deployed to (project scope):**
 
 ```
-.codex/skills/author--asvc-report/
+.agents/skills/author--asvc-report/
 ├── SKILL.md
 ├── scripts/
 │   └── generate-report.py
@@ -57,7 +62,7 @@ Skills are copied as-is to `.codex/skills/` or `~/.codex/skills/`. The entire sk
 **Deployed to (user scope):**
 
 ```
-~/.codex/skills/author--asvc-report/
+~/.agents/skills/author--asvc-report/
 ├── SKILL.md
 ├── scripts/
 │   └── generate-report.py
@@ -72,9 +77,9 @@ Skills are copied as-is to `.codex/skills/` or `~/.codex/skills/`. The entire sk
 ```yaml
 platforms:
   codex:
-    skill_scope: project  # Deploy to .codex/skills/
+    skill_scope: project  # Deploy to .agents/skills/
     # OR
-    skill_scope: user     # Deploy to ~/.codex/skills/
+    skill_scope: user     # Deploy to ~/.agents/skills/
 ```
 
 ### Agents
@@ -313,7 +318,7 @@ Links to internal documentation...
 
 platforms:
   codex:
-    skill_scope: user                 # "project" or "user"
+    skill_scope: project              # "project" or "user"
     merge_instructions: true          # Merge into AGENTS.md (default)
 ```
 
@@ -321,13 +326,13 @@ platforms:
 
 | Option | Values | Default | Description |
 |--------|--------|---------|-------------|
-| `skill_scope` | `project`, `user` | `user` | Where to deploy skills |
+| `skill_scope` | `project`, `user` | `project` | Where to deploy skills |
 | `merge_instructions` | `true`, `false` | `true` | Whether to merge agents/instructions into AGENTS.md |
 
 **skill_scope:**
 
-- `project`: Deploy to `.codex/skills/` (project-specific)
-- `user`: Deploy to `~/.codex/skills/` (available in all projects)
+- `project`: Deploy to `.agents/skills/` (project-specific)
+- `user`: Deploy to `~/.agents/skills/` (available in all projects)
 
 **merge_instructions:**
 
@@ -441,8 +446,8 @@ Resolved dependencies:
 Downloaded 2 packages (145 KB)
 
 Deployed to codex:
-  skill: author--asvc-report -> .codex/skills/author--asvc-report/
-  skill: author--generic-auditor -> .codex/skills/author--generic-auditor/
+  skill: author--asvc-report -> .agents/skills/author--asvc-report/
+  skill: author--generic-auditor -> .agents/skills/author--generic-auditor/
   agent: asvc-audit -> AGENTS.md (merged)
   prompt: audit-finding -> .codex/prompts/author--audit-finding.md
   prompt: audit-summary -> .codex/prompts/author--audit-summary.md
@@ -483,7 +488,7 @@ grep "BEGIN AAM" AGENTS.md
 
 ```bash
 # List deployed skills
-ls .codex/skills/
+ls .agents/skills/
 
 # Expected output:
 # author--asvc-report
@@ -504,7 +509,7 @@ ls .codex/prompts/
 ### Test in Codex
 
 1. Codex automatically reads `AGENTS.md`
-2. Skills in `.codex/skills/` (or `~/.codex/skills/`) are available
+2. Skills in `.agents/skills/` (or `~/.agents/skills/`) are available
 3. Prompts in `.codex/prompts/` can be referenced
 
 ## Tips & Best Practices
@@ -607,10 +612,10 @@ Each agent gets its own marked section in `AGENTS.md`:
 
 ### Skill References
 
-Codex can access skills in `.codex/skills/` or `~/.codex/skills/` by referencing them in `AGENTS.md`:
+Codex can access skills in `.agents/skills/` or `~/.agents/skills/` by referencing them in `AGENTS.md`:
 
 ```markdown
-When auditing code, use the asvc-report skill located in .codex/skills/author--asvc-report/.
+When auditing code, use the asvc-report skill located in .agents/skills/author--asvc-report/.
 ```
 
 ### Backup AGENTS.md
@@ -686,7 +691,7 @@ nano AGENTS.md
 
 ### Skills Not Found
 
-**Symptom:** Codex can't find skills in `.codex/skills/` or `~/.codex/skills/`.
+**Symptom:** Codex can't find skills in `.agents/skills/` or `~/.agents/skills/`.
 
 **Cause:** Path mismatch or skill not deployed.
 
@@ -694,13 +699,13 @@ nano AGENTS.md
 
 1. **Check skill location:**
    ```bash
-   ls .codex/skills/
-   ls ~/.codex/skills/
+   ls .agents/skills/
+   ls ~/.agents/skills/
    ```
 
 2. **Verify SKILL.md exists:**
    ```bash
-   cat .codex/skills/author--asvc-report/SKILL.md
+   cat .agents/skills/author--asvc-report/SKILL.md
    ```
 
 3. **Check skill scope configuration:**

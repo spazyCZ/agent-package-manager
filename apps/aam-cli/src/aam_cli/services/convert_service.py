@@ -27,6 +27,8 @@ from aam_cli.converters.mappings import (
     COMMAND_TARGET_EXTENSIONS,
     PROMPT_TARGET_DIRS,
     SINGLE_FILE_INSTRUCTION_TARGETS,
+    SKILL_PRESERVE_NESTING,
+    SKILL_SOURCE_ROOTS,
     SKILL_TARGET_DIRS,
 )
 
@@ -259,26 +261,72 @@ def _find_prompts(root: Path, platform: str) -> list[Path]:
     return files
 
 
-def _find_skills(root: Path, platform: str) -> list[Path]:
+def _find_skills(
+    root: Path,
+    platform: str,
+) -> tuple[list[tuple[Path, Path]], list[ConversionResult]]:
     """Find skill directories for a given source platform.
 
-    Returns paths to skill directories (parent of SKILL.md).
+    Walks each configured source root recursively for ``SKILL.md``.
+    When the same relative path appears under multiple roots (for example
+    ``.cursor/skills/x`` and ``.agents/skills/x``), prefers the
+    platform-specific root listed first in ``SKILL_SOURCE_ROOTS`` and
+    emits a skipped result for the duplicate.
+
+    Args:
+        root: Project root directory.
+        platform: Source platform identifier.
+
+    Returns:
+        A tuple of:
+        - list of ``(skill_dir, source_root)`` pairs
+        - list of skipped ``ConversionResult`` entries for duplicates
     """
-    dirs: list[Path] = []
-    base_map = {
-        "cursor": ".cursor/skills",
-        "copilot": ".github/skills",
-        "claude-code": ".claude/skills",
-        "codex": ".agents/skills",
-    }
+    found: list[tuple[Path, Path]] = []
+    duplicate_results: list[ConversionResult] = []
+    # Map relative-within-root path → first winning source path (for dedupe)
+    seen_rel: dict[str, str] = {}
 
-    base = root / base_map.get(platform, "")
-    if base.is_dir():
-        for skill_dir in base.iterdir():
-            if skill_dir.is_dir() and (skill_dir / "SKILL.md").is_file():
-                dirs.append(skill_dir)
+    for root_rel in SKILL_SOURCE_ROOTS.get(platform, []):
+        source_root = root / root_rel
+        if not source_root.is_dir():
+            continue
 
-    return dirs
+        for skill_md in sorted(source_root.rglob("SKILL.md")):
+            if not skill_md.is_file():
+                continue
+            skill_dir = skill_md.parent
+            try:
+                rel_within_root = str(skill_dir.relative_to(source_root))
+            except ValueError:
+                continue
+
+            rel_source = str(skill_dir.relative_to(root))
+            if rel_within_root in seen_rel:
+                # Prefer platform-specific root (first in SKILL_SOURCE_ROOTS)
+                duplicate_results.append(
+                    ConversionResult(
+                        source_path=rel_source,
+                        target_path="",
+                        artifact_type="skill",
+                        skipped=True,
+                        warnings=[
+                            f"Duplicate skill path '{rel_within_root}' also "
+                            f"found at {seen_rel[rel_within_root]}; "
+                            f"preferring platform-specific root."
+                        ],
+                    )
+                )
+                logger.warning(
+                    f"Skipping duplicate skill at {rel_source}; "
+                    f"already found at {seen_rel[rel_within_root]}"
+                )
+                continue
+
+            seen_rel[rel_within_root] = rel_source
+            found.append((skill_dir, source_root))
+
+    return found, duplicate_results
 
 
 ################################################################################
@@ -720,17 +768,57 @@ def _convert_prompt(
     )
 
 
+def _skill_target_rel(
+    source_dir: Path,
+    source_root: Path,
+    target_platform: str,
+) -> str:
+    """Compute the relative path under the target skills root.
+
+    Cursor and Codex preserve nesting under the source root. Copilot and
+    Claude flatten to the SKILL.md parent folder name.
+
+    Args:
+        source_dir: Skill directory (parent of SKILL.md).
+        source_root: Skills root the skill was discovered under.
+        target_platform: Target platform identifier.
+
+    Returns:
+        Relative path under ``SKILL_TARGET_DIRS[target_platform]``.
+    """
+    if target_platform in SKILL_PRESERVE_NESTING:
+        return str(source_dir.relative_to(source_root))
+    return source_dir.name
+
+
 def _convert_skill(
     source_dir: Path,
+    source_root: Path,
     root: Path,
     source_platform: str,
     target_platform: str,
     force: bool,
     dry_run: bool,
+    claimed_targets: dict[str, str] | None = None,
 ) -> ConversionResult:
-    """Convert a skill directory (direct copy)."""
-    name = source_dir.name
+    """Convert a skill directory (direct copy with layout rules).
+
+    Args:
+        source_dir: Skill directory (parent of SKILL.md).
+        source_root: Skills root the skill was discovered under.
+        root: Project root directory.
+        source_platform: Source platform identifier.
+        target_platform: Target platform identifier.
+        force: Overwrite existing targets when True.
+        dry_run: Skip writes when True.
+        claimed_targets: Map of target relative path → first source path,
+            used to detect flatten collisions within one convert run.
+
+    Returns:
+        ConversionResult for this skill.
+    """
     rel_source = str(source_dir.relative_to(root))
+    warnings: list[str] = []
 
     target_base = SKILL_TARGET_DIRS.get(target_platform)
     if not target_base:
@@ -741,8 +829,47 @@ def _convert_skill(
             error=f"Unsupported skill target platform: {target_platform}",
         )
 
-    target_dir = root / target_base / name
+    # -----
+    # Resolve target path (preserve nesting or flatten)
+    # -----
+    rel_under_target = _skill_target_rel(source_dir, source_root, target_platform)
+    target_dir = root / target_base / rel_under_target
     target_path_str = str(target_dir.relative_to(root))
+
+    # -----
+    # Same-path skip (e.g. .agents/skills on both Cursor and Codex)
+    # -----
+    if source_dir.resolve() == target_dir.resolve():
+        return ConversionResult(
+            source_path=rel_source,
+            target_path=target_path_str,
+            artifact_type="skill",
+            skipped=True,
+            warnings=[
+                f"Source and target skill path are identical "
+                f"({target_path_str}); skipped."
+            ],
+        )
+
+    # -----
+    # Flatten collision: two nested skills map to the same flat name
+    # -----
+    if claimed_targets is not None and target_path_str in claimed_targets:
+        prior = claimed_targets[target_path_str]
+        return ConversionResult(
+            source_path=rel_source,
+            target_path=target_path_str,
+            artifact_type="skill",
+            skipped=True,
+            warnings=[
+                f"Flatten collision: skill '{source_dir.name}' from "
+                f"{rel_source} maps to {target_path_str}, already claimed "
+                f"by {prior}."
+            ],
+        )
+
+    if claimed_targets is not None:
+        claimed_targets[target_path_str] = rel_source
 
     if not dry_run:
         if target_dir.exists() and not force:
@@ -763,10 +890,16 @@ def _convert_skill(
         target_dir.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(source_dir, target_dir)
 
+    layout_note = (
+        "direct copy"
+        if target_platform in SKILL_PRESERVE_NESTING
+        else "direct copy, flattened"
+    )
     return ConversionResult(
         source_path=rel_source,
-        target_path=f"{target_path_str} (direct copy)",
+        target_path=f"{target_path_str} ({layout_note})",
         artifact_type="skill",
+        warnings=warnings,
     )
 
 
@@ -1215,9 +1348,19 @@ def run_conversion(
     # Convert skills
     # -----
     if "skill" in types_to_convert:
-        for src_dir in _find_skills(root, source_platform):
+        skill_entries, skill_dupes = _find_skills(root, source_platform)
+        report.results.extend(skill_dupes)
+        claimed_skill_targets: dict[str, str] = {}
+        for src_dir, source_root in skill_entries:
             result = _convert_skill(
-                src_dir, root, source_platform, target_platform, force, dry_run
+                src_dir,
+                source_root,
+                root,
+                source_platform,
+                target_platform,
+                force,
+                dry_run,
+                claimed_targets=claimed_skill_targets,
             )
             report.results.append(result)
 

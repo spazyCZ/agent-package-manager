@@ -60,11 +60,14 @@ def _setup_copilot(tmp_path: Path) -> CopilotAdapter:
 
 
 def _setup_codex(tmp_path: Path) -> CodexAdapter:
-    """Create a CodexAdapter with codex_dir overridden to tmp_path/.codex."""
+    """Create a CodexAdapter with home dirs redirected under tmp_path."""
     adapter = CodexAdapter(tmp_path)
     adapter.codex_dir = tmp_path / ".codex"
+    adapter.agents_user_dir = tmp_path / ".agents-user"
     for d in ("skills", "prompts"):
         (adapter.codex_dir / d).mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
+    (adapter.agents_user_dir / "skills").mkdir(parents=True, exist_ok=True)
     return adapter
 
 
@@ -439,12 +442,21 @@ class TestCodexAdapterLifecycle:
     """Tests for CodexAdapter undeploy() and list_deployed()."""
 
     def test_unit_undeploy_skill(self, tmp_path: Path) -> None:
-        """undeploy removes codex_dir/skills/<name>/ directory."""
+        """undeploy removes .agents/skills/<name>/ directory."""
         adapter = _setup_codex(tmp_path)
-        d = adapter.codex_dir / "skills" / "test-skill"
-        d.mkdir()
+        d = tmp_path / ".agents" / "skills" / "test-skill"
+        d.mkdir(parents=True)
         (d / "SKILL.md").write_text("# Skill", encoding=_UTF8)
         adapter.undeploy("test-skill", "skill")
+        assert not d.exists()
+
+    def test_unit_undeploy_legacy_codex_skill(self, tmp_path: Path) -> None:
+        """undeploy still removes legacy ~/.codex/skills/<name>/."""
+        adapter = _setup_codex(tmp_path)
+        d = adapter.codex_dir / "skills" / "legacy-skill"
+        d.mkdir(parents=True)
+        (d / "SKILL.md").write_text("# Legacy", encoding=_UTF8)
+        adapter.undeploy("legacy-skill", "skill")
         assert not d.exists()
 
     def test_unit_undeploy_agent(self, tmp_path: Path) -> None:
@@ -484,10 +496,10 @@ class TestCodexAdapterLifecycle:
         assert "test-instr" not in md.read_text(encoding=_UTF8)
 
     def test_unit_undeploy_command(self, tmp_path: Path) -> None:
-        """undeploy removes codex_dir/skills/<name>/ command directory."""
+        """undeploy removes .agents/skills/<name>/ command directory."""
         adapter = _setup_codex(tmp_path)
-        d = adapter.codex_dir / "skills" / "pkg:my-cmd"
-        d.mkdir()
+        d = tmp_path / ".agents" / "skills" / "pkg:my-cmd"
+        d.mkdir(parents=True)
         (d / "SKILL.md").write_text("# Cmd", encoding=_UTF8)
         adapter.undeploy("pkg:my-cmd", "command")
         assert not d.exists()
@@ -530,12 +542,12 @@ class TestCodexAdapterLifecycle:
     def test_unit_list_deployed_discovers_all_types(self, tmp_path: Path) -> None:
         """list_deployed discovers skill, command, agent, instruction, rule."""
         adapter = _setup_codex(tmp_path)
-        cd = adapter.codex_dir
-        (cd / "skills" / "my-skill").mkdir()
-        (cd / "skills" / "my-skill" / "SKILL.md").write_text("x", encoding=_UTF8)
-        (cd / "skills" / "pkg:my-cmd").mkdir()
-        (cd / "skills" / "pkg:my-cmd" / "SKILL.md").write_text("x", encoding=_UTF8)
-        (cd / "prompts" / "my-prompt.md").write_text("x", encoding=_UTF8)
+        agents_skills = tmp_path / ".agents" / "skills"
+        (agents_skills / "my-skill").mkdir(parents=True)
+        (agents_skills / "my-skill" / "SKILL.md").write_text("x", encoding=_UTF8)
+        (agents_skills / "pkg:my-cmd").mkdir()
+        (agents_skills / "pkg:my-cmd" / "SKILL.md").write_text("x", encoding=_UTF8)
+        (adapter.codex_dir / "prompts" / "my-prompt.md").write_text("x", encoding=_UTF8)
         (tmp_path / "AGENTS.md").write_text(
             "<!-- BEGIN AAM: my-agent agent -->\ncontent\n"
             "<!-- END AAM: my-agent agent -->\n"
@@ -550,6 +562,17 @@ class TestCodexAdapterLifecycle:
         assert types_found >= {
             "skill", "command", "agent", "instruction", "rule",
         }
+
+    def test_unit_list_deployed_includes_legacy_codex_skills(
+        self, tmp_path: Path
+    ) -> None:
+        """list_deployed still finds skills under legacy ~/.codex/skills/."""
+        adapter = _setup_codex(tmp_path)
+        legacy = adapter.codex_dir / "skills" / "legacy-skill"
+        legacy.mkdir(parents=True)
+        (legacy / "SKILL.md").write_text("x", encoding=_UTF8)
+        names = {d[0] for d in adapter.list_deployed() if d[1] == "skill"}
+        assert "legacy-skill" in names
 
 
 ################################################################################

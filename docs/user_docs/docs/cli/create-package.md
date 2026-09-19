@@ -210,7 +210,10 @@ The scanner looks for these artifact patterns:
 
 - `**/SKILL.md` - Any SKILL.md file (parent directory is the skill)
 - `.cursor/skills/*/SKILL.md` - Cursor skills
-- `.codex/skills/*/SKILL.md` - Codex skills
+- `.codex/skills/*/SKILL.md` - Codex skills (legacy)
+- `.agents/skills/*/SKILL.md` - Codex / shared Agent Skills root
+- `.github/skills/*/SKILL.md` - Copilot skills
+- `.claude/skills/*/SKILL.md` - Claude Code skills
 - `skills/*/SKILL.md` - AAM convention
 
 ### Agents

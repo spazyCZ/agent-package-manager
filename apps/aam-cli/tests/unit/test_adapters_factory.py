@@ -404,14 +404,33 @@ class TestCodexAdapter:
         assert "<!-- BEGIN AAM: type-hints instruction -->" in content
         assert "Always use type hints." in content
 
-    def test_unit_deploy_skill_to_codex_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Skill is deployed to ~/.codex/skills/<name>/."""
+    def test_unit_deploy_skill_to_agents_project(
+        self, tmp_path: Path
+    ) -> None:
+        """Skill with project scope deploys to .agents/skills/<name>/."""
+        project = tmp_path / "project"
+        project.mkdir()
+
+        skill_dir = tmp_path / "src-skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("# Skill\n")
+
+        adapter = CodexAdapter(project)
+        ref = ArtifactRef(name="my-skill", path="skills/my-skill", description="test")
+        dest = adapter.deploy_skill(skill_dir, ref, {"skill_scope": "project"})
+
+        assert dest == project / ".agents" / "skills" / "my-skill"
+        assert (dest / "SKILL.md").is_file()
+
+    def test_unit_deploy_skill_to_agents_user(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Skill with user scope deploys to ~/.agents/skills/<name>/."""
         project = tmp_path / "project"
         project.mkdir()
         fake_home = tmp_path / "home"
         fake_home.mkdir()
 
-        # Override Path.home() to use our temp directory
         monkeypatch.setattr(Path, "home", lambda: fake_home)
 
         skill_dir = tmp_path / "src-skill"
@@ -420,9 +439,9 @@ class TestCodexAdapter:
 
         adapter = CodexAdapter(project)
         ref = ArtifactRef(name="my-skill", path="skills/my-skill", description="test")
-        dest = adapter.deploy_skill(skill_dir, ref, {})
+        dest = adapter.deploy_skill(skill_dir, ref, {"skill_scope": "user"})
 
-        assert dest == fake_home / ".codex" / "skills" / "my-skill"
+        assert dest == fake_home / ".agents" / "skills" / "my-skill"
         assert (dest / "SKILL.md").is_file()
 
     def test_unit_deploy_prompt_to_codex_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

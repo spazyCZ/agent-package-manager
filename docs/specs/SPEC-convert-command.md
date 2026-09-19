@@ -78,10 +78,13 @@ aam convert -s codex -t cursor --force
 
 | Platform | File(s) | Format | Metadata |
 |----------|---------|--------|----------|
-| **Cursor** | `.cursor/skills/*/SKILL.md` | Markdown | None |
-| **Copilot** | Follows agentskills.io standard | `SKILL.md` + optional metadata | Via agent integration |
-| **Claude** | `.claude/skills/*/` | Directory with files | None |
-| **Codex** | `.agents/skills/*/SKILL.md` | Markdown + optional `agents/openai.yaml` | `interface`, `policy`, `dependencies` |
+| **Cursor** | `.cursor/skills/**/SKILL.md`, also `.agents/skills/**/SKILL.md` | Markdown + YAML frontmatter (agentskills.io) | Spec fields + Cursor extras (`paths`, `disable-model-invocation`) |
+| **Copilot** | `.github/skills/**/SKILL.md`, also `.agents/skills/**/SKILL.md` | agentskills.io `SKILL.md` | Spec fields |
+| **Claude** | `.claude/skills/**/SKILL.md` | agentskills.io + Claude-only fields | Spec fields + Claude extras |
+| **Codex** | `.agents/skills/**/SKILL.md`, legacy `.codex/skills/**/SKILL.md` | Markdown + optional `agents/openai.yaml` | `interface`, `policy`, `dependencies` |
+
+**Nested layout on convert:** Cursor and Codex targets preserve category nesting.
+Copilot and Claude targets flatten to the `SKILL.md` parent folder name.
 
 ---
 
@@ -91,7 +94,7 @@ aam convert -s codex -t cursor --force
 
 | Source | Target | Artifact | Conversion |
 |--------|--------|----------|------------|
-| Any | Any | **Skill** (SKILL.md) | Direct copy — universal format across all platforms. Only deployment path changes. |
+| Any | Any | **Skill** (SKILL.md) | Direct copy — universal format. Path changes; Cursor/Codex preserve nesting; Copilot/Claude flatten. |
 | Cursor `.cursorrules` | Claude `CLAUDE.md` | instruction | Direct content copy |
 | Cursor `.cursorrules` | Codex `AGENTS.md` | instruction | Direct content copy |
 | Cursor `.cursorrules` | Copilot `copilot-instructions.md` | instruction | Direct content copy |

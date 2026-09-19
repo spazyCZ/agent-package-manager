@@ -1,10 +1,14 @@
 """Codex (OpenAI) platform adapter.
 
 Deploys AAM artifacts into the OpenAI Codex filesystem structure:
-  - Skills       → ``~/.codex/skills/<fs-name>/``
+  - Skills       → ``.agents/skills/<fs-name>/`` (project) or
+                   ``~/.agents/skills/<fs-name>/`` (user)
   - Agents       → ``AGENTS.md`` (marker-delimited section)
-  - Commands     → ``~/.codex/skills/<pkg>:<name>/`` (converted to skill)
+  - Commands     → scoped skills root as ``<pkg>:<name>/``
   - Instructions → ``AGENTS.md`` (marker-delimited section)
+
+Legacy ``~/.codex/skills/`` is still scanned on undeploy/list for cleanup.
+Prompts remain under ``~/.codex/prompts/``.
 
 UAAPS v0.5.0: prompts merged into commands.
 
@@ -54,9 +58,9 @@ END_MARKER_TEMPLATE: str = "<!-- END AAM: {name} {kind} -->"
 class CodexAdapter:
     """OpenAI Codex platform adapter.
 
-    Skills and commands are deployed to ``~/.codex/`` (user-level).
-    Agents and instructions are merged into ``AGENTS.md`` at the
-    project root using HTML comment markers.
+    Skills and commands deploy to ``.agents/skills/`` (project scope) or
+    ``~/.agents/skills/`` (user scope). Agents and instructions are merged
+    into ``AGENTS.md`` at the project root using HTML comment markers.
     """
 
     def __init__(self, project_root: Path) -> None:
@@ -67,8 +71,35 @@ class CodexAdapter:
         """
         self.name = "codex"
         self.project_root = project_root.resolve()
-        # Codex skills/prompts go to the user home directory
+        # Legacy Codex home (prompts still use this; skills may remain here)
         self.codex_dir = Path.home() / ".codex"
+        self.agents_user_dir = Path.home() / ".agents"
+
+    def _skills_base(self, config: dict[str, str]) -> Path:
+        """Resolve the skills root from ``skill_scope``.
+
+        Args:
+            config: Deploy config; ``skill_scope`` is ``project`` or ``user``.
+
+        Returns:
+            Absolute path to the skills directory root.
+        """
+        scope = config.get("skill_scope", "project")
+        if scope == "user":
+            return self.agents_user_dir / "skills"
+        return self.project_root / ".agents" / "skills"
+
+    def _skill_search_roots(self) -> list[Path]:
+        """Return skill roots to check for undeploy/list (incl. legacy).
+
+        Returns:
+            Ordered list of skill directory roots that may contain artifacts.
+        """
+        return [
+            self.project_root / ".agents" / "skills",
+            self.agents_user_dir / "skills",
+            self.codex_dir / "skills",  # legacy
+        ]
 
     # ------------------------------------------------------------------
     # Deploy methods
@@ -78,23 +109,23 @@ class CodexAdapter:
         self,
         skill_path: Path,
         skill_ref: ArtifactRef,
-        _config: dict[str, str],
+        config: dict[str, str],
     ) -> Path:
-        """Deploy a skill to ``~/.codex/skills/<fs-name>/``.
+        """Deploy a skill to ``.agents/skills/`` or ``~/.agents/skills/``.
 
-        Copies the entire skill directory. Codex uses user-level
-        skill deployment by default (native format).
+        Copies the entire skill directory. Scope comes from
+        ``config["skill_scope"]`` (default ``project``).
 
         Args:
             skill_path: Path to the extracted skill directory.
             skill_ref: Artifact reference from the manifest.
-            _config: Platform config (unused currently).
+            config: Platform config including ``skill_scope``.
 
         Returns:
             Destination path.
         """
         fs_name = self._artifact_fs_name(skill_ref.name)
-        dest = self.codex_dir / "skills" / fs_name
+        dest = self._skills_base(config) / fs_name
 
         logger.info(f"Deploying skill '{skill_ref.name}' -> {dest}")
 
@@ -208,12 +239,12 @@ class CodexAdapter:
         """Deploy a slash-command as a Codex skill with ``disable-model-invocation``.
 
         Codex uses skills as its primary reusable context mechanism.
-        Commands are stored in ``~/.codex/skills/<pkg>:<name>/``.
+        Commands are stored under the scoped skills root as ``<pkg>:<name>/``.
 
         Args:
             cmd_path: Path to the command markdown file.
             cmd_ref: Artifact reference from the manifest.
-            config: Platform config; ``package_name`` key for namespacing.
+            config: Platform config; ``package_name`` and ``skill_scope``.
 
         Returns:
             Destination skill directory path.
@@ -221,7 +252,7 @@ class CodexAdapter:
         pkg_name = config.get("package_name", "unknown")
         safe_pkg = pkg_name.lstrip("@").replace("/", "--")
         safe_name = self._artifact_fs_name(cmd_ref.name)
-        skill_dir = self.codex_dir / "skills" / f"{safe_pkg}:{safe_name}"
+        skill_dir = self._skills_base(config) / f"{safe_pkg}:{safe_name}"
 
         logger.info(f"Deploying command '{cmd_ref.name}' -> {skill_dir}")
         skill_dir.mkdir(parents=True, exist_ok=True)
@@ -333,20 +364,23 @@ class CodexAdapter:
         logger.info(f"Undeploying {artifact_type} '{artifact_name}' from codex")
 
         if artifact_type == "skill":
-            path = self.codex_dir / "skills" / fs_name
-            if path.is_dir():
-                shutil.rmtree(path)
-                logger.info(f"Removed skill directory: {path}")
+            # Check project, user, and legacy roots so old installs can be removed
+            for skills_root in self._skill_search_roots():
+                path = skills_root / fs_name
+                if path.is_dir():
+                    shutil.rmtree(path)
+                    logger.info(f"Removed skill directory: {path}")
 
         elif artifact_type in ("agent", "instruction"):
             agents_md = self.project_root / "AGENTS.md"
             self._remove_marker_section(agents_md, artifact_name, artifact_type)
 
         elif artifact_type in ("prompt", "command"):
-            path = self.codex_dir / "skills" / fs_name
-            if path.is_dir():
-                shutil.rmtree(path)
-                logger.info(f"Removed command directory: {path}")
+            for skills_root in self._skill_search_roots():
+                path = skills_root / fs_name
+                if path.is_dir():
+                    shutil.rmtree(path)
+                    logger.info(f"Removed command directory: {path}")
             prompt_path = self.codex_dir / "prompts" / f"{fs_name}.md"
             if prompt_path.is_file():
                 prompt_path.unlink()
@@ -374,16 +408,23 @@ class CodexAdapter:
             List of ``(name, type, path)`` tuples.
         """
         deployed: list[tuple[str, str, Path]] = []
+        seen_names: set[tuple[str, str]] = set()
 
         # -----
-        # Skills and commands (commands use ':' in directory name)
+        # Skills and commands across project, user, and legacy roots
         # -----
-        skills_dir = self.codex_dir / "skills"
-        if skills_dir.is_dir():
+        for skills_dir in self._skill_search_roots():
+            if not skills_dir.is_dir():
+                continue
             for entry in skills_dir.iterdir():
-                if entry.is_dir():
-                    kind = "command" if ":" in entry.name else "skill"
-                    deployed.append((entry.name, kind, entry))
+                if not entry.is_dir():
+                    continue
+                kind = "command" if ":" in entry.name else "skill"
+                key = (entry.name, kind)
+                if key in seen_names:
+                    continue
+                seen_names.add(key)
+                deployed.append((entry.name, kind, entry))
 
         # -----
         # Commands (legacy prompts) from ~/.codex/prompts/

@@ -114,19 +114,45 @@ PROMPT_TARGET_DIRS: dict[str, str] = {
 #                                                                              #
 ################################################################################
 
+# Glob patterns used for documentation and high-level scanning.
+# Nested skills are discovered via rglob under each root in SKILL_SOURCE_ROOTS.
 SKILL_PATHS: dict[str, list[str]] = {
-    "cursor": [".cursor/skills/*/SKILL.md"],
-    "copilot": [".github/skills/*/SKILL.md"],
-    "claude-code": [".claude/skills/*/SKILL.md"],
-    "codex": [".agents/skills/*/SKILL.md"],
+    "cursor": [
+        ".cursor/skills/**/SKILL.md",
+        ".agents/skills/**/SKILL.md",
+    ],
+    "copilot": [
+        ".github/skills/**/SKILL.md",
+        ".agents/skills/**/SKILL.md",
+    ],
+    "claude-code": [".claude/skills/**/SKILL.md"],
+    "codex": [
+        ".agents/skills/**/SKILL.md",
+        ".codex/skills/**/SKILL.md",  # legacy
+    ],
 }
 
+# Canonical write targets (one per platform).
 SKILL_TARGET_DIRS: dict[str, str] = {
     "cursor": ".cursor/skills",
     "copilot": ".github/skills",
     "claude-code": ".claude/skills",
     "codex": ".agents/skills",
 }
+
+# Discovery roots per source platform (order matters: platform-specific first).
+# Shared ``.agents/skills`` is scanned for Cursor/Copilot; Claude skills stay
+# under ``.claude/skills`` only (use ``aam convert -s claude`` for those).
+SKILL_SOURCE_ROOTS: dict[str, list[str]] = {
+    "cursor": [".cursor/skills", ".agents/skills"],
+    "copilot": [".github/skills", ".agents/skills"],
+    "claude-code": [".claude/skills"],
+    "codex": [".agents/skills", ".codex/skills"],  # legacy last
+}
+
+# Platforms that keep category nesting under the target skills root.
+# Copilot and Claude flatten to the SKILL.md parent folder name.
+SKILL_PRESERVE_NESTING: set[str] = {"cursor", "codex"}
 
 ################################################################################
 #                                                                              #

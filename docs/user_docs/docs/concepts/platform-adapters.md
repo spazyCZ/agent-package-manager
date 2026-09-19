@@ -366,7 +366,7 @@ my-project/
 
 | Artifact Type | Codex Location | Format | Merging |
 |---------------|---------------|--------|---------|
-| **Skill** | `~/.codex/skills/<name>/` | SKILL.md (native) | No |
+| **Skill** | `.agents/skills/<name>/` or `~/.agents/skills/<name>/` | SKILL.md (native) | No |
 | **Agent** | `AGENTS.md` | Markdown section | Yes (markers) |
 | **Prompt** | `~/.codex/prompts/<name>.md` | Markdown (as-is) | No |
 | **Instruction** | `AGENTS.md` | Markdown section | Yes (markers) |
@@ -377,19 +377,21 @@ my-project/
 # aam.yaml
 platforms:
   codex:
-    skill_scope: user           # "project" or "user"
+    skill_scope: project        # "project" or "user"
 ```
 
 | Option | Values | Default | Description |
 |--------|--------|---------|-------------|
-| `skill_scope` | `project`, `user` | `user` | Deploy to `~/.codex/skills/` or project-local |
+| `skill_scope` | `project`, `user` | `project` | Deploy to `.agents/skills/` or `~/.agents/skills/` |
 
 ### Skill Deployment
 
-Codex natively supports the SKILL.md format. Skills are deployed to `~/.codex/skills/`:
+Codex natively supports the SKILL.md format. Skills deploy to `.agents/skills/`
+(project) or `~/.agents/skills/` (user). Legacy `~/.codex/skills/` is still
+recognized on undeploy and listing so older installs can be cleaned up.
 
 ```
-~/.codex/skills/
+.agents/skills/
 ├── author--asvc-report/
 │   ├── SKILL.md
 │   └── scripts/
@@ -451,7 +453,7 @@ graph TB
     CursorAdapter --> CursorDeploy[".cursor/<br/>skills/, rules/, prompts/"]
     CopilotAdapter --> CopilotDeploy[".github/<br/>agents/, instructions/<br/>skills/, prompts/"]
     ClaudeAdapter --> ClaudeDeploy["CLAUDE.md<br/>.claude/agents/, skills/, prompts/"]
-    CodexAdapter --> CodexDeploy["AGENTS.md<br/>~/.codex/skills/, prompts/"]
+    CodexAdapter --> CodexDeploy["AGENTS.md<br/>~/.agents/skills/, ~/.codex/prompts/"]
 
     style Package fill:#e1f5fe
     style CursorAdapter fill:#fff3e0
@@ -471,7 +473,7 @@ graph TB
 | Feature | Cursor | Copilot | Claude | Codex |
 |---------|--------|---------|--------|-------|
 | **Skill format** | SKILL.md | SKILL.md | SKILL.md | SKILL.md (native) |
-| **Skill location** | `.cursor/skills/` | `.github/skills/` | `.claude/skills/` | `~/.codex/skills/` |
+| **Skill location** | `.cursor/skills/` | `.github/skills/` | `.claude/skills/` | `.agents/skills/` |
 | **Agent format** | `.mdc` rule | `.agent.md` file | `.md` file | Merged section |
 | **Agent location** | `.cursor/rules/` | `.github/agents/` | `.claude/agents/` | `AGENTS.md` |
 | **Instruction format** | `.mdc` rule | `.instructions.md` file | Merged section | Merged section |
@@ -529,7 +531,8 @@ ls .claude/skills/
 cat AGENTS.md | grep "BEGIN AAM"
 
 # List skills (user-level)
-ls ~/.codex/skills/
+ls .agents/skills/
+ls ~/.agents/skills/
 ```
 
 ---

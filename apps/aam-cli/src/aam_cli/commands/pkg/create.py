@@ -56,7 +56,26 @@ logger = logging.getLogger(__name__)
 ################################################################################
 
 # Artifact type ordering for display
-TYPE_ORDER: list[str] = ["skill", "agent", "prompt", "instruction"]
+TYPE_ORDER: list[str] = ["skill", "agent", "command", "rule", "prompt", "instruction"]
+
+# Canonical artifact types for UAAPS package format alignment.
+CANONICAL_ARTIFACT_TYPES: dict[str, str] = {
+    "skill": "skill",
+    "agent": "agent",
+    "command": "command",
+    "rule": "rule",
+    # Backward-compatible scanner labels mapped to UAAPS names.
+    "prompt": "command",
+    "instruction": "rule",
+}
+
+# Directory name by canonical artifact type.
+TYPE_DIRS: dict[str, str] = {
+    "skill": "skills",
+    "agent": "agents",
+    "command": "commands",
+    "rule": "rules",
+}
 
 # Rich colour for each platform badge
 PLATFORM_COLORS: dict[str, str] = {
@@ -273,16 +292,11 @@ def _artifact_target_path(art: DetectedArtifact, organize: str) -> str:
     if organize == "reference":
         return str(art.source_path)
 
-    # For copy / move: map into canonical AAM structure
-    type_dirs = {
-        "skill": "skills",
-        "agent": "agents",
-        "prompt": "prompts",
-        "instruction": "instructions",
-    }
-    base = type_dirs[art.type]
+    # For copy / move: map into canonical UAAPS package structure.
+    canonical_type = CANONICAL_ARTIFACT_TYPES.get(art.type, art.type)
+    base = TYPE_DIRS[canonical_type]
 
-    if art.type in ("skill", "agent"):
+    if canonical_type in ("skill", "agent"):
         return f"{base}/{art.name}/"
     return f"{base}/{art.name}.md"
 
@@ -300,18 +314,19 @@ def _generate_manifest_dict(
     grouped: dict[str, list[dict[str, str]]] = {
         "agents": [],
         "skills": [],
-        "prompts": [],
-        "instructions": [],
+        "commands": [],
+        "rules": [],
     }
 
     for art in artifacts:
         target = _artifact_target_path(art, organize)
+        canonical_type = CANONICAL_ARTIFACT_TYPES.get(art.type, art.type)
         ref = {
             "name": art.name,
             "path": target,
-            "description": art.description or f"{art.type.capitalize()} {art.name}",
+            "description": art.description or f"{canonical_type.capitalize()} {art.name}",
         }
-        grouped[art.type + "s"].append(ref)
+        grouped[canonical_type + "s"].append(ref)
 
     data: dict[str, Any] = {
         "name": name,
@@ -455,8 +470,16 @@ def _create_from_source(
     # Step 2: Filter by type if requested
     # -----
     if artifact_types:
-        type_set = set(artifact_types)
-        artifacts = [a for a in artifacts if a["type"] in type_set]
+        selected_types = {
+            CANONICAL_ARTIFACT_TYPES.get(artifact_type, artifact_type)
+            for artifact_type in artifact_types
+        }
+        artifacts = [
+            artifact
+            for artifact in artifacts
+            if CANONICAL_ARTIFACT_TYPES.get(artifact["type"], artifact["type"])
+            in selected_types
+        ]
 
     # -----
     # Step 3: Filter by specific artifact names if requested
@@ -563,17 +586,18 @@ def _create_from_source(
     grouped: dict[str, list[dict[str, str]]] = {
         "agents": [],
         "skills": [],
-        "prompts": [],
-        "instructions": [],
+        "commands": [],
+        "rules": [],
     }
     for art in artifacts:
-        art_type = art["type"]
-        type_key = art_type + "s"
+        art_type = CANONICAL_ARTIFACT_TYPES.get(art["type"], art["type"])
+        type_key = f"{art_type}s"
+        base_dir = TYPE_DIRS[art_type]
 
         if art_type in ("skill", "agent"):
-            target_path = f"{type_key}/{art['name']}/"
+            target_path = f"{base_dir}/{art['name']}/"
         else:
-            target_path = f"{type_key}/{art['name']}.md"
+            target_path = f"{base_dir}/{art['name']}.md"
 
         grouped[type_key].append({
             "name": art["name"],
@@ -608,12 +632,12 @@ def _create_from_source(
         console.print("\n[bold]Would create:[/bold]")
         console.print("  package.agent.json (with provenance)")
         for art in artifacts:
-            art_type = art["type"]
-            type_key = art_type + "s"
+            art_type = CANONICAL_ARTIFACT_TYPES.get(art["type"], art["type"])
+            base_dir = TYPE_DIRS[art_type]
             if art_type in ("skill", "agent"):
-                console.print(f"  {type_key}/{art['name']}/")
+                console.print(f"  {base_dir}/{art['name']}/")
             else:
-                console.print(f"  {type_key}/{art['name']}.md")
+                console.print(f"  {base_dir}/{art['name']}.md")
 
         content = json.dumps(manifest_data, indent=2, ensure_ascii=False)
         console.print("\n[yellow]\\[Dry run \u2014 no files written][/yellow]")
@@ -667,8 +691,8 @@ def _create_from_source(
     # Step 10: Copy artifact files from cache to output directory
     # -----
     for art in artifacts:
-        art_type = art["type"]
-        type_key = art_type + "s"
+        art_type = CANONICAL_ARTIFACT_TYPES.get(art["type"], art["type"])
+        base_dir = TYPE_DIRS[art_type]
         art_path = art.get("path", "")
 
         # Source: the artifact in the cached clone
@@ -676,9 +700,9 @@ def _create_from_source(
 
         # Destination: canonical AAM structure
         if art_type in ("skill", "agent"):
-            dest = output_dir / type_key / art["name"]
+            dest = output_dir / base_dir / art["name"]
         else:
-            dest = output_dir / type_key / f"{art['name']}.md"
+            dest = output_dir / base_dir / f"{art['name']}.md"
 
         dest.parent.mkdir(parents=True, exist_ok=True)
 
@@ -687,12 +711,12 @@ def _create_from_source(
                 shutil.rmtree(dest)
             shutil.copytree(src, dest)
             console.print(
-                f"  [green]\u2713[/green] Copied {art['name']} \u2192 {type_key}/{art['name']}/"
+                f"  [green]\u2713[/green] Copied {art['name']} \u2192 {base_dir}/{art['name']}/"
             )
         elif src.is_file():
             shutil.copy2(src, dest)
             console.print(
-                f"  [green]\u2713[/green] Copied {art['name']} \u2192 {type_key}/{art['name']}.md"
+                f"  [green]\u2713[/green] Copied {art['name']} \u2192 {base_dir}/{art['name']}.md"
             )
         else:
             console.print(
@@ -728,7 +752,8 @@ def _create_from_source(
     # -----
     type_counts: dict[str, int] = {}
     for art in artifacts:
-        label = art["type"] + "s"
+        canonical_type = CANONICAL_ARTIFACT_TYPES.get(art["type"], art["type"])
+        label = f"{canonical_type}s"
         type_counts[label] = type_counts.get(label, 0) + 1
 
     parts = [f"{count} {label}" for label, count in type_counts.items()]
@@ -770,7 +795,10 @@ def _create_from_source(
     "-t",
     "artifact_types",
     multiple=True,
-    type=click.Choice(["skill", "agent", "prompt", "instruction"], case_sensitive=False),
+    type=click.Choice(
+        ["skill", "agent", "command", "rule", "prompt", "instruction"],
+        case_sensitive=False,
+    ),
     help="Filter detection to specific artifact types",
 )
 @click.option(
@@ -792,7 +820,10 @@ def _create_from_source(
 )
 @click.option(
     "--include-as",
-    type=click.Choice(["skill", "agent", "prompt", "instruction"], case_sensitive=False),
+    type=click.Choice(
+        ["skill", "agent", "command", "rule", "prompt", "instruction"],
+        case_sensitive=False,
+    ),
     default=None,
     help="Artifact type for --include",
 )
@@ -892,8 +923,16 @@ def pkg_create(
 
     # Filter by type if requested
     if artifact_types:
-        type_set = set(artifact_types)
-        artifacts = [a for a in artifacts if a.type in type_set]
+        selected_types = {
+            CANONICAL_ARTIFACT_TYPES.get(artifact_type, artifact_type)
+            for artifact_type in artifact_types
+        }
+        artifacts = [
+            artifact
+            for artifact in artifacts
+            if CANONICAL_ARTIFACT_TYPES.get(artifact.type, artifact.type)
+            in selected_types
+        ]
 
     # Add manual includes
     if includes:
@@ -1038,7 +1077,8 @@ def pkg_create(
     # -----
     type_counts: dict[str, int] = {}
     for art in selected:
-        label = art.type + "s"
+        canonical_type = CANONICAL_ARTIFACT_TYPES.get(art.type, art.type)
+        label = f"{canonical_type}s"
         type_counts[label] = type_counts.get(label, 0) + 1
 
     parts = [f"{count} {label}" for label, count in type_counts.items()]

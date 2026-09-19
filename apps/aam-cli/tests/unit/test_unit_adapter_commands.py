@@ -333,17 +333,19 @@ class TestCodexAdapterCommands:
     """Tests for CodexAdapter new deploy methods."""
 
     def test_unit_deploy_command_to_codex_skills(self, tmp_path: Path):
-        """deploy_command writes to ~/.codex/skills/<pkg>:<name>/SKILL.md."""
+        """deploy_command writes to .agents/skills/<pkg>:<name>/SKILL.md."""
         adapter = CodexAdapter(tmp_path)
-        # Override codex_dir to tmp_path for testing (avoid writing to home)
+        # Override home-based dirs to keep tests isolated
         adapter.codex_dir = tmp_path / ".codex"
+        adapter.agents_user_dir = tmp_path / ".agents-user"
 
         cmd_file = _make_cmd_file(tmp_path, "my-cmd")
         ref = _make_artifact_ref("my-cmd", "commands/my-cmd.md", "My cmd")
-        config = {"package_name": "@scope/pkg"}
+        config = {"package_name": "@scope/pkg", "skill_scope": "project"}
 
         dest = adapter.deploy_command(cmd_file, ref, config)
 
+        assert dest == tmp_path / ".agents" / "skills" / "scope--pkg:my-cmd"
         assert dest.is_dir()
         skill_md = dest / "SKILL.md"
         assert skill_md.exists()

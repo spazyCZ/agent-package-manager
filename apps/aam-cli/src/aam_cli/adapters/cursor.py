@@ -1,9 +1,10 @@
 """Cursor platform adapter.
 
 Deploys AAM artifacts into the Cursor IDE filesystem structure:
-  - Skills       → ``.cursor/skills/<fs-name>/``
+  - Skills       → ``.cursor/skills/<fs-name>/`` (project) or
+                   ``~/.cursor/skills/<fs-name>/`` (user)
   - Agents       → ``.cursor/rules/agent-<fs-name>.mdc``
-  - Commands     → ``.cursor/skills/<pkg>:<name>/`` (simple) or
+  - Commands     → scoped skills root as ``<pkg>:<name>/`` (simple) or
                    ``.cursor/prompts/<name>.md`` (parameterized/template)
   - Instructions → ``.cursor/rules/<fs-name>.mdc``
 
@@ -47,8 +48,8 @@ logger = logging.getLogger(__name__)
 class CursorAdapter:
     """Cursor IDE platform adapter.
 
-    All deploy methods write to a ``.cursor/`` directory within
-    the project root.
+    Most deploy methods write to a ``.cursor/`` directory within the
+    project root. Skills honor ``skill_scope`` (project or user).
     """
 
     def __init__(self, project_root: Path) -> None:
@@ -60,6 +61,32 @@ class CursorAdapter:
         self.name = "cursor"
         self.project_root = project_root.resolve()
         self.cursor_dir = self.project_root / ".cursor"
+        self.cursor_user_dir = Path.home() / ".cursor"
+
+    def _skills_base(self, config: dict[str, str]) -> Path:
+        """Resolve the skills root from ``skill_scope``.
+
+        Args:
+            config: Deploy config; ``skill_scope`` is ``project`` or ``user``.
+
+        Returns:
+            Absolute path to the skills directory root.
+        """
+        scope = config.get("skill_scope", "project")
+        if scope == "user":
+            return self.cursor_user_dir / "skills"
+        return self.cursor_dir / "skills"
+
+    def _skill_search_roots(self) -> list[Path]:
+        """Return skill roots to check for undeploy/list.
+
+        Returns:
+            Ordered list of skill directory roots that may contain artifacts.
+        """
+        return [
+            self.cursor_dir / "skills",
+            self.cursor_user_dir / "skills",
+        ]
 
     # ------------------------------------------------------------------
     # Deploy methods
@@ -69,22 +96,23 @@ class CursorAdapter:
         self,
         skill_path: Path,
         skill_ref: ArtifactRef,
-        _config: dict[str, str],
+        config: dict[str, str],
     ) -> Path:
-        """Deploy a skill to ``.cursor/skills/<fs-name>/``.
+        """Deploy a skill to ``.cursor/skills/`` or ``~/.cursor/skills/``.
 
-        Copies the entire skill directory.
+        Copies the entire skill directory. Scope comes from
+        ``config["skill_scope"]`` (default ``project``).
 
         Args:
             skill_path: Path to the extracted skill directory.
             skill_ref: Artifact reference from the manifest.
-            config: Platform config (e.g. skill_scope).
+            config: Platform config including ``skill_scope``.
 
         Returns:
             Destination path.
         """
         fs_name = self._artifact_fs_name(skill_ref.name)
-        dest = self.cursor_dir / "skills" / fs_name
+        dest = self._skills_base(config) / fs_name
 
         logger.info(f"Deploying skill '{skill_ref.name}' -> {dest}")
 
@@ -237,7 +265,7 @@ class CursorAdapter:
         pkg_name = config.get("package_name", "unknown")
         safe_pkg = pkg_name.lstrip("@").replace("/", "--")
         safe_name = self._artifact_fs_name(cmd_ref.name)
-        skill_dir = self.cursor_dir / "skills" / f"{safe_pkg}:{safe_name}"
+        skill_dir = self._skills_base(config) / f"{safe_pkg}:{safe_name}"
 
         logger.info(f"Deploying command '{cmd_ref.name}' -> {skill_dir}")
         skill_dir.mkdir(parents=True, exist_ok=True)
@@ -404,10 +432,11 @@ class CursorAdapter:
         logger.info(f"Undeploying {artifact_type} '{artifact_name}' from cursor")
 
         if artifact_type == "skill":
-            path = self.cursor_dir / "skills" / fs_name
-            if path.is_dir():
-                shutil.rmtree(path)
-                logger.info(f"Removed skill directory: {path}")
+            for skills_root in self._skill_search_roots():
+                path = skills_root / fs_name
+                if path.is_dir():
+                    shutil.rmtree(path)
+                    logger.info(f"Removed skill directory: {path}")
 
         elif artifact_type == "agent":
             path = self.cursor_dir / "rules" / f"agent-{fs_name}.mdc"
@@ -426,10 +455,11 @@ class CursorAdapter:
             if prompt_path.is_file():
                 prompt_path.unlink()
                 logger.info(f"Removed command (template): {prompt_path}")
-            skill_path = self.cursor_dir / "skills" / fs_name
-            if skill_path.is_dir():
-                shutil.rmtree(skill_path)
-                logger.info(f"Removed command directory: {skill_path}")
+            for skills_root in self._skill_search_roots():
+                skill_path = skills_root / fs_name
+                if skill_path.is_dir():
+                    shutil.rmtree(skill_path)
+                    logger.info(f"Removed command directory: {skill_path}")
 
         elif artifact_type == "rule":
             path = self.cursor_dir / "rules" / f"{fs_name}.mdc"
@@ -460,16 +490,23 @@ class CursorAdapter:
             List of ``(name, type, path)`` tuples.
         """
         deployed: list[tuple[str, str, Path]] = []
+        seen_names: set[tuple[str, str]] = set()
 
         # -----
-        # Skills and commands (commands use ':' in directory name)
+        # Skills and commands across project and user roots
         # -----
-        skills_dir = self.cursor_dir / "skills"
-        if skills_dir.is_dir():
+        for skills_dir in self._skill_search_roots():
+            if not skills_dir.is_dir():
+                continue
             for entry in skills_dir.iterdir():
-                if entry.is_dir():
-                    kind = "command" if ":" in entry.name else "skill"
-                    deployed.append((entry.name, kind, entry))
+                if not entry.is_dir():
+                    continue
+                kind = "command" if ":" in entry.name else "skill"
+                key = (entry.name, kind)
+                if key in seen_names:
+                    continue
+                seen_names.add(key)
+                deployed.append((entry.name, kind, entry))
 
         # -----
         # Rules (agents, instructions, and rules)

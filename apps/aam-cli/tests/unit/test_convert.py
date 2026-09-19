@@ -443,6 +443,150 @@ class TestSkillConversion:
         assert (target / "SKILL.md").is_file()
         assert (target / "config.yaml").is_file()
 
+    def test_nested_cursor_skill_preserves_path_for_codex(
+        self, tmp_path: Path
+    ) -> None:
+        """Nested Cursor skill → Codex keeps category nesting."""
+        skill_dir = (
+            tmp_path / ".cursor" / "skills" / "shipping" / "land-it"
+        )
+        _write_file(skill_dir / "SKILL.md", "# Land It\nShip carefully.")
+
+        report = run_conversion(tmp_path, "cursor", "codex", artifact_type="skill")
+
+        skill_results = [
+            r for r in report.results
+            if r.artifact_type == "skill" and not r.skipped
+        ]
+        assert len(skill_results) == 1
+        target = tmp_path / ".agents" / "skills" / "shipping" / "land-it"
+        assert (target / "SKILL.md").is_file()
+        assert "Ship carefully." in (target / "SKILL.md").read_text()
+
+    def test_nested_cursor_skill_flattens_for_copilot(self, tmp_path: Path) -> None:
+        """Nested Cursor skill → Copilot flattens to parent folder name."""
+        skill_dir = (
+            tmp_path / ".cursor" / "skills" / "shipping" / "land-it"
+        )
+        _write_file(skill_dir / "SKILL.md", "# Land It")
+
+        report = run_conversion(tmp_path, "cursor", "copilot", artifact_type="skill")
+
+        skill_results = [
+            r for r in report.results
+            if r.artifact_type == "skill" and not r.skipped
+        ]
+        assert len(skill_results) == 1
+        assert "flattened" in skill_results[0].target_path
+        target = tmp_path / ".github" / "skills" / "land-it"
+        assert (target / "SKILL.md").is_file()
+        assert not (
+            tmp_path / ".github" / "skills" / "shipping" / "land-it"
+        ).exists()
+
+    def test_nested_cursor_skill_flattens_for_claude(self, tmp_path: Path) -> None:
+        """Nested Cursor skill → Claude flattens to parent folder name."""
+        skill_dir = (
+            tmp_path / ".cursor" / "skills" / "shipping" / "land-it"
+        )
+        _write_file(skill_dir / "SKILL.md", "# Land It")
+
+        report = run_conversion(
+            tmp_path, "cursor", "claude-code", artifact_type="skill"
+        )
+
+        skill_results = [
+            r for r in report.results
+            if r.artifact_type == "skill" and not r.skipped
+        ]
+        assert len(skill_results) == 1
+        target = tmp_path / ".claude" / "skills" / "land-it"
+        assert (target / "SKILL.md").is_file()
+
+    def test_flatten_collision_skips_second_skill(self, tmp_path: Path) -> None:
+        """Two nested skills with the same folder name collide when flattened."""
+        first = tmp_path / ".cursor" / "skills" / "shipping" / "land-it"
+        second = tmp_path / ".cursor" / "skills" / "debug" / "land-it"
+        _write_file(first / "SKILL.md", "# Shipping land-it")
+        _write_file(second / "SKILL.md", "# Debug land-it")
+
+        report = run_conversion(tmp_path, "cursor", "copilot", artifact_type="skill")
+
+        skill_results = [r for r in report.results if r.artifact_type == "skill"]
+        converted = [r for r in skill_results if not r.skipped and r.error is None]
+        skipped = [r for r in skill_results if r.skipped]
+        assert len(converted) == 1
+        assert len(skipped) == 1
+        assert any("collision" in w.lower() for w in skipped[0].warnings)
+        target = tmp_path / ".github" / "skills" / "land-it"
+        assert (target / "SKILL.md").is_file()
+        content = (target / "SKILL.md").read_text()
+        assert "land-it" in content
+        # Exactly one of the two sources was written
+        assert content in ("# Shipping land-it", "# Debug land-it")
+
+    def test_cursor_discovers_agents_skills(self, tmp_path: Path) -> None:
+        """Cursor convert also picks up skills under .agents/skills/."""
+        skill_dir = tmp_path / ".agents" / "skills" / "shared-skill"
+        _write_file(skill_dir / "SKILL.md", "# Shared")
+
+        report = run_conversion(tmp_path, "cursor", "claude-code", artifact_type="skill")
+
+        skill_results = [
+            r for r in report.results
+            if r.artifact_type == "skill" and not r.skipped
+        ]
+        assert len(skill_results) == 1
+        target = tmp_path / ".claude" / "skills" / "shared-skill"
+        assert (target / "SKILL.md").is_file()
+
+    def test_codex_discovers_legacy_codex_skills(self, tmp_path: Path) -> None:
+        """Codex convert still picks up legacy .codex/skills/."""
+        skill_dir = tmp_path / ".codex" / "skills" / "legacy-skill"
+        _write_file(skill_dir / "SKILL.md", "# Legacy")
+
+        report = run_conversion(tmp_path, "codex", "cursor", artifact_type="skill")
+
+        skill_results = [
+            r for r in report.results
+            if r.artifact_type == "skill" and not r.skipped
+        ]
+        assert len(skill_results) == 1
+        target = tmp_path / ".cursor" / "skills" / "legacy-skill"
+        assert (target / "SKILL.md").is_file()
+
+    def test_duplicate_relative_path_prefers_platform_root(
+        self, tmp_path: Path
+    ) -> None:
+        """Same relative path in .cursor/skills and .agents/skills prefers Cursor."""
+        cursor_skill = tmp_path / ".cursor" / "skills" / "dup"
+        agents_skill = tmp_path / ".agents" / "skills" / "dup"
+        _write_file(cursor_skill / "SKILL.md", "# From cursor")
+        _write_file(agents_skill / "SKILL.md", "# From agents")
+
+        report = run_conversion(tmp_path, "cursor", "copilot", artifact_type="skill")
+
+        skill_results = [r for r in report.results if r.artifact_type == "skill"]
+        converted = [r for r in skill_results if not r.skipped and r.error is None]
+        skipped = [r for r in skill_results if r.skipped]
+        assert len(converted) == 1
+        assert len(skipped) == 1
+        assert any("duplicate" in w.lower() for w in skipped[0].warnings)
+        target = tmp_path / ".github" / "skills" / "dup"
+        assert "From cursor" in (target / "SKILL.md").read_text()
+
+    def test_same_path_agents_skills_skipped(self, tmp_path: Path) -> None:
+        """Cursor→Codex with skill only under .agents/skills skips same path."""
+        skill_dir = tmp_path / ".agents" / "skills" / "shared"
+        _write_file(skill_dir / "SKILL.md", "# Shared")
+
+        report = run_conversion(tmp_path, "cursor", "codex", artifact_type="skill")
+
+        skill_results = [r for r in report.results if r.artifact_type == "skill"]
+        assert len(skill_results) == 1
+        assert skill_results[0].skipped is True
+        assert any("identical" in w.lower() for w in skill_results[0].warnings)
+
 
 class TestConflictHandling:
     """Tests for conflict resolution behavior."""

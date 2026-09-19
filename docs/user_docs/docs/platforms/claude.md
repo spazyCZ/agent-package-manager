@@ -317,6 +317,17 @@ aam config set active_platforms claude
 aam install @author/asvc-auditor
 ```
 
+When you set `active_platforms` with a single value, AAM persists it as a YAML
+list:
+
+```yaml
+active_platforms:
+  - claude
+```
+
+This `aam config set` workflow is expected to complete without serializer
+warnings.
+
 ### After Installation
 
 **CLAUDE.md** (instructions merged):

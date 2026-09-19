@@ -122,6 +122,7 @@ Error: Unknown config key: author.invalid_field
 | Key | Type | Description |
 |-----|------|-------------|
 | `default_platform` | string | Default deployment platform (cursor, copilot, claude, codex) |
+| `active_platforms` | list[string] | Active deployment platforms used by multi-platform installs |
 
 ### Author Section
 
@@ -160,6 +161,22 @@ aam config set author.name "John Doe"
 
 Quotes are optional but recommended for values with spaces.
 
+### List Values
+
+For `list[string]` keys such as `active_platforms`, pass a single value or a
+comma-separated list:
+
+```bash
+# Single platform (stored as a one-item list)
+aam config set active_platforms claude
+
+# Multiple platforms (stored as a list)
+aam config set active_platforms cursor,claude,copilot
+```
+
+When you set `active_platforms` to a single platform, AAM stores it as a list
+in `~/.aam/config.yaml` and does not emit serializer warnings.
+
 ### Integer Values
 
 ```bash
@@ -179,6 +196,8 @@ Changes are saved to `~/.aam/config.yaml`:
 
 ```yaml
 default_platform: cursor
+active_platforms:
+  - claude
 author:
   name: John Doe
   email: john@example.com
@@ -278,7 +297,6 @@ aam config set security.require_checksum true
 Some configuration cannot be set via CLI:
 
 - `registries` - Use `aam registry add/remove` instead
-- `active_platforms` - Planned for future versions
 
 ### Max Depth
 

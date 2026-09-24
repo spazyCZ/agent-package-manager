@@ -1,13 +1,13 @@
 # Packages
 
-A **package** is the fundamental unit of distribution in AAM. It bundles one or more artifacts (skills, agents, prompts, instructions) together with metadata, dependencies, and platform-specific configuration.
+A **package** is the fundamental unit of distribution in AAM. It bundles one or more artifacts (skills, agents, commands, instructions, rules, hooks, MCP servers) together with metadata, dependencies, and platform-specific configuration.
 
 ## What is a Package?
 
 Think of a package as a self-contained bundle that provides reusable AI agent capabilities. A package contains:
 
 - **Metadata** — Name, version, description, author, license
-- **Artifacts** — One or more skills, agents, prompts, or instructions
+- **Artifacts** — One or more skills, agents, commands, instructions, rules, hooks, or MCP servers
 - **Dependencies** — References to other packages this package requires
 - **Configuration** — Platform-specific deployment settings
 - **Lock file** — Pinned dependency versions for reproducible installs (optional)
@@ -19,9 +19,19 @@ Packages are the building blocks of the AAM ecosystem. They enable:
 - **Versioning** — Track changes and manage compatibility
 - **Composition** — Combine multiple packages into complex workflows
 
-## The Manifest: `aam.yaml`
+## The manifest: `package.agent.json`
 
-Every package must have an `aam.yaml` manifest at its root. This file describes the package contents, metadata, and dependencies.
+Every package has a manifest at its root that describes its contents,
+metadata, and dependencies. AAM supports two manifest formats:
+
+| Format | File | Precedence |
+|--------|------|-----------|
+| **JSON** (preferred) | `package.agent.json` | Primary — used when both exist |
+| **YAML** (legacy) | `aam.yaml` / `package.agent.yaml` | Secondary — fully supported |
+
+When you run `aam pkg init`, AAM generates `package.agent.json` by
+default. Existing `aam.yaml` packages continue to work without
+changes.
 
 ### Complete Example
 
@@ -31,7 +41,7 @@ Here's a fully annotated `aam.yaml` example:
 # Package identity
 name: "@author/asvc-auditor"        # Scoped package name
 version: 1.0.0                      # Semantic version (MAJOR.MINOR.PATCH)
-description: "ASVC audit agent with reporting skill and prompts"
+description: "ASVC audit agent with reporting skill and commands"
 
 # Metadata (all optional)
 author: author                      # Package author
@@ -58,14 +68,14 @@ artifacts:
       path: skills/asvc-report/
       description: "Skill for generating ASVC audit reports"
 
-  # Prompts
-  prompts:
+  # Commands (parameterized templates — formerly "prompts")
+  commands:
     - name: audit-finding
-      path: prompts/audit-finding.md
-      description: "Structured prompt for documenting audit findings"
+      path: commands/audit-finding.md
+      description: "Structured template for documenting audit findings"
     - name: audit-summary
-      path: prompts/audit-summary.md
-      description: "Prompt for generating executive audit summaries"
+      path: commands/audit-summary.md
+      description: "Template for generating executive audit summaries"
 
   # Instructions
   instructions:
@@ -138,8 +148,11 @@ At least one artifact type must be declared. Each artifact reference follows the
 artifacts:
   agents: list[ArtifactRef]
   skills: list[ArtifactRef]
-  prompts: list[ArtifactRef]
+  commands: list[ArtifactRef]      # Parameterized templates (formerly "prompts")
   instructions: list[ArtifactRef]
+  rules: list[ArtifactRef]
+  hooks: list[ArtifactRef]
+  mcp: list[ArtifactRef]
 ```
 
 **ArtifactRef schema:**
@@ -308,7 +321,7 @@ my-package/
 │       │   └── guide.md
 │       └── assets/                   # Files used in output (optional)
 │           └── logo.png
-├── prompts/                          # Prompt artifacts
+├── commands/                         # Command artifacts (parameterized templates)
 │   ├── task-prompt.md
 │   └── analysis-prompt.md
 ├── instructions/                     # Instruction artifacts
@@ -325,9 +338,16 @@ my-package/
 
 1. **Artifacts organized by type** — Each artifact type has its own top-level directory
 2. **One artifact per subdirectory** — Skills and agents get their own folders
-3. **Prompts and instructions are files** — Single markdown files with frontmatter
+3. **Commands and instructions are files** — Single markdown files with frontmatter
 4. **Optional supporting files** — Scripts, templates, references, assets are organized within artifact directories
 5. **Tests and evals at root** — Testing infrastructure at package root
+
+### Auto-discovery
+
+When the manifest omits the `artifacts` section, AAM automatically
+discovers artifacts from the standard directories listed above. You
+can also declare custom paths in the manifest to override defaults.
+See [Artifact auto-discovery](artifacts.md#artifact-auto-discovery).
 
 ## Distribution Format: `.aam` Archives
 
@@ -341,7 +361,7 @@ asvc-auditor-1.0.0.aam
     ├── aam.yaml
     ├── agents/
     ├── skills/
-    ├── prompts/
+    ├── commands/
     └── instructions/
 ```
 
@@ -381,14 +401,14 @@ Attempting to pack a package that exceeds these limits will fail with a clear er
 
 When packages with scoped names are installed or deployed, the `@scope/name` format must be converted to a filesystem-safe name.
 
-### Scoped Name Conversion
+### Scoped name conversion
 
 AAM uses the **double-hyphen convention**:
 
 | Package Name | Filesystem Name | Example Path |
 |-------------|-----------------|--------------|
-| `asvc-report` (unscoped) | `asvc-report` | `.aam/packages/asvc-report/` |
-| `@author/asvc-report` (scoped) | `author--asvc-report` | `.aam/packages/@author/asvc-report/` |
+| `asvc-report` (unscoped) | `asvc-report` | `.agent-packages/asvc-report/` |
+| `@author/asvc-report` (scoped) | `author--asvc-report` | `.agent-packages/@author/asvc-report/` |
 
 **Why double-hyphen (`--`)?**
 
@@ -397,20 +417,26 @@ AAM uses the **double-hyphen convention**:
 - The mapping is reversible: split on `--` to recover `(scope, name)`
 - Consistent across all platforms (Cursor, Copilot, Claude, Codex)
 
-### Directory Structure for Scoped Packages
+### Directory structure for scoped packages
 
-In `.aam/packages/`, scoped packages are nested under `@scope/`:
+In `.agent-packages/`, scoped packages are nested under `@scope/`:
 
 ```
-.aam/packages/
+.agent-packages/
 ├── @author/                    # Scoped packages under @scope/
 │   ├── asvc-auditor/
-│   │   └── aam.yaml
+│   │   └── package.agent.json
 │   └── generic-auditor/
-│       └── aam.yaml
+│       └── package.agent.json
 └── report-templates/           # Unscoped packages at root
-    └── aam.yaml
+    └── package.agent.json
 ```
+
+!!! note "Migration from `.aam/packages/`"
+    The install root has changed from `.aam/packages/` to
+    `.agent-packages/`. AAM detects existing installs at the old
+    location and offers to migrate them automatically. See the
+    [Migration Guide](../troubleshooting/migration.md).
 
 When deployed to platforms, artifact names use the `scope--name` format:
 
@@ -478,9 +504,9 @@ Here's a complete, real-world package structure:
 │       │   └── report.j2             # Jinja2 template
 │       └── references/
 │           └── asvc-framework.md     # ASVC documentation
-├── prompts/
-│   ├── audit-finding.md              # Finding prompt
-│   └── audit-summary.md              # Summary prompt
+├── commands/
+│   ├── audit-finding.md              # Finding command template
+│   └── audit-summary.md              # Summary command template
 ├── instructions/
 │   └── asvc-coding-standards.md      # Coding standards
 ├── evals/
@@ -495,7 +521,7 @@ Here's a complete, real-world package structure:
 ```yaml
 name: "@author/asvc-auditor"
 version: 1.0.0
-description: "ASVC audit agent with reporting skill and prompts"
+description: "ASVC audit agent with reporting skill and commands"
 author: author
 license: Apache-2.0
 repository: https://github.com/author/asvc-auditor
@@ -510,13 +536,13 @@ artifacts:
     - name: asvc-report
       path: skills/asvc-report/
       description: "Skill for generating ASVC audit reports"
-  prompts:
+  commands:
     - name: audit-finding
-      path: prompts/audit-finding.md
-      description: "Structured prompt for documenting audit findings"
+      path: commands/audit-finding.md
+      description: "Structured template for documenting audit findings"
     - name: audit-summary
-      path: prompts/audit-summary.md
-      description: "Prompt for generating executive audit summaries"
+      path: commands/audit-summary.md
+      description: "Template for generating executive audit summaries"
   instructions:
     - name: asvc-coding-standards
       path: instructions/asvc-coding-standards.md

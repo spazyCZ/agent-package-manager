@@ -20,6 +20,8 @@ import os
 import tarfile
 from pathlib import Path
 
+from aam_cli.utils.paths import MANIFEST_JSON, MANIFEST_LEGACY, MANIFEST_YAML
+
 ################################################################################
 #                                                                              #
 # LOGGING                                                                      #
@@ -52,17 +54,19 @@ def create_archive(source_dir: Path, output_path: Path) -> Path:
     """Create a gzipped tar archive from a package directory.
 
     The archive includes all files under *source_dir* relative to
-    *source_dir* itself (so ``aam.yaml`` appears at the archive root).
+    *source_dir* itself (so the manifest file appears at the archive root).
 
     Args:
-        source_dir: Directory containing the package (must contain ``aam.yaml``).
+        source_dir: Directory containing the package (must contain a
+            manifest — ``package.agent.json``, ``package.agent.yaml``, or
+            ``aam.yaml``).
         output_path: Target path for the ``.aam`` file.
 
     Returns:
         The path to the created archive.
 
     Raises:
-        FileNotFoundError: If *source_dir* does not exist or has no ``aam.yaml``.
+        FileNotFoundError: If *source_dir* does not exist or has no manifest.
         ValueError: If the archive exceeds the 50 MB limit or contains
             unsafe entries (symlinks outside package, absolute paths).
     """
@@ -74,10 +78,11 @@ def create_archive(source_dir: Path, output_path: Path) -> Path:
     if not source_dir.is_dir():
         raise FileNotFoundError(f"Source directory not found: {source_dir}")
 
-    manifest_path = source_dir / "aam.yaml"
-    if not manifest_path.is_file():
+    manifest_names = (MANIFEST_JSON, MANIFEST_YAML, MANIFEST_LEGACY)
+    if not any((source_dir / name).is_file() for name in manifest_names):
         raise FileNotFoundError(
-            f"No aam.yaml found in {source_dir}. Run 'aam create-package' or 'aam init' first."
+            f"No manifest found in {source_dir}. Expected one of: "
+            f"{', '.join(manifest_names)}. Run 'aam pkg init' first."
         )
 
     # -----

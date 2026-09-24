@@ -326,3 +326,46 @@ def find_best_match(
     best = max(matching)
     logger.debug(f"Best match: {best}")
     return str(best)
+
+
+def find_lowest_match(
+    constraint_str: str,
+    available_versions: list[str],
+) -> str | None:
+    """Find the lowest version that satisfies a constraint.
+
+    Used by the ``MINIMAL`` resolution strategy to pick the most
+    conservative satisfying version.
+
+    Args:
+        constraint_str: Version constraint string.
+        available_versions: List of available version strings.
+
+    Returns:
+        The lowest matching version string, or ``None`` if no version matches.
+    """
+    logger.debug(
+        f"Finding lowest match: constraint='{constraint_str}', "
+        f"available={available_versions}"
+    )
+
+    constraints = parse_constraint(constraint_str)
+
+    matching: list[Version] = []
+    for ver_str in available_versions:
+        try:
+            ver = parse_version(ver_str)
+        except ValueError:
+            logger.warning(f"Skipping unparseable version: '{ver_str}'")
+            continue
+
+        if version_matches(ver, constraints):
+            matching.append(ver)
+
+    if not matching:
+        logger.debug(f"No matching version found for constraint '{constraint_str}'")
+        return None
+
+    lowest = min(matching)
+    logger.debug(f"Lowest match: {lowest}")
+    return str(lowest)

@@ -16,16 +16,17 @@ from pathlib import Path
 from typing import Any
 
 from aam_cli.adapters.cursor import CursorAdapter
+from aam_cli.core.autodiscovery import discover_artifacts
 from aam_cli.core.config import AamConfig
-from aam_cli.core.manifest import load_manifest
+from aam_cli.core.manifest import load_manifest_universal
 from aam_cli.core.workspace import (
     get_packages_dir,
     read_lock_file,
     write_lock_file,
 )
 from aam_cli.detection.scanner import scan_project
+from aam_cli.services.source_service import scan_source
 from aam_cli.utils.naming import parse_package_name, to_filesystem_name
-from aam_cli.utils.yaml_utils import dump_yaml
 
 ################################################################################
 #                                                                              #
@@ -80,7 +81,7 @@ def list_installed_packages(
 
         if pkg_dir.is_dir():
             try:
-                manifest = load_manifest(pkg_dir)
+                manifest = load_manifest_universal(pkg_dir)
                 for atype, _ref in manifest.all_artifacts:
                     key = atype + "s"
                     artifact_counts[key] = artifact_counts.get(key, 0) + 1
@@ -154,7 +155,7 @@ def get_package_info(
     pkg_dir = get_packages_dir(effective_dir) / fs_name
 
     try:
-        manifest = load_manifest(pkg_dir)
+        manifest = load_manifest_universal(pkg_dir)
     except FileNotFoundError as exc:
         raise ValueError(
             f"[AAM_PACKAGE_NOT_FOUND] Package directory not found for "
@@ -162,10 +163,16 @@ def get_package_info(
         ) from exc
 
     # -----
+    # Resolve artifacts via auto-discovery if not explicitly declared
+    # -----
+    artifacts_were_explicit = manifest.artifacts is not None
+    resolved_artifacts = discover_artifacts(pkg_dir, manifest)
+
+    # -----
     # Build artifact info grouped by type
     # -----
     artifacts: dict[str, list[dict[str, Any]]] = {}
-    for artifact_type, ref in manifest.all_artifacts:
+    for artifact_type, ref in resolved_artifacts.all_artifacts:
         key = artifact_type + "s"
         if key not in artifacts:
             artifacts[key] = []
@@ -187,6 +194,7 @@ def get_package_info(
         "homepage": getattr(manifest, "homepage", None),
         "keywords": getattr(manifest, "keywords", []),
         "artifacts": artifacts,
+        "artifacts_discovered": not artifacts_were_explicit,
         "dependencies": manifest.dependencies or {},
         "platforms": getattr(manifest, "platforms", {}),
         "installed": True,
@@ -256,7 +264,7 @@ def uninstall_package(
 
     if pkg_dir.is_dir():
         try:
-            manifest = load_manifest(pkg_dir)
+            manifest = load_manifest_universal(pkg_dir)
             adapter = CursorAdapter(effective_dir)
 
             for artifact_type, ref in manifest.all_artifacts:
@@ -380,8 +388,13 @@ def create_package(
         },
     }
 
-    manifest_path = project_path / "aam.yaml"
-    dump_yaml(manifest_data, manifest_path)
+    import json
+
+    manifest_path = project_path / "package.agent.json"
+    manifest_path.write_text(
+        json.dumps(manifest_data, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
     # -----
     # Step 5: Build result
@@ -402,4 +415,81 @@ def create_package(
         "version": pkg_version,
         "artifacts_included": type_counts,
         "total_artifacts": len(selected),
+    }
+
+
+################################################################################
+#                                                                              #
+# CREATE PACKAGE FROM SOURCE                                                   #
+#                                                                              #
+################################################################################
+
+
+def create_package_from_source(
+    source_name: str,
+    name: str | None = None,
+    version: str | None = None,
+    artifact_types: list[str] | None = None,
+    artifacts: list[str] | None = None,
+) -> dict[str, Any]:
+    """Create a package manifest from a registered remote source.
+
+    Scans the source, filters artifacts, and returns a structured result
+    with provenance metadata.
+
+    Args:
+        source_name: Name of the registered remote source.
+        name: Package name override. Defaults to source name.
+        version: Package version. Defaults to "1.0.0".
+        artifact_types: Filter by artifact types.
+        artifacts: Filter by specific artifact names.
+
+    Returns:
+        Dict with package_name, version, from_source, artifacts,
+        artifact_count, and provenance.
+    """
+    logger.info(f"Creating package from source: source='{source_name}'")
+
+    # -----
+    # Step 1: Scan the source for artifacts
+    # -----
+    scan_result = scan_source(source_name)
+    source_artifacts = scan_result.get("artifacts", [])
+
+    # -----
+    # Step 2: Filter by artifact names if specified
+    # -----
+    if artifacts:
+        source_artifacts = [
+            a for a in source_artifacts
+            if a.get("name") in artifacts
+        ]
+
+    # -----
+    # Step 3: Filter by type if specified
+    # -----
+    if artifact_types:
+        source_artifacts = [
+            a for a in source_artifacts
+            if a.get("type") in artifact_types
+        ]
+
+    logger.info(
+        f"Package from source created: source='{source_name}', "
+        f"artifacts={len(source_artifacts)}"
+    )
+
+    return {
+        "package_name": name or source_name.replace("/", "-"),
+        "version": version or "1.0.0",
+        "from_source": source_name,
+        "artifacts": source_artifacts,
+        "artifact_count": len(source_artifacts),
+        "provenance": {
+            "source_type": "git",
+            "source_name": source_name,
+            "source_url": scan_result.get("source_url", ""),
+            "source_ref": scan_result.get("source_ref", ""),
+            "source_commit": scan_result.get("last_commit", ""),
+        },
     }

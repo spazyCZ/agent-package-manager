@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-from aam_cli.commands.create_package import create_package
+from aam_cli.commands.pkg.create import pkg_create
 
 ################################################################################
 #                                                                              #
@@ -104,7 +104,7 @@ class TestCreateFromSourceDryRun:
         mock_scan.return_value = mock_scan_result
 
         result = cli_runner.invoke(
-            create_package,
+            pkg_create,
             [
                 str(tmp_path),
                 "--from-source", "openai/skills",
@@ -135,7 +135,7 @@ class TestCreateFromSourceDryRun:
         mock_scan.return_value = mock_scan_result
 
         result = cli_runner.invoke(
-            create_package,
+            pkg_create,
             [
                 str(tmp_path),
                 "--from-source", "openai/skills",
@@ -165,7 +165,7 @@ class TestCreateFromSourceDryRun:
         mock_scan.return_value = mock_scan_result
 
         result = cli_runner.invoke(
-            create_package,
+            pkg_create,
             [
                 str(tmp_path),
                 "--from-source", "openai/skills",
@@ -206,7 +206,7 @@ class TestCreateFromSourceErrors:
         )
 
         result = cli_runner.invoke(
-            create_package,
+            pkg_create,
             [
                 str(tmp_path),
                 "--from-source", "nonexistent",
@@ -237,7 +237,7 @@ class TestCreateFromSourceErrors:
         }
 
         result = cli_runner.invoke(
-            create_package,
+            pkg_create,
             [
                 str(tmp_path),
                 "--from-source", "empty-source",
@@ -265,7 +265,7 @@ class TestCreateFromSourceErrors:
         mock_scan.return_value = mock_scan_result
 
         result = cli_runner.invoke(
-            create_package,
+            pkg_create,
             [
                 str(tmp_path),
                 "--from-source", "openai/skills",

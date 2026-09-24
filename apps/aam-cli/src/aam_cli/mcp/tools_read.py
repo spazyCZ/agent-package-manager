@@ -17,7 +17,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from aam_cli.commands.diff import diff_package
+from aam_cli.services.diff_service import diff_package
 from aam_cli.core.config import load_config
 from aam_cli.services.checksum_service import verify_all, verify_package
 from aam_cli.services.config_service import get_config
@@ -30,12 +30,26 @@ from aam_cli.services.recommend_service import recommend_skills_for_repo
 from aam_cli.services.registry_service import list_registries
 from aam_cli.services.search_service import search_packages
 from aam_cli.services.source_service import (
+    list_available,
     list_candidates,
     list_sources,
     scan_source,
     update_source,
 )
 from aam_cli.services.validate_service import validate_package
+from aam_cli.services import cache_service
+from aam_cli.mcp.error_boundary import mcp_error_boundary
+from aam_cli.services.upgrade_service import check_outdated
+from aam_cli.core.workspace import read_lock_file
+from aam_cli.services.client_init_service import SUPPORTED_PLATFORMS, detect_platform
+from aam_cli.services.dependency_tree_service import (
+    get_tree,
+    get_why,
+    check_deps,
+    audit_deps,
+    dedupe_deps,
+    prune_deps,
+)
 
 ################################################################################
 #                                                                              #
@@ -60,6 +74,7 @@ def register_read_tools(mcp: FastMCP) -> None:
     """
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_search(
         query: str,
         limit: int = 255,
@@ -77,7 +92,7 @@ def register_read_tools(mcp: FastMCP) -> None:
             query: Search query (case-insensitive). Empty string for browse mode.
             limit: Maximum results to return (1-255, default 255).
             package_types: Filter by artifact types (OR logic).
-                Valid: skill, agent, prompt, instruction.
+                Valid: skill, agent, command, instruction.
             source_filter: Limit to a specific git source name.
             registry_filter: Limit to a specific registry name.
             sort_by: Sort order — relevance, name, or recent (default: relevance).
@@ -105,6 +120,7 @@ def register_read_tools(mcp: FastMCP) -> None:
         return result
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_list() -> list[dict[str, Any]]:
         """List all installed AAM packages in the current workspace.
 
@@ -118,6 +134,7 @@ def register_read_tools(mcp: FastMCP) -> None:
         return list_installed_packages()
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_info(
         package_name: str,
         version: str | None = None,
@@ -141,6 +158,7 @@ def register_read_tools(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_validate(path: str = ".") -> dict[str, Any]:
         """Validate an AAM package manifest and artifacts.
 
@@ -157,6 +175,7 @@ def register_read_tools(mcp: FastMCP) -> None:
         return validate_package(Path(path))
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_config_get(key: str | None = None) -> dict[str, Any]:
         """Get AAM configuration value(s).
 
@@ -174,6 +193,7 @@ def register_read_tools(mcp: FastMCP) -> None:
         return get_config(key=key)
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_registry_list() -> list[dict[str, Any]]:
         """List all configured AAM registries.
 
@@ -187,6 +207,7 @@ def register_read_tools(mcp: FastMCP) -> None:
         return list_registries()
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_doctor() -> dict[str, Any]:
         """Run AAM environment diagnostics.
 
@@ -208,6 +229,7 @@ def register_read_tools(mcp: FastMCP) -> None:
     ############################################################################
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_source_list() -> list[dict[str, Any]]:
         """List all configured remote git sources.
 
@@ -224,6 +246,7 @@ def register_read_tools(mcp: FastMCP) -> None:
         return sources
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_source_scan(
         source_name: str,
         artifact_type: str | None = None,
@@ -236,7 +259,7 @@ def register_read_tools(mcp: FastMCP) -> None:
         Args:
             source_name: Display name of the source to scan.
             artifact_type: Optional filter by artifact type
-                (skill, agent, prompt, instruction).
+                (skill, agent, command, instruction).
 
         Returns:
             Scan result dict with source info and artifact list.
@@ -264,6 +287,7 @@ def register_read_tools(mcp: FastMCP) -> None:
         return result
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_source_candidates(
         source_name: str | None = None,
         artifact_type: str | None = None,
@@ -276,7 +300,7 @@ def register_read_tools(mcp: FastMCP) -> None:
         Args:
             source_name: Optional source name filter. If None, scan all sources.
             artifact_type: Optional filter by artifact type
-                (skill, agent, prompt, instruction).
+                (skill, agent, command, instruction).
 
         Returns:
             List of candidate artifact dicts.
@@ -294,6 +318,7 @@ def register_read_tools(mcp: FastMCP) -> None:
         return candidates
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_source_diff(source_name: str) -> dict[str, Any]:
         """Preview upstream changes for a source without applying them.
 
@@ -317,6 +342,7 @@ def register_read_tools(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_verify(
         package_name: str | None = None,
         check_all: bool = False,
@@ -350,6 +376,7 @@ def register_read_tools(mcp: FastMCP) -> None:
         return {"error": "Either package_name or check_all=True is required"}
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_diff(package_name: str) -> dict[str, Any]:
         """Show differences in installed package files.
 
@@ -377,6 +404,7 @@ def register_read_tools(mcp: FastMCP) -> None:
     ############################################################################
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_outdated() -> dict[str, Any]:
         """Check for outdated source-installed packages.
 
@@ -388,33 +416,15 @@ def register_read_tools(mcp: FastMCP) -> None:
             Outdated result dict with outdated packages, counts, and
             stale source warnings.
         """
-        from aam_cli.commands.outdated import check_outdated
-        from aam_cli.core.workspace import read_lock_file
-
         logger.info("MCP tool aam_outdated")
         config = load_config()
         lock = read_lock_file()
 
         result = check_outdated(lock, config)
-
-        return {
-            "outdated": [
-                {
-                    "name": o.name,
-                    "current_commit": o.current_commit,
-                    "latest_commit": o.latest_commit,
-                    "source_name": o.source_name,
-                    "has_local_modifications": o.has_local_modifications,
-                }
-                for o in result.outdated
-            ],
-            "up_to_date": result.up_to_date,
-            "no_source": result.no_source,
-            "stale_sources": result.stale_sources,
-            "total_outdated": result.total_outdated,
-        }
+        return result.to_dict()
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_available() -> dict[str, Any]:
         """List all available artifacts from configured sources.
 
@@ -425,32 +435,9 @@ def register_read_tools(mcp: FastMCP) -> None:
             Dict with artifacts grouped by source, total count, and
             number of sources indexed.
         """
-        from aam_cli.services.source_service import build_source_index
-
         logger.info("MCP tool aam_available")
         config = load_config()
-        index = build_source_index(config)
-
-        # -----
-        # Group by source for structured output
-        # -----
-        by_source: dict[str, list[dict[str, Any]]] = {}
-        for _qname, vp in index.by_qualified_name.items():
-            source_group = by_source.setdefault(vp.source_name, [])
-            source_group.append({
-                "name": vp.name,
-                "qualified_name": vp.qualified_name,
-                "type": vp.type,
-                "path": vp.path,
-                "description": vp.description,
-            })
-
-        return {
-            "by_source": by_source,
-            "total_count": index.total_count,
-            "sources_indexed": index.sources_indexed,
-            "build_timestamp": index.build_timestamp,
-        }
+        return list_available(config)
 
     ############################################################################
     #                                                                          #
@@ -459,6 +446,7 @@ def register_read_tools(mcp: FastMCP) -> None:
     ############################################################################
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_recommend_skills(
         path: str | None = None,
         limit: int = 15,
@@ -491,6 +479,7 @@ def register_read_tools(mcp: FastMCP) -> None:
     ############################################################################
 
     @mcp.tool(tags={"read"})
+    @mcp_error_boundary
     def aam_init_info() -> dict[str, Any]:
         """Get client initialization information.
 
@@ -501,11 +490,6 @@ def register_read_tools(mcp: FastMCP) -> None:
             Dict with detected_platform, supported_platforms, and
             recommended defaults.
         """
-        from aam_cli.services.client_init_service import (
-            SUPPORTED_PLATFORMS,
-            detect_platform,
-        )
-
         logger.info("MCP tool aam_init_info")
 
         detected = detect_platform()
@@ -519,4 +503,169 @@ def register_read_tools(mcp: FastMCP) -> None:
             "recommended_platform": detected or "cursor",
         }
 
-    logger.info("Registered 17 read-only MCP tools")
+    ############################################################################
+    #                                                                          #
+    # DEPENDENCY TREE TOOLS (UAAPS v0.4.0 — T064, T065)                       #
+    #                                                                          #
+    ############################################################################
+
+    @mcp.tool(tags={"read"})
+    @mcp_error_boundary
+    def aam_tree(depth: int = 0, project: str = ".") -> dict[str, Any]:
+        """Show the resolved dependency tree.
+
+        Reads the universal lock file and returns a nested dependency tree
+        rooted at the project. Each node has name, version, source, dep_type,
+        optional flag, and children.
+
+        Args:
+            depth: Maximum tree depth (0 = unlimited).
+            project: Project directory (default: current directory).
+
+        Returns:
+            Dict with tree, total_packages, and lock_file fields.
+        """
+        logger.info(f"MCP tool aam_tree: depth={depth}, project='{project}'")
+        return get_tree(project_dir=Path(project).resolve(), depth=depth)
+
+    @mcp.tool(tags={"read"})
+    @mcp_error_boundary
+    def aam_why(package_name: str, project: str = ".") -> dict[str, Any]:
+        """Show why a package is installed.
+
+        Traces all packages that directly depend on the given package
+        and explains whether it is direct or transitive.
+
+        Args:
+            package_name: Package name to trace.
+            project: Project directory (default: current directory).
+
+        Returns:
+            Dict with package_name, found, is_direct, version,
+            and required_by list.
+        """
+        logger.info(
+            f"MCP tool aam_why: package='{package_name}', project='{project}'"
+        )
+        return get_why(package_name=package_name, project_dir=Path(project).resolve())
+
+    @mcp.tool(tags={"read"})
+    @mcp_error_boundary
+    def aam_check(system_only: bool = False, project: str = ".") -> dict[str, Any]:
+        """Check package installation status and system dependencies.
+
+        Without system_only=True, verifies that all locked packages have
+        corresponding directories in .agent-packages/.
+
+        With system_only=True, aggregates system dependencies across
+        all installed package manifests and runs pre-flight checks.
+
+        Args:
+            system_only: Check system dependencies only.
+            project: Project directory (default: current directory).
+
+        Returns:
+            Dict with check_type, results, all_passed, and total fields.
+        """
+        logger.info(
+            f"MCP tool aam_check: system_only={system_only}, project='{project}'"
+        )
+        return check_deps(
+            project_dir=Path(project).resolve(),
+            system_only=system_only,
+        )
+
+    @mcp.tool(tags={"read"})
+    @mcp_error_boundary
+    def aam_audit(severity: str = "all", project: str = ".") -> dict[str, Any]:
+        """Audit installed packages for integrity issues.
+
+        Computes directory hashes for installed packages and compares against
+        lock file checksums. Reports mismatches as CRITICAL findings.
+
+        Args:
+            severity: Minimum severity level to report
+                (critical/high/medium/low/info/all).
+            project: Project directory (default: current directory).
+
+        Returns:
+            Dict with findings, total_checked, findings_count,
+            and severity_filter fields.
+        """
+        logger.info(
+            f"MCP tool aam_audit: severity='{severity}', project='{project}'"
+        )
+        return audit_deps(
+            project_dir=Path(project).resolve(),
+            severity=severity,
+        )
+
+    @mcp.tool(tags={"read"})
+    @mcp_error_boundary
+    def aam_dedupe(dry_run: bool = True, project: str = ".") -> dict[str, Any]:
+        """Detect duplicate package installations.
+
+        Scans .agent-packages/ for packages appearing in multiple sub-namespace
+        directories. With dry_run=True (default), only reports; does not modify.
+
+        Args:
+            dry_run: If True, report without making changes (default: True).
+            project: Project directory (default: current directory).
+
+        Returns:
+            Dict with would_dedupe (or deduped), packages_changed, and dry_run.
+        """
+        logger.info(
+            f"MCP tool aam_dedupe: dry_run={dry_run}, project='{project}'"
+        )
+        return dedupe_deps(
+            project_dir=Path(project).resolve(),
+            dry_run=dry_run,
+        )
+
+    @mcp.tool(tags={"read"})
+    @mcp_error_boundary
+    def aam_prune(dry_run: bool = True, project: str = ".") -> dict[str, Any]:
+        """Remove unlisted package directories.
+
+        Compares .agent-packages/ against the lock file and reports (or removes)
+        directories not tracked. With dry_run=True (default), only reports.
+
+        Args:
+            dry_run: If True, report without removing (default: True).
+            project: Project directory (default: current directory).
+
+        Returns:
+            Dict with would_remove (or removed), packages_removed, and dry_run.
+        """
+        logger.info(
+            f"MCP tool aam_prune: dry_run={dry_run}, project='{project}'"
+        )
+        return prune_deps(
+            project_dir=Path(project).resolve(),
+            dry_run=dry_run,
+        )
+
+    ############################################################################
+    #                                                                          #
+    # CACHE TOOLS (UAAPS v0.5.0)                                              #
+    #                                                                          #
+    ############################################################################
+
+    @mcp.tool(tags={"read"})
+    @mcp_error_boundary
+    def aam_cache_ls() -> dict[str, Any]:
+        """List cached package archives.
+
+        Returns all ``.aam`` archives stored in the shared download cache
+        at ``~/.aam/cache/packages/``, with name, size, and path for each.
+
+        Returns:
+            Dict with entries list and total_count.
+        """
+        logger.info("MCP tool aam_cache_ls")
+        entries = cache_service.list_cached()
+        return {
+            "entries": entries,
+            "total_count": len(entries),
+        }

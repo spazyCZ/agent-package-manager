@@ -11,9 +11,9 @@ aam convert --source-platform <platform> --target-platform <platform> [OPTIONS]
 ## Description
 
 Convert AI agent configurations between platforms. Reads artifacts from one
-platform's format (instructions, agents, prompts, skills) and writes them in
-another platform's format, with clear warnings about metadata that cannot be
-directly converted.
+platform's format (instructions, agents, prompts, skills, rules, hooks, MCP
+configs) and writes them in another platform's format, with clear warnings
+about metadata that cannot be directly converted.
 
 Supported platforms: **cursor**, **copilot**, **claude**, **codex**.
 
@@ -29,7 +29,7 @@ This is useful when:
 |--------|-------|----------|-------------|
 | `--source-platform` | `-s` | Yes | Source platform: `cursor`, `copilot`, `claude`, `codex` |
 | `--target-platform` | `-t` | Yes | Target platform: `cursor`, `copilot`, `claude`, `codex` |
-| `--type` | | No | Filter by artifact type: `instruction`, `agent`, `prompt`, `skill` |
+| `--type` | | No | Filter by artifact type: `instruction`, `agent`, `prompt`, `skill`, `rule`, `hooks`, `mcp` |
 | `--dry-run` | | No | Show what would be converted without writing files |
 | `--force` | | No | Overwrite existing target files (creates `.bak` backup) |
 | `--verbose` | | No | Show detailed workaround instructions for warnings |
@@ -136,6 +136,30 @@ Verbose mode includes detailed workaround text for each warning:
 
 Skills use a universal `SKILL.md` format and are **directly copied** between
 all platforms. Only the deployment path changes.
+
+### Rules (UAAPS v0.4.0)
+
+| Source → Target | Behavior |
+|-----------------|----------|
+| Cursor `.mdc` → Copilot `.instructions.md` | `globs` mapped to `applyTo`; frontmatter converted |
+| Copilot `.instructions.md` → Cursor `.mdc` | `applyTo` mapped to `globs` |
+| Any → Claude/Codex | Appended to `CLAUDE.md` / `AGENTS.md`; conditional scoping lost (warning) |
+
+### Hooks (UAAPS v0.4.0)
+
+| Source → Target | Behavior |
+|-----------------|----------|
+| Any → Any | Hook event names translated between platform conventions |
+| Claude `hooks.json` → Cursor | Mapped to Cursor hook format |
+| Copilot → Claude | Lifecycle events translated |
+
+### MCP server configs (UAAPS v0.4.0)
+
+| Source → Target | Behavior |
+|-----------------|----------|
+| Claude `servers.json` → Cursor `.mcp.json` | Config restructured to Cursor format |
+| Cursor `.mcp.json` → VS Code `.vscode/mcp.json` | Adapted for VS Code Copilot format |
+| Any → Codex | Mapped to Codex MCP configuration |
 
 ## Conflict handling
 

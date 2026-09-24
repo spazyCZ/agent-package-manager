@@ -11,11 +11,19 @@ Reference: spec 004 US7.
 #                                                                              #
 ################################################################################
 
+import json
 import logging
+from pathlib import Path
 
 import click
+from rich.console import Console
 
-from aam_cli.commands.pack import pack
+from aam_cli.core.manifest import load_manifest_universal
+from aam_cli.services.checksum_service import compute_file_checksums
+from aam_cli.utils.archive import create_archive
+from aam_cli.utils.checksum import calculate_sha256
+from aam_cli.utils.paths import MANIFEST_JSON, MANIFEST_LEGACY, MANIFEST_YAML
+from aam_cli.utils.yaml_utils import dump_yaml, load_yaml
 
 ################################################################################
 #                                                                              #
@@ -46,9 +54,125 @@ def pkg_pack(ctx: click.Context, path: str) -> None:
         aam pkg pack
         aam pkg pack ./my-package/
     """
-    logger.info(f"pkg pack invoked: path='{path}'")
+    console: Console = ctx.obj["console"]
+    pkg_path = Path(path).resolve()
 
     # -----
-    # Delegate to the existing pack command handler
+    # Step 1: Load and validate the manifest
     # -----
-    ctx.invoke(pack, path=path)
+    try:
+        manifest = load_manifest_universal(pkg_path)
+    except FileNotFoundError:
+        console.print(
+            "[red]Error:[/red] No manifest found. Run 'aam pkg init' first."
+        )
+        ctx.exit(1)
+        return
+    except Exception as exc:
+        console.print(
+            f"[red]Error:[/red] Package validation failed. Run 'aam validate' for details.\n{exc}"
+        )
+        ctx.exit(1)
+        return
+
+    console.print(f"Building [bold]{manifest.name}@{manifest.version}[/bold]...")
+
+    # -----
+    # Step 2: Check artifact paths exist
+    # -----
+    missing_paths: list[str] = []
+    for _artifact_type, ref in manifest.all_artifacts:
+        artifact_path = pkg_path / ref.path
+        if not artifact_path.exists():
+            missing_paths.append(ref.path)
+
+    if missing_paths:
+        console.print(
+            "[red]Error:[/red] Package validation failed. Run 'aam validate' for details."
+        )
+        for missing_path in missing_paths:
+            console.print(f"  [red]✗[/red] Missing: {missing_path}")
+        ctx.exit(1)
+        return
+
+    # -----
+    # Step 3: Compute per-file SHA-256 checksums for integrity tracking
+    # -----
+    console.print("  Computing per-file checksums...")
+    file_checksums = compute_file_checksums(pkg_path)
+
+    if file_checksums:
+        # -----
+        # Write checksums back into whichever manifest format was loaded
+        # so they are included in the archive
+        # -----
+        if manifest.manifest_format == "json":
+            manifest_file_path = pkg_path / MANIFEST_JSON
+            manifest_raw = json.loads(manifest_file_path.read_text(encoding="utf-8"))
+            manifest_raw["file_checksums"] = {
+                "algorithm": "sha256",
+                "files": file_checksums,
+            }
+            manifest_file_path.write_text(
+                json.dumps(manifest_raw, indent=2) + "\n", encoding="utf-8"
+            )
+        else:
+            manifest_file_name = (
+                MANIFEST_YAML if manifest.manifest_format == "yaml" else MANIFEST_LEGACY
+            )
+            manifest_file_path = pkg_path / manifest_file_name
+            manifest_raw = load_yaml(manifest_file_path)
+            manifest_raw["file_checksums"] = {
+                "algorithm": "sha256",
+                "files": file_checksums,
+            }
+            dump_yaml(manifest_raw, manifest_file_path)
+
+        console.print(
+            f"  [dim]{len(file_checksums)} file checksum(s) computed[/dim]"
+        )
+        logger.info(
+            f"File checksums computed and written: count={len(file_checksums)}"
+        )
+
+    # -----
+    # Step 4: Log what's being added
+    # -----
+    manifest_file_names = {"json": MANIFEST_JSON, "yaml": MANIFEST_YAML, "legacy": MANIFEST_LEGACY}
+    console.print(f"  Adding {manifest_file_names[manifest.manifest_format]}")
+    for _artifact_type, ref in manifest.all_artifacts:
+        console.print(f"  Adding {ref.path}")
+
+    # -----
+    # Step 5: Create the archive
+    # -----
+    archive_name = f"{manifest.base_name}-{manifest.version}.aam"
+    if manifest.scope:
+        archive_name = f"{manifest.scope}-{manifest.base_name}-{manifest.version}.aam"
+
+    output_path = pkg_path / archive_name
+
+    try:
+        create_archive(pkg_path, output_path)
+    except ValueError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        ctx.exit(1)
+        return
+
+    # -----
+    # Step 6: Report results
+    # -----
+    checksum = calculate_sha256(output_path)
+    size_bytes = output_path.stat().st_size
+
+    if size_bytes >= 1024 * 1024:
+        size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
+    else:
+        size_str = f"{size_bytes / 1024:.1f} KB"
+
+    console.print(f"\n[green]✓[/green] Built {archive_name} ({size_str})")
+    console.print(f"  Checksum: {checksum}")
+
+    logger.info(
+        f"Pack complete: archive='{output_path}', size={size_bytes}, checksum='{checksum}'"
+    )

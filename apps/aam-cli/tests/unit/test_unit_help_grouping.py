@@ -161,9 +161,12 @@ class TestOrderedGroupClass:
             "Getting Started",
             "Package Management",
             "Package Integrity",
+            "Dependency Management",
+            "Testing",
             "Package Authoring",
             "Source Management",
             "Configuration",
+            "Authentication",
             "Utilities",
         }
 

@@ -159,7 +159,7 @@ def _handle_upgrade_warning(
             # -----
             # Show diff of modified files
             # -----
-            from aam_cli.commands.diff import diff_package
+            from aam_cli.services.diff_service import diff_package
 
             diff_result = diff_package(package_name, project_dir)
 
@@ -249,6 +249,51 @@ def _read_file_checksums_from_package(
     "--global", "-g", "is_global", is_flag=True,
     help="Install to global ~/.aam/ directory",
 )
+@click.option(
+    "--frozen",
+    is_flag=True,
+    help="Use exact versions from lock file (fail if no lock file).",
+)
+@click.option(
+    "--minimal",
+    is_flag=True,
+    help="Select lowest satisfying version (stable reproducible builds).",
+)
+@click.option(
+    "--latest",
+    is_flag=True,
+    help="Select highest available version for each package.",
+)
+@click.option(
+    "--install-system-deps",
+    "install_system_deps",
+    is_flag=True,
+    help=(
+        "Auto-install missing pip/npm system dependencies. "
+        "Requires --allow-sudo for brew/apt packages."
+    ),
+)
+@click.option(
+    "--allow-sudo",
+    "allow_sudo",
+    is_flag=True,
+    help="Allow brew/apt installs that require elevated privileges.",
+)
+@click.option(
+    "--skip-checks",
+    "skip_checks",
+    is_flag=True,
+    help=(
+        "Skip system dependency pre-flight checks entirely "
+        "(useful in CI where deps are pre-provisioned)."
+    ),
+)
+@click.option(
+    "--install-mode",
+    type=click.Choice(["uaaps", "plugin"]),
+    default=None,
+    help="Override install mode (uaaps or plugin)",
+)
 @click.pass_context
 def install(
     ctx: click.Context,
@@ -258,6 +303,13 @@ def install(
     force: bool,
     dry_run: bool,
     is_global: bool,
+    frozen: bool,
+    minimal: bool,
+    latest: bool,
+    install_system_deps: bool,
+    allow_sudo: bool,
+    skip_checks: bool,
+    install_mode: str | None,
 ) -> None:
     """Install a package and deploy artifacts.
 
@@ -271,6 +323,12 @@ def install(
     Use ``-g`` / ``--global`` to install into the user-wide ``~/.aam/``
     directory instead of the project-local ``.aam/`` workspace.
 
+    Resolution strategies (mutually exclusive)::
+
+        --frozen      use lock file exact versions (fail if no lock file)
+        --minimal     select lowest satisfying version
+        --latest      select highest available version
+
     Examples::
 
         aam install my-agent
@@ -281,6 +339,8 @@ def install(
         aam install my-agent --no-deploy
         aam install my-agent --force
         aam install my-agent -g
+        aam install my-agent --skip-checks
+        aam install my-agent --install-system-deps
     """
     console: Console = ctx.obj["console"]
     project_dir = resolve_project_dir(is_global)
@@ -293,6 +353,17 @@ def install(
 
     if dry_run:
         console.print("[yellow]Dry run mode — no changes will be made[/yellow]\n")
+
+    # -----
+    # Validate mutually exclusive resolution strategy flags
+    # -----
+    strategy_flags = [frozen, minimal, latest]
+    if sum(strategy_flags) > 1:
+        console.print(
+            "[red]Error:[/red] --frozen, --minimal, and --latest are mutually exclusive."
+        )
+        ctx.exit(1)
+        return
 
     config = load_config(project_dir)
     platform_name = platform or config.default_platform
@@ -341,6 +412,7 @@ def install(
         no_deploy,
         force,
         dry_run,
+        install_mode=install_mode,
     )
 
 
@@ -442,6 +514,7 @@ def _install_from_registry_or_source(
     no_deploy: bool,
     force: bool,
     dry_run: bool,
+    install_mode: str | None = None,
 ) -> None:
     """Install a package from registries, with source fallback.
 
@@ -449,6 +522,18 @@ def _install_from_registry_or_source(
       1. Qualified name (contains "/"): try source index directly
       2. Registry lookup (unqualified): try configured registries
       3. Source fallback (unqualified): try source artifact index
+
+    Args:
+        ctx: Click context.
+        console: Rich console for output.
+        package_spec: Package spec (name, name@version, @scope/name).
+        project_dir: Project root directory.
+        config: AAM configuration.
+        platform_name: Target platform for deployment.
+        no_deploy: If True, skip platform deployment.
+        force: If True, reinstall even if present.
+        dry_run: If True, preview without installing.
+        install_mode: Override install mode (``"uaaps"`` or ``"plugin"``).
     """
     # -----
     # Step 1: Qualified name (contains "/") — try source index first
@@ -563,6 +648,7 @@ def _install_from_registry_or_source(
                     project_dir,
                     no_deploy=no_deploy,
                     force=force,
+                    install_mode=install_mode,
                 )
 
                 console.print(

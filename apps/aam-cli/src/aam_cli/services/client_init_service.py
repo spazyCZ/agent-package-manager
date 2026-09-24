@@ -20,6 +20,7 @@ from pathlib import Path
 from aam_cli.core.config import (
     load_config,
     save_global_config,
+    save_project_config,
 )
 
 ################################################################################
@@ -65,7 +66,7 @@ class ClientInitResult:
 #                                                                              #
 ################################################################################
 
-SUPPORTED_PLATFORMS: list[str] = ["cursor", "copilot", "claude", "codex"]
+SUPPORTED_PLATFORMS: list[str] = ["cursor", "copilot", "claude-code", "codex"]
 
 ################################################################################
 #                                                                              #
@@ -101,8 +102,8 @@ def detect_platform(project_dir: Path | None = None) -> str | None:
         return "copilot"
 
     if (root / "CLAUDE.md").is_file():
-        logger.info("Detected platform: claude")
-        return "claude"
+        logger.info("Detected platform: claude-code")
+        return "claude-code"
 
     if (root / ".codex").is_dir():
         logger.info("Detected platform: codex")
@@ -201,6 +202,64 @@ def orchestrate_init(
         f"Client init complete: platform='{platform}', "
         f"sources_added={len(sources_added)}, "
         f"is_reconfigure={is_reconfigure}"
+    )
+
+    return result
+
+
+def orchestrate_project_init(
+    platform: str,
+    active_platforms: list[str] | None = None,
+    project_dir: Path | None = None,
+) -> ClientInitResult:
+    """Create a project-level ``.aam/config.yaml`` with overrides.
+
+    Unlike :func:`orchestrate_init` which writes to the global config,
+    this writes a sparse override file at ``<project>/.aam/config.yaml``.
+
+    Args:
+        platform: Default AI platform for this project.
+        active_platforms: Platforms to install for. Defaults to
+            ``[platform]``.
+        project_dir: Project root. Defaults to cwd.
+
+    Returns:
+        :class:`ClientInitResult` with summary of actions taken.
+    """
+    from aam_cli.utils.paths import get_project_config_path
+
+    root = project_dir or Path.cwd()
+    config_path = get_project_config_path(root)
+    is_reconfigure = config_path.exists()
+
+    logger.info(
+        f"Orchestrating project init: platform='{platform}', "
+        f"project_dir='{root}'"
+    )
+
+    # -----
+    # Build sparse config with only project-specific overrides
+    # -----
+    platforms = active_platforms or [platform]
+    data: dict[str, object] = {
+        "default_platform": platform,
+        "active_platforms": platforms,
+    }
+
+    saved_path = save_project_config(data, root)
+
+    result = ClientInitResult(
+        platform=platform,
+        registry_created=False,
+        registry_name=None,
+        sources_added=[],
+        config_path=saved_path,
+        is_reconfigure=is_reconfigure,
+    )
+
+    logger.info(
+        f"Project init complete: platform='{platform}', "
+        f"config_path='{saved_path}', is_reconfigure={is_reconfigure}"
     )
 
     return result

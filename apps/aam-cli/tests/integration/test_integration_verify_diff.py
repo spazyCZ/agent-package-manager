@@ -50,7 +50,7 @@ def installed_package(tmp_path: Path) -> tuple[Path, str]:
     """Create a fake installed package with checksums in lock file.
 
     Creates:
-    - .aam/packages/test-pkg/ with files
+    - .agent-packages/test-pkg/ with files
     - .aam/aam-lock.yaml with file checksums
 
     Returns:
@@ -62,7 +62,7 @@ def installed_package(tmp_path: Path) -> tuple[Path, str]:
     # -----
     # Create package directory
     # -----
-    pkg_dir = project_dir / ".aam" / "packages" / "test-pkg"
+    pkg_dir = project_dir / ".agent-packages" / "test-pkg"
     pkg_dir.mkdir(parents=True)
 
     skill_dir = pkg_dir / "skills" / "my-skill"
@@ -129,7 +129,7 @@ class TestVerifyIntegration:
 
         # Modify a file
         skill_path = (
-            project_dir / ".aam" / "packages" / pkg_name
+            project_dir / ".agent-packages" / pkg_name
             / "skills" / "my-skill" / "SKILL.md"
         )
         skill_path.write_text("# My Skill\nModified content!!")
@@ -148,7 +148,7 @@ class TestVerifyIntegration:
 
         # Delete a file
         skill_path = (
-            project_dir / ".aam" / "packages" / pkg_name
+            project_dir / ".agent-packages" / pkg_name
             / "skills" / "my-skill" / "SKILL.md"
         )
         skill_path.unlink()
@@ -190,7 +190,7 @@ class TestCheckModificationsIntegration:
 
         # Modify a file
         skill_path = (
-            project_dir / ".aam" / "packages" / pkg_name
+            project_dir / ".agent-packages" / pkg_name
             / "skills" / "my-skill" / "SKILL.md"
         )
         skill_path.write_text("Modified!")
@@ -220,7 +220,7 @@ class TestBackupIntegration:
 
         # Modify a file
         skill_path = (
-            project_dir / ".aam" / "packages" / pkg_name
+            project_dir / ".agent-packages" / pkg_name
             / "skills" / "my-skill" / "SKILL.md"
         )
         skill_path.write_text("Modified content for backup test!")

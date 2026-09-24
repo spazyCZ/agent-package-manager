@@ -541,8 +541,8 @@ aam install <package>
 Or explicitly:
 
 ```bash
-aam init
-# Creates .aam/ directory and aam.yaml
+aam init --project
+# Creates .aam/config.yaml project overrides
 ```
 
 ### Check Workspace Status

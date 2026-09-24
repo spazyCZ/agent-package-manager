@@ -83,10 +83,10 @@ mkdir my-awesome-skill && cd my-awesome-skill
 aam pkg init
 
 # ✓ Created my-awesome-skill/
-#     ├── aam.yaml
+#     ├── package.agent.json
 #     ├── skills/
 #     ├── prompts/
-#     └── instructions/
+#     └── commands/
 ```
 
 **Validate, pack, and publish:**
@@ -178,7 +178,7 @@ aam mcp serve --allow-write
 }
 ```
 
-The server exposes **29 tools** and **9 resources**:
+The server exposes **35 tools** and **9 resources**:
 
 | Category | Read-only tools | Write tools (opt-in) |
 |----------|----------------|---------------------|
@@ -187,6 +187,7 @@ The server exposes **29 tools** and **9 resources**:
 | **Config** | `config_get`, `doctor`, `registry_list` | `config_set`, `registry_add`, `init` |
 | **Discovery** | `recommend_skills`, `available`, `outdated` | `upgrade`, `init_package` |
 | **Integrity** | `verify`, `diff` | — |
+| **Dependencies** | `tree`, `why`, `check`, `audit`, `dedupe`, `prune` | — |
 
 **Options:**
 
@@ -227,6 +228,12 @@ The server exposes **29 tools** and **9 resources**:
 | `aam source` | Manage git artifact sources (add, list, update, remove) |
 | `aam registry` | Manage registries (init, add, list) |
 | `aam config` | Manage configuration |
+| `aam tree` | Display the resolved dependency tree |
+| `aam why <pkg>` | Show why a package is installed |
+| `aam check` | Check installation health and system dependencies |
+| `aam audit` | Audit installed packages for integrity issues |
+| `aam dedupe` | Detect and remove duplicate installations |
+| `aam prune` | Remove unlocked package directories |
 
 ### Package authoring (pkg)
 
@@ -244,7 +251,7 @@ The server exposes **29 tools** and **9 resources**:
 
 ```
 my-package/
-├── aam.yaml                    # Package manifest (required)
+├── package.agent.json          # Package manifest (required)
 ├── agents/                     # Agent definitions
 │   └── my-agent/
 │       ├── agent.yaml
@@ -254,36 +261,42 @@ my-package/
 │       └── SKILL.md
 ├── prompts/                    # Prompt templates
 │   └── my-prompt.md
-└── instructions/               # Platform rules
-    └── coding-standards.md
+├── commands/                   # Slash commands
+│   └── review.md
+├── rules/                      # Platform rules
+│   └── coding-standards/
+│       └── RULE.md
+├── hooks/                      # Lifecycle hooks
+│   └── hooks.json
+└── mcp/                        # MCP server configs
+    └── servers.json
 ```
 
-### Package Manifest (`aam.yaml`)
+### Package Manifest (`package.agent.json`)
 
-```yaml
-name: my-package
-version: 1.0.0
-description: "My awesome AI agent package"
-author: your-username
-license: Apache-2.0
+> `aam.yaml` is still supported for backward compatibility. New packages
+> use `package.agent.json` by default.
 
-artifacts:
-  skills:
-    - name: my-skill
-      path: skills/my-skill/
-      description: "Does something useful"
-  prompts:
-    - name: my-prompt
-      path: prompts/my-prompt.md
-
-dependencies:
-  common-utils: "^1.0.0"
-
-platforms:
-  cursor:
-    skill_scope: project
-  claude:
-    merge_instructions: true
+```json
+{
+  "name": "my-package",
+  "version": "1.0.0",
+  "description": "My awesome AI agent package",
+  "author": "your-username",
+  "license": "Apache-2.0",
+  "artifacts": {
+    "skills": [
+      { "name": "my-skill", "path": "skills/my-skill/",
+        "description": "Does something useful" }
+    ],
+    "prompts": [
+      { "name": "my-prompt", "path": "prompts/my-prompt.md" }
+    ]
+  },
+  "dependencies": {
+    "common-utils": "^1.0.0"
+  }
+}
 ```
 
 ---
@@ -292,12 +305,12 @@ platforms:
 
 AAM automatically deploys artifacts to the correct locations for each platform:
 
-| Platform | Skills | Agents | Prompts | Instructions |
-|----------|--------|--------|---------|--------------|
-| **Cursor** | `.cursor/skills/` | `.cursor/rules/` | `.cursor/prompts/` | `.cursor/rules/` |
-| **Claude** | `.claude/skills/` | `.claude/agents/` | `.claude/prompts/` | `CLAUDE.md` |
-| **Copilot** | `.github/skills/` | `.github/agents/` | `.github/prompts/` | `.github/instructions/` |
-| **Codex** | `~/.codex/skills/` | `AGENTS.md` | `~/.codex/prompts/` | `AGENTS.md` |
+| Platform | Skills | Agents | Prompts | Instructions | Commands | Rules | Hooks | MCP |
+|----------|--------|--------|---------|--------------|----------|-------|-------|-----|
+| **Cursor** | `.cursor/skills/` | `.cursor/rules/` | `.cursor/prompts/` | `.cursor/rules/` | `.cursor/skills/` | `.cursor/rules/` | `.cursor/hooks.json` | `.cursor/mcp.json` |
+| **Claude** | `.claude/skills/` | `.claude/agents/` | `.claude/prompts/` | `CLAUDE.md` | `.claude/commands/` | `CLAUDE.md` | `.claude/hooks.json` | `.mcp.json` |
+| **Copilot** | `.github/skills/` | `.github/agents/` | `.github/prompts/` | `.github/instructions/` | `.github/prompts/` | `.github/instructions/` | `.github/copilot-hooks.json` | `.vscode/mcp.json` |
+| **Codex** | `~/.codex/skills/` | `AGENTS.md` | `~/.codex/prompts/` | `AGENTS.md` | `~/.codex/skills/` | `AGENTS.md` | *(not supported)* | *(limited)* |
 
 ---
 

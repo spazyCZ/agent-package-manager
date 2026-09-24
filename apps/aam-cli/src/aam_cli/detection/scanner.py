@@ -75,7 +75,7 @@ EXCLUDED_DIRS: set[str] = {
 }
 
 # All recognised platform identifiers (used for validation & filtering)
-KNOWN_PLATFORMS: set[str] = {"cursor", "codex", "copilot", "claude"}
+KNOWN_PLATFORMS: set[str] = {"cursor", "codex", "copilot", "claude-code", "claude"}
 
 ################################################################################
 #                                                                              #
@@ -111,8 +111,10 @@ def _should_skip(rel_path: Path) -> bool:
 
 
 def _in_aam_packages(rel_path: Path) -> bool:
-    """Return True if the path is inside .aam/packages/ (installed pkgs)."""
+    """Return True if the path is inside .agent-packages/ or .aam/packages/ (installed pkgs)."""
     parts = rel_path.parts
+    if len(parts) >= 1 and parts[0] == ".agent-packages":
+        return True
     return len(parts) >= 2 and parts[0] == ".aam" and parts[1] == "packages"
 
 
@@ -235,7 +237,10 @@ def _detect_agents(root: Path) -> list[DetectedArtifact]:
 
 
 def _detect_prompts(root: Path) -> list[DetectedArtifact]:
-    """Detect prompt artifacts.
+    """Detect prompt artifacts and classify them as commands.
+
+    Per UAAPS v0.5.0, prompts are merged into the ``command`` artifact
+    type.  Detected prompt files are returned with ``type="command"``.
 
     Patterns:
       - ``prompts/*.md`` (AAM convention)
@@ -281,7 +286,7 @@ def _detect_prompts(root: Path) -> list[DetectedArtifact]:
             artifacts.append(
                 DetectedArtifact(
                     name=name,
-                    type="prompt",
+                    type="command",
                     source_path=rel,
                     platform=platform,
                     source_dir=source_dir,
@@ -349,7 +354,7 @@ def _detect_instructions(root: Path) -> list[DetectedArtifact]:
     # (file_rel, artifact_name, platform, source_dir)
     # -----
     standalone: list[tuple[str, str, str, str]] = [
-        ("CLAUDE.md", "claude-instructions", "claude", ""),
+        ("CLAUDE.md", "claude-instructions", "claude-code", ""),
         ("AGENTS.md", "codex-instructions", "codex", ""),
         (".github/copilot-instructions.md", "copilot-instructions", "copilot", ".github"),
     ]
@@ -649,7 +654,7 @@ def scan_directory(
     # Check for root-level instruction files
     # -----
     standalone_instructions: list[tuple[str, str, str, str]] = [
-        ("CLAUDE.md", "claude-instructions", "claude", ""),
+        ("CLAUDE.md", "claude-instructions", "claude-code", ""),
         ("AGENTS.md", "codex-instructions", "codex", ""),
     ]
     for filename, name, platform, source_dir in standalone_instructions:

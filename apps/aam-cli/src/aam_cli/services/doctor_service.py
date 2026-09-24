@@ -41,6 +41,10 @@ logger = logging.getLogger(__name__)
 MIN_PYTHON_VERSION = (3, 11)
 STAGING_DIR_NAME = ".tmp"
 
+# UAAPS conformance metadata (see spec §1 Conformance Levels)
+UAAPS_SPEC_VERSION = "0.6.0"
+UAAPS_CONFORMANCE_LEVEL = 2  # Level 2 — Installer
+
 ################################################################################
 #                                                                              #
 # SERVICE FUNCTIONS                                                            #
@@ -54,12 +58,14 @@ def run_diagnostics(
     """Run comprehensive AAM environment diagnostics.
 
     Performs the following checks:
-      1. Python version >= 3.11
-      2. Config file existence, paths, and YAML/schema validation
-      3. AAM configuration is valid and loadable (merged)
-      4. Configured registries are accessible
-      5. Installed packages have valid manifests and checksums
-      6. No incomplete installations (leftover staging directories)
+      1. UAAPS conformance level and spec version
+      2. Python version >= 3.11
+      3. Config file existence, paths, and YAML/schema validation
+      4. AAM configuration is valid and loadable (merged)
+      5. Default platform and active platforms
+      6. Configured registries are accessible
+      7. Installed packages have valid manifests and checksums
+      8. No incomplete installations (leftover staging directories)
 
     Args:
         project_dir: Project root directory. Defaults to cwd.
@@ -74,32 +80,42 @@ def run_diagnostics(
     checks: list[dict[str, Any]] = []
 
     # -----
-    # Check 1: Python version
+    # Check 1: UAAPS conformance info
+    # -----
+    checks.append(_check_uaaps_conformance())
+
+    # -----
+    # Check 2: Python version
     # -----
     checks.append(_check_python_version())
 
     # -----
-    # Check 2: Config file paths and structure validation
+    # Check 3: Config file paths and structure validation
     # -----
     checks.extend(_check_config_files(effective_dir))
 
     # -----
-    # Check 3: Configuration validity (merged config loadable)
+    # Check 4: Configuration validity (merged config loadable)
     # -----
     checks.append(_check_config_valid(effective_dir))
 
     # -----
-    # Check 4: Registry accessibility
+    # Check 5: Default platform
+    # -----
+    checks.append(_check_default_platform(effective_dir))
+
+    # -----
+    # Check 6: Registry accessibility
     # -----
     checks.extend(_check_registries(effective_dir))
 
     # -----
-    # Check 5: Package integrity
+    # Check 7: Package integrity
     # -----
     checks.extend(_check_packages_integrity(effective_dir))
 
     # -----
-    # Check 6: Incomplete installations
+    # Check 8: Incomplete installations
     # -----
     checks.append(_check_incomplete_installs(effective_dir))
 
@@ -132,6 +148,28 @@ def run_diagnostics(
 # INDIVIDUAL CHECKS                                                            #
 #                                                                              #
 ################################################################################
+
+
+def _check_uaaps_conformance() -> dict[str, Any]:
+    """Report the UAAPS conformance level and spec version.
+
+    Always passes — this is informational, not a diagnostic.
+
+    Returns:
+        DoctorCheck dict.
+    """
+    conformance_labels = {1: "Reader", 2: "Installer", 3: "Publisher"}
+    label = conformance_labels.get(UAAPS_CONFORMANCE_LEVEL, "Unknown")
+
+    return {
+        "name": "uaaps_conformance",
+        "status": "pass",
+        "message": (
+            f"UAAPS spec {UAAPS_SPEC_VERSION} — "
+            f"Conformance Level {UAAPS_CONFORMANCE_LEVEL} ({label})"
+        ),
+        "suggestion": None,
+    }
 
 
 def _check_python_version() -> dict[str, Any]:
@@ -184,15 +222,13 @@ def _check_config_files(project_dir: Path) -> list[dict[str, Any]]:
 
         if not config_path.exists():
             # -----
-            # File does not exist — defaults will be used; warn for project config
+            # File does not exist — defaults will be used; this is normal
             # -----
             logger.debug(f"{label} not found: path='{config_path}'")
-            # Project config missing is a warning (user may want to initialize)
-            is_project = "project" in check_name.lower()
             checks.append(
                 {
                     "name": check_name,
-                    "status": "warn" if is_project else "pass",
+                    "status": "pass",
                     "message": f"{label}: {config_path} (not found, using defaults)",
                     "suggestion": None,
                 }
@@ -304,6 +340,84 @@ def _check_config_valid(project_dir: Path) -> dict[str, Any]:
                 "Check ~/.aam/config.yaml and .aam/config.yaml for syntax errors."
             ),
         }
+
+
+def _check_default_platform(project_dir: Path) -> dict[str, Any]:
+    """Report the configured default platform and active platforms.
+
+    Validates that the default platform is a recognised value and that
+    ``active_platforms`` is consistent. Accepts legacy aliases (e.g.
+    ``"claude"`` → ``"claude-code"``).
+
+    Args:
+        project_dir: Project root directory.
+
+    Returns:
+        DoctorCheck dict.
+    """
+    from aam_cli.adapters.factory import (
+        PLATFORM_ALIASES,
+        SUPPORTED_PLATFORMS,
+        normalize_platform,
+    )
+
+    try:
+        config = load_config(project_dir)
+    except Exception:
+        return {
+            "name": "default_platform",
+            "status": "warn",
+            "message": "Could not determine default platform (config failed to load)",
+            "suggestion": "Fix configuration errors reported above.",
+        }
+
+    raw_platform = config.default_platform
+    platform = normalize_platform(raw_platform)
+    active = [normalize_platform(p) for p in config.active_platforms]
+
+    # -----
+    # Warn if user is using a legacy alias
+    # -----
+    alias_note = ""
+    if raw_platform in PLATFORM_ALIASES:
+        alias_note = f" (migrated from legacy alias '{raw_platform}')"
+
+    active_str = ", ".join(active) if active else "(none)"
+
+    if platform not in SUPPORTED_PLATFORMS:
+        return {
+            "name": "default_platform",
+            "status": "warn",
+            "message": (
+                f"Default platform '{raw_platform}' is not recognised "
+                f"(supported: {', '.join(SUPPORTED_PLATFORMS)})"
+            ),
+            "suggestion": (
+                f"Set a valid default platform in your config: "
+                f"{', '.join(SUPPORTED_PLATFORMS)}"
+            ),
+        }
+
+    if platform not in active:
+        return {
+            "name": "default_platform",
+            "status": "warn",
+            "message": (
+                f"Default platform: {platform} — active: {active_str} "
+                f"(default_platform not in active_platforms)"
+            ),
+            "suggestion": (
+                f"Add '{platform}' to active_platforms or change "
+                f"default_platform to one of: {active_str}"
+            ),
+        }
+
+    return {
+        "name": "default_platform",
+        "status": "pass",
+        "message": f"Default platform: {platform} — active: {active_str}{alias_note}",
+        "suggestion": None,
+    }
 
 
 def _check_registries(project_dir: Path) -> list[dict[str, Any]]:
@@ -451,7 +565,9 @@ def _check_incomplete_installs(project_dir: Path) -> dict[str, Any]:
     Returns:
         DoctorCheck dict.
     """
-    workspace_dir = get_packages_dir(project_dir).parent
+    from aam_cli.utils.paths import get_project_workspace
+
+    workspace_dir = get_project_workspace(project_dir)
     staging_dir = workspace_dir / STAGING_DIR_NAME
 
     if not staging_dir.exists():

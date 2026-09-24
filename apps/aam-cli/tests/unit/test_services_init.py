@@ -43,7 +43,8 @@ class TestInitService:
         assert (pkg_dir / "agents").exists()
         assert (pkg_dir / "prompts").exists()
         assert (pkg_dir / "instructions").exists()
-        assert (pkg_dir / "aam.yaml").exists()
+        # Default format is now JSON (UAAPS v0.4.0)
+        assert (pkg_dir / "package.agent.json").exists()
         assert result["package_name"] == "test-pkg"
         assert len(result["artifact_types"]) == 4
         assert len(result["directories_created"]) == 5  # root + 4 artifact dirs
@@ -68,10 +69,10 @@ class TestInitService:
         result = init_package(
             name="plat-pkg",
             path=str(tmp_path),
-            platforms=["cursor", "claude"],
+            platforms=["cursor", "claude-code"],
         )
 
-        assert result["platforms"] == ["cursor", "claude"]
+        assert result["platforms"] == ["cursor", "claude-code"]
 
     def test_unit_init_scoped_name(self, tmp_path: object) -> None:
         """Verify scoped name creates directory using bare name."""
@@ -96,8 +97,8 @@ class TestInitService:
         )
 
         assert result["package_name"] == "meta-pkg"
-        # Manifest was written — check it exists
-        assert result["manifest_path"].endswith("aam.yaml")
+        # Manifest was written — default format is JSON (UAAPS v0.4.0)
+        assert result["manifest_path"].endswith("package.agent.json")
 
     def test_unit_init_invalid_name(self, tmp_path: object) -> None:
         """Verify ValueError raised for an invalid package name."""

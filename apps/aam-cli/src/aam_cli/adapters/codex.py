@@ -3,8 +3,10 @@
 Deploys AAM artifacts into the OpenAI Codex filesystem structure:
   - Skills       → ``~/.codex/skills/<fs-name>/``
   - Agents       → ``AGENTS.md`` (marker-delimited section)
-  - Prompts      → ``~/.codex/prompts/<fs-name>.md``
+  - Commands     → ``~/.codex/skills/<pkg>:<name>/`` (converted to skill)
   - Instructions → ``AGENTS.md`` (marker-delimited section)
+
+UAAPS v0.5.0: prompts merged into commands.
 
 Decision reference: DESIGN.md Section 8.4.
 """
@@ -52,7 +54,7 @@ END_MARKER_TEMPLATE: str = "<!-- END AAM: {name} {kind} -->"
 class CodexAdapter:
     """OpenAI Codex platform adapter.
 
-    Skills and prompts are deployed to ``~/.codex/`` (user-level).
+    Skills and commands are deployed to ``~/.codex/`` (user-level).
     Agents and instructions are merged into ``AGENTS.md`` at the
     project root using HTML comment markers.
     """
@@ -142,33 +144,6 @@ class CodexAdapter:
         logger.info(f"Agent deployed to: {agents_md}")
         return agents_md
 
-    def deploy_prompt(
-        self,
-        prompt_path: Path,
-        prompt_ref: ArtifactRef,
-        _config: dict[str, str],
-    ) -> Path:
-        """Deploy a prompt to ``~/.codex/prompts/<fs-name>.md``.
-
-        Args:
-            prompt_path: Path to the prompt file.
-            prompt_ref: Artifact reference from the manifest.
-            _config: Platform config.
-
-        Returns:
-            Destination path.
-        """
-        fs_name = self._artifact_fs_name(prompt_ref.name)
-        dest = self.codex_dir / "prompts" / f"{fs_name}.md"
-
-        logger.info(f"Deploying prompt '{prompt_ref.name}' -> {dest}")
-        dest.parent.mkdir(parents=True, exist_ok=True)
-
-        shutil.copy2(prompt_path, dest)
-
-        logger.info(f"Prompt deployed: {dest}")
-        return dest
-
     def deploy_instruction(
         self,
         instr_path: Path,
@@ -198,6 +173,149 @@ class CodexAdapter:
         logger.info(f"Instruction deployed to: {agents_md}")
         return agents_md
 
+    def deploy_prompt(
+        self,
+        prompt_path: Path,
+        prompt_ref: ArtifactRef,
+        _config: dict[str, str],
+    ) -> Path:
+        """Deploy a prompt to ``~/.codex/prompts/<name>.md``.
+
+        Args:
+            prompt_path: Path to the prompt markdown file.
+            prompt_ref: Artifact reference from the manifest.
+            _config: Platform config (unused).
+
+        Returns:
+            Destination path.
+        """
+        fs_name = self._artifact_fs_name(prompt_ref.name)
+        dest = self.codex_dir / "prompts" / f"{fs_name}.md"
+
+        logger.info(f"Deploying prompt '{prompt_ref.name}' -> {dest}")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(prompt_path, dest)
+
+        logger.info(f"Prompt deployed: {dest}")
+        return dest
+
+    def deploy_command(
+        self,
+        cmd_path: Path,
+        cmd_ref: ArtifactRef,
+        config: dict[str, str],
+    ) -> Path:
+        """Deploy a slash-command as a Codex skill with ``disable-model-invocation``.
+
+        Codex uses skills as its primary reusable context mechanism.
+        Commands are stored in ``~/.codex/skills/<pkg>:<name>/``.
+
+        Args:
+            cmd_path: Path to the command markdown file.
+            cmd_ref: Artifact reference from the manifest.
+            config: Platform config; ``package_name`` key for namespacing.
+
+        Returns:
+            Destination skill directory path.
+        """
+        pkg_name = config.get("package_name", "unknown")
+        safe_pkg = pkg_name.lstrip("@").replace("/", "--")
+        safe_name = self._artifact_fs_name(cmd_ref.name)
+        skill_dir = self.codex_dir / "skills" / f"{safe_pkg}:{safe_name}"
+
+        logger.info(f"Deploying command '{cmd_ref.name}' -> {skill_dir}")
+        skill_dir.mkdir(parents=True, exist_ok=True)
+
+        content = cmd_path.read_text(encoding="utf-8")
+        frontmatter = (
+            "---\n"
+            f"description: \"{cmd_ref.description}\"\n"
+            "disable-model-invocation: true\n"
+            "---\n\n"
+        )
+        (skill_dir / "SKILL.md").write_text(frontmatter + content, encoding="utf-8")
+
+        logger.info(f"Command deployed: {skill_dir}")
+        return skill_dir
+
+    def deploy_rule(
+        self,
+        rule_path: Path,
+        rule_ref: ArtifactRef,
+        _config: dict[str, str],
+    ) -> Path:
+        """Deploy a rule by appending it to ``AGENTS.md``.
+
+        Rules for Codex are merged into ``AGENTS.md`` using marker-delimited
+        sections (same mechanism as instructions).
+
+        Args:
+            rule_path: Path to the rule markdown file.
+            rule_ref: Artifact reference from the manifest.
+            _config: Platform config (unused).
+
+        Returns:
+            Path to AGENTS.md.
+        """
+        logger.info(f"Deploying rule '{rule_ref.name}' -> AGENTS.md")
+
+        content = rule_path.read_text(encoding="utf-8")
+
+        agents_md = self.project_root / "AGENTS.md"
+        self._upsert_marker_section(agents_md, rule_ref.name, "rule", content)
+
+        logger.info(f"Rule deployed to: {agents_md}")
+        return agents_md
+
+    def deploy_hook(
+        self,
+        hooks_json_path: Path,
+        config: dict[str, str],
+    ) -> Path:
+        """Log a warning that Codex does not support lifecycle hooks.
+
+        Codex has no hook mechanism.  This method always emits a warning and
+        returns a sentinel path without writing any files.
+
+        Args:
+            hooks_json_path: Path to the package ``hooks/hooks.json``.
+            config: Platform config (unused).
+
+        Returns:
+            The ``hooks_json_path`` unchanged (no file written).
+        """
+        pkg_name = config.get("package_name", "unknown")
+        logger.warning(
+            f"[{pkg_name}] Codex does not support lifecycle hooks. "
+            f"Hook file '{hooks_json_path.name}' will not be deployed."
+        )
+        return hooks_json_path
+
+    def deploy_mcp(
+        self,
+        servers_json_path: Path,
+        config: dict[str, str],
+    ) -> Path:
+        """Log a warning that Codex has limited MCP support.
+
+        Codex MCP support is limited.  This method logs a warning and
+        returns a sentinel path without writing any files.
+
+        Args:
+            servers_json_path: Path to the package ``mcp/servers.json``.
+            config: Platform config (unused).
+
+        Returns:
+            The ``servers_json_path`` unchanged (no file written).
+        """
+        pkg_name = config.get("package_name", "unknown")
+        logger.warning(
+            f"[{pkg_name}] Codex has limited MCP server support. "
+            f"MCP config '{servers_json_path.name}' will not be automatically deployed. "
+            "Configure MCP servers manually per Codex documentation."
+        )
+        return servers_json_path
+
     # ------------------------------------------------------------------
     # Undeploy and list
     # ------------------------------------------------------------------
@@ -207,7 +325,8 @@ class CodexAdapter:
 
         Args:
             artifact_name: Name of the artifact.
-            artifact_type: Type (skill, agent, prompt, instruction).
+            artifact_type: One of skill, agent, prompt, instruction,
+                command, rule, hook, mcp.
         """
         fs_name = self._artifact_fs_name(artifact_name)
 
@@ -223,11 +342,30 @@ class CodexAdapter:
             agents_md = self.project_root / "AGENTS.md"
             self._remove_marker_section(agents_md, artifact_name, artifact_type)
 
-        elif artifact_type == "prompt":
-            path = self.codex_dir / "prompts" / f"{fs_name}.md"
-            if path.is_file():
-                path.unlink()
-                logger.info(f"Removed prompt: {path}")
+        elif artifact_type in ("prompt", "command"):
+            path = self.codex_dir / "skills" / fs_name
+            if path.is_dir():
+                shutil.rmtree(path)
+                logger.info(f"Removed command directory: {path}")
+            prompt_path = self.codex_dir / "prompts" / f"{fs_name}.md"
+            if prompt_path.is_file():
+                prompt_path.unlink()
+                logger.info(f"Removed command (legacy prompt): {prompt_path}")
+
+        elif artifact_type == "rule":
+            agents_md = self.project_root / "AGENTS.md"
+            self._remove_marker_section(agents_md, artifact_name, "rule")
+
+        elif artifact_type in ("hook", "mcp"):
+            logger.warning(
+                f"Codex does not support '{artifact_type}' artifacts — "
+                f"skipping undeploy for '{artifact_name}'"
+            )
+
+        else:
+            logger.warning(
+                f"Unknown artifact type '{artifact_type}' for undeploy, skipping"
+            )
 
     def list_deployed(self) -> list[tuple[str, str, Path]]:
         """List all deployed artifacts.
@@ -237,21 +375,28 @@ class CodexAdapter:
         """
         deployed: list[tuple[str, str, Path]] = []
 
-        # Skills
+        # -----
+        # Skills and commands (commands use ':' in directory name)
+        # -----
         skills_dir = self.codex_dir / "skills"
         if skills_dir.is_dir():
             for entry in skills_dir.iterdir():
                 if entry.is_dir():
-                    deployed.append((entry.name, "skill", entry))
+                    kind = "command" if ":" in entry.name else "skill"
+                    deployed.append((entry.name, kind, entry))
 
-        # Prompts
+        # -----
+        # Commands (legacy prompts) from ~/.codex/prompts/
+        # -----
         prompts_dir = self.codex_dir / "prompts"
         if prompts_dir.is_dir():
             for entry in prompts_dir.iterdir():
                 if entry.suffix == ".md":
-                    deployed.append((entry.stem, "prompt", entry))
+                    deployed.append((entry.stem, "command", entry))
 
-        # Agents and instructions from AGENTS.md markers
+        # -----
+        # Agents, instructions, and rules from AGENTS.md markers
+        # -----
         agents_md = self.project_root / "AGENTS.md"
         if agents_md.is_file():
             deployed.extend(self._list_marker_sections(agents_md))
@@ -354,7 +499,7 @@ class CodexAdapter:
         content = file_path.read_text(encoding="utf-8")
         results: list[tuple[str, str, Path]] = []
 
-        pattern = re.compile(r"<!-- BEGIN AAM: (.+?) (agent|instruction) -->")
+        pattern = re.compile(r"<!-- BEGIN AAM: (.+?) (agent|instruction|rule) -->")
         for match in pattern.finditer(content):
             name = match.group(1)
             kind = match.group(2)

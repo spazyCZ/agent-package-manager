@@ -38,14 +38,28 @@ PROJECT_WORKSPACE_DIR_NAME: str = ".aam"
 # Global config file name
 GLOBAL_CONFIG_FILE: str = "config.yaml"
 
-# Lock file name
+# Lock file name (legacy)
 LOCK_FILE_NAME: str = "aam-lock.yaml"
 
-# Packages directory within workspace
+# Packages directory within workspace (legacy)
 PACKAGES_DIR_NAME: str = "packages"
+
+# UAAPS v0.4.0 manifest file names (in precedence order)
+MANIFEST_JSON: str = "package.agent.json"
+MANIFEST_YAML: str = "package.agent.yaml"
+MANIFEST_LEGACY: str = "aam.yaml"
+
+# UAAPS v0.4.0 packages directory (replaces .aam/packages/)
+PACKAGES_DIR_NAME_V2: str = ".agent-packages"
+
+# UAAPS v0.4.0 lock file (replaces aam-lock.yaml)
+LOCK_FILE_JSON: str = "package.agent.lock"
 
 # Sources registry directory name (auto-created by `aam source update`)
 SOURCES_REGISTRY_DIR_NAME: str = "sources-registry"
+
+# Global lock file name (UAAPS v0.5.0)
+GLOBAL_LOCK_FILE: str = "global.lock"
 
 ################################################################################
 #                                                                              #
@@ -57,23 +71,18 @@ SOURCES_REGISTRY_DIR_NAME: str = "sources-registry"
 def resolve_project_dir(is_global: bool = False) -> Path:
     """Return the effective project directory for workspace operations.
 
-    When ``is_global`` is True, returns ``Path.home()`` so that all
-    workspace paths (packages, lock file) resolve under ``~/.aam/``
-    instead of the project-local ``.aam/`` directory.
-
-    This mirrors npm's ``-g`` / ``--global`` flag behaviour: global
-    installs live in the user's home directory and are available
-    across all projects.
+    When ``is_global`` is True, returns ``Path.home()`` so global installs
+    operate from the user's home directory.
 
     Args:
-        is_global: If True, use the global home directory.
+        is_global: If True, use the user's home directory.
 
     Returns:
         Effective project root directory.
     """
     if is_global:
         home = Path.home()
-        logger.debug(f"Global mode: project_dir resolved to home='{home}'")
+        logger.debug(f"Global mode: project_dir resolved to '{home}'")
         return home
 
     cwd = Path.cwd()
@@ -143,14 +152,74 @@ def get_lock_file_path(project_dir: Path | None = None) -> Path:
     return get_project_workspace(project_dir) / LOCK_FILE_NAME
 
 
+def get_universal_lock_file_path(project_dir: Path | None = None) -> Path:
+    """Return the UAAPS v0.4.0 lock file path (``package.agent.lock``).
+
+    The lock file lives at the project root alongside ``package.agent.json``,
+    not inside ``.aam/`` or ``.agent-packages/``.
+
+    Args:
+        project_dir: Project root directory.
+
+    Returns:
+        Absolute path to the universal lock file.
+    """
+    root = (project_dir or Path.cwd()).resolve()
+    return root / LOCK_FILE_JSON
+
+
+def resolve_lock_path(is_global: bool = False, project_dir: Path | None = None) -> Path:
+    """Return the appropriate lock file path for local or global installs.
+
+    For global installs, returns ``~/.aam/global.lock``.
+    For local installs, returns ``<project>/package.agent.lock``.
+
+    Args:
+        is_global: If True, return the global lock file path.
+        project_dir: Project root directory (ignored when ``is_global`` is True).
+
+    Returns:
+        Absolute path to the lock file.
+    """
+    if is_global:
+        global_dir = Path.home() / GLOBAL_AAM_DIR_NAME
+        global_dir.mkdir(parents=True, exist_ok=True)
+        lock_path = global_dir / GLOBAL_LOCK_FILE
+        logger.debug(f"Global lock path: '{lock_path}'")
+        return lock_path
+
+    root = (project_dir or Path.cwd()).resolve()
+    lock_path = root / LOCK_FILE_JSON
+    logger.debug(f"Local lock path: '{lock_path}'")
+    return lock_path
+
+
 def get_packages_dir(project_dir: Path | None = None) -> Path:
-    """Return the installed packages directory (``.aam/packages/``).
+    """Return the installed packages directory (``.agent-packages/``).
+
+    Updated in UAAPS v0.4.0 to use ``.agent-packages/`` at the project root
+    instead of ``.aam/packages/``.
 
     Args:
         project_dir: Project root directory.
 
     Returns:
         Absolute path to the packages directory.
+    """
+    root = (project_dir or Path.cwd()).resolve()
+    return root / PACKAGES_DIR_NAME_V2
+
+
+def get_legacy_packages_dir(project_dir: Path | None = None) -> Path:
+    """Return the legacy packages directory (``.aam/packages/``).
+
+    Used for migration detection — checks if the old directory layout exists.
+
+    Args:
+        project_dir: Project root directory.
+
+    Returns:
+        Absolute path to the legacy packages directory.
     """
     return get_project_workspace(project_dir) / PACKAGES_DIR_NAME
 

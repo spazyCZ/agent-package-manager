@@ -13,15 +13,13 @@ Reference: spec 004 US5; contracts/cli-commands.md.
 ################################################################################
 
 import logging
-from pathlib import Path
 
 import click
 from rich.console import Console
 
-from aam_cli.commands.outdated import check_outdated
-from aam_cli.core.config import AamConfig, load_config
+from aam_cli.core.config import load_config
 from aam_cli.core.workspace import read_lock_file
-from aam_cli.services.upgrade_service import OutdatedPackage, UpgradeResult
+from aam_cli.services.upgrade_service import check_outdated, upgrade_packages
 from aam_cli.utils.paths import resolve_project_dir
 
 ################################################################################
@@ -126,7 +124,6 @@ def upgrade(
         project_dir=project_dir,
         force=force,
         dry_run=dry_run,
-        console=console,
     )
 
     # -----
@@ -173,111 +170,3 @@ def upgrade(
     )
 
 
-################################################################################
-#                                                                              #
-# UPGRADE LOGIC                                                                #
-#                                                                              #
-################################################################################
-
-
-def upgrade_packages(
-    targets: list["OutdatedPackage"],
-    config: AamConfig,
-    project_dir: Path,
-    force: bool,
-    dry_run: bool,
-    console: Console,
-) -> UpgradeResult:
-    """Upgrade a list of outdated packages from sources.
-
-    For each target, reinstalls from the source cache using the
-    existing install_from_source flow.
-
-    Args:
-        targets: List of OutdatedPackage instances to upgrade.
-        config: AAM configuration.
-        project_dir: Project root directory.
-        force: Skip modification warnings.
-        dry_run: Preview without making changes.
-        console: Rich console for output.
-
-    Returns:
-        :class:`UpgradeResult` with outcomes.
-    """
-    from aam_cli.services.install_service import install_from_source
-    from aam_cli.services.source_service import build_source_index, resolve_artifact
-
-    logger.info(f"Upgrading {len(targets)} package(s)")
-
-    result = UpgradeResult()
-
-    if dry_run:
-        # -----
-        # Dry run: just report what would be upgraded
-        # -----
-        for target in targets:
-            result.upgraded.append({
-                "name": target.name,
-                "from_commit": target.current_commit,
-                "to_commit": target.latest_commit,
-            })
-        result.total_upgraded = len(result.upgraded)
-        return result
-
-    # -----
-    # Build source index for resolution
-    # -----
-    index = build_source_index(config)
-
-    for target in targets:
-        try:
-            # -----
-            # Check for local modifications
-            # -----
-            if target.has_local_modifications and not force:
-                result.skipped.append({
-                    "name": target.name,
-                    "reason": "Local modifications detected. Use --force to overwrite.",
-                })
-                continue
-
-            # -----
-            # Resolve the artifact from source index
-            # -----
-            virtual_package = resolve_artifact(target.name, index)
-
-            # -----
-            # Reinstall from source with force=True (overwrite existing)
-            # -----
-            install_from_source(
-                virtual_package=virtual_package,
-                project_dir=project_dir,
-                platform_name=config.default_platform,
-                config=config,
-                force=True,
-                no_deploy=False,
-            )
-
-            result.upgraded.append({
-                "name": target.name,
-                "from_commit": target.current_commit,
-                "to_commit": target.latest_commit,
-            })
-
-        except Exception as e:
-            logger.error(
-                f"Failed to upgrade '{target.name}': {e}", exc_info=True
-            )
-            result.failed.append({
-                "name": target.name,
-                "error": str(e),
-            })
-
-    result.total_upgraded = len(result.upgraded)
-
-    logger.info(
-        f"Upgrade complete: upgraded={result.total_upgraded}, "
-        f"skipped={len(result.skipped)}, failed={len(result.failed)}"
-    )
-
-    return result

@@ -1,0 +1,33 @@
+{
+  "name": "aam-registry-storybook",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/aam-registry-storybook/src",
+  "tags": ["type:app", "scope:web", "lang:typescript"],
+  "targets": {
+    "storybook": {
+      "executor": "@nx/storybook:storybook",
+      "options": {
+        "port": 6006,
+        "configDir": "apps/aam-registry-storybook/.storybook"
+      }
+    },
+    "build-storybook": {
+      "executor": "@nx/storybook:build",
+      "outputs": ["{options.outputDir}"],
+      "options": {
+        "outputDir": "dist/apps/aam-registry-storybook",
+        "configDir": "apps/aam-registry-storybook/.storybook"
+      }
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "options": {
+        "reportsDirectory": "../../coverage/apps/aam-registry-storybook"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    }
+  }
+}

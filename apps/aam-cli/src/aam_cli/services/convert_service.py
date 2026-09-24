@@ -22,9 +22,10 @@ from aam_cli.converters.mappings import (
     AGENT_SUPPORTED_FIELDS,
     AGENT_TARGET_DIRS,
     AGENT_TARGET_EXTENSIONS,
-    PROMPT_SUPPORTED_FIELDS,
+    COMMAND_SUPPORTED_FIELDS,
+    COMMAND_TARGET_DIRS,
+    COMMAND_TARGET_EXTENSIONS,
     PROMPT_TARGET_DIRS,
-    PROMPT_TARGET_EXTENSIONS,
     SINGLE_FILE_INSTRUCTION_TARGETS,
     SKILL_TARGET_DIRS,
 )
@@ -198,7 +199,7 @@ def _find_instructions(root: Path, platform: str) -> list[Path]:
     finders = {
         "cursor": _find_cursor_instructions,
         "copilot": _find_copilot_instructions,
-        "claude": _find_claude_instructions,
+        "claude-code": _find_claude_instructions,
         "codex": _find_codex_instructions,
     }
     return finders[platform](root)
@@ -223,7 +224,7 @@ def _find_agents(root: Path, platform: str) -> list[Path]:
         if agents_dir.is_dir():
             files.extend(agents_dir.glob("*.agent.md"))
 
-    elif platform == "claude":
+    elif platform == "claude-code":
         agents_dir = root / ".claude" / "agents"
         if agents_dir.is_dir():
             files.extend(agents_dir.glob("*.md"))
@@ -248,7 +249,7 @@ def _find_prompts(root: Path, platform: str) -> list[Path]:
         if d.is_dir():
             files.extend(d.glob("*.prompt.md"))
 
-    elif platform == "claude":
+    elif platform == "claude-code":
         d = root / ".claude" / "prompts"
         if d.is_dir():
             files.extend(d.glob("*.md"))
@@ -267,7 +268,7 @@ def _find_skills(root: Path, platform: str) -> list[Path]:
     base_map = {
         "cursor": ".cursor/skills",
         "copilot": ".github/skills",
-        "claude": ".claude/skills",
+        "claude-code": ".claude/skills",
         "codex": ".agents/skills",
     }
 
@@ -561,7 +562,7 @@ def _convert_agent(
             elif field_name == "handoffs":
                 warnings.append(f"Handoffs are {source_platform}-specific and were removed: {value}.")
             elif field_name == "model":
-                if target_platform in ("cursor", "claude"):
+                if target_platform in ("cursor", "claude-code"):
                     # Cursor/Claude subagents support model but map differently
                     if "model" in supported:
                         new_meta["model"] = "inherit"
@@ -656,7 +657,7 @@ def _convert_prompt(
     # Other platforms
     # -----
     target_dir_name = PROMPT_TARGET_DIRS.get(target_platform)
-    target_ext = PROMPT_TARGET_EXTENSIONS.get(target_platform)
+    target_ext = COMMAND_TARGET_EXTENSIONS.get(target_platform)
 
     if not target_dir_name or not target_ext:
         return ConversionResult(
@@ -670,7 +671,7 @@ def _convert_prompt(
     target_path_str = str(target_file.relative_to(root))
 
     # Build target frontmatter
-    supported = PROMPT_SUPPORTED_FIELDS.get(target_platform, set())
+    supported = COMMAND_SUPPORTED_FIELDS.get(target_platform, set())
     new_meta: dict[str, object] = {}
 
     if target_platform == "copilot":
@@ -798,6 +799,351 @@ def _backup_file(file_path: Path) -> Path:
 ################################################################################
 
 
+def _convert_rule(
+    src_file: Path,
+    root: Path,
+    source_platform: str,
+    target_platform: str,
+    force: bool,
+    dry_run: bool,
+) -> ConversionResult:
+    """Convert a rule/instruction file between platforms.
+
+    Maps ``applyTo`` → ``globs`` (Copilot → Cursor) or vice versa.
+    For platforms that have no per-file scoping (Claude, Codex), the rule
+    is written as a plain markdown block.
+
+    Args:
+        src_file: Path to the source rule file.
+        root: Project root directory.
+        source_platform: Source platform identifier.
+        target_platform: Target platform identifier.
+        force: If True, overwrite existing files.
+        dry_run: If True, do not write files.
+
+    Returns:
+        ConversionResult for the rule.
+    """
+    from aam_cli.converters.frontmatter import generate_frontmatter, parse_frontmatter
+    from aam_cli.converters.mappings import VERBOSE_WORKAROUNDS
+
+    name = _derive_name(src_file, source_platform)
+    rel_source = str(src_file.relative_to(root))
+
+    try:
+        raw = src_file.read_text(encoding="utf-8")
+        fm, body = parse_frontmatter(raw)
+
+        new_fm: dict[str, object] = {}
+        warnings: list[str] = []
+
+        # -----
+        # Translate applyTo (Copilot) → globs (Cursor) and vice versa
+        # -----
+        if source_platform == "copilot" and target_platform == "cursor":
+            apply_to = fm.get("applyTo", "")
+            if apply_to:
+                new_fm["globs"] = apply_to
+            new_fm["description"] = fm.get("description", fm.get("name", name))
+            new_fm["alwaysApply"] = not bool(apply_to)
+        elif source_platform == "cursor" and target_platform == "copilot":
+            globs = fm.get("globs", "")
+            if globs:
+                new_fm["applyTo"] = globs if isinstance(globs, str) else ", ".join(globs)
+            new_fm["name"] = fm.get("description", name)
+            new_fm["description"] = fm.get("description", "")
+        else:
+            # Plain markdown (Claude, Codex) — drop frontmatter
+            if "globs" in fm or "applyTo" in fm:
+                warnings.append(VERBOSE_WORKAROUNDS.get("globs_lost", ""))
+
+        content = generate_frontmatter(new_fm, body) if new_fm else body
+
+        # -----
+        # Determine target path
+        # -----
+        if target_platform == "cursor":
+            target_path = root / ".cursor" / "rules" / f"{name}.mdc"
+        elif target_platform == "copilot":
+            target_path = root / ".github" / "instructions" / f"{name}.instructions.md"
+        elif target_platform == "claude-code":
+            target_path = root / "CLAUDE.md"
+            content = f"\n## Rule: {name}\n\n{body}"
+        elif target_platform == "codex":
+            target_path = root / "AGENTS.md"
+            content = f"\n## Rule: {name}\n\n{body}"
+        else:
+            return ConversionResult(
+                source_path=rel_source,
+                artifact_type="rule",
+                target_path="",
+                error=f"Unknown target platform: {target_platform}",
+            )
+
+        rel_target = str(target_path.relative_to(root))
+
+        if dry_run:
+            return ConversionResult(
+                source_path=rel_source,
+                artifact_type="rule",
+                target_path=rel_target,
+                warnings=warnings,
+            )
+
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.is_file() and not force:
+            return ConversionResult(
+                source_path=rel_source,
+                artifact_type="rule",
+                target_path=rel_target,
+                skipped=True,
+                warnings=warnings,
+            )
+
+        if target_path.is_file() and force:
+            _backup_file(target_path)
+
+        target_path.write_text(content, encoding="utf-8")
+        return ConversionResult(
+            source_path=rel_source,
+            artifact_type="rule",
+            target_path=rel_target,
+            warnings=warnings,
+        )
+
+    except Exception as exc:
+        logger.error(f"Failed to convert rule '{src_file}': {exc}", exc_info=True)
+        return ConversionResult(
+            source_path=rel_source,
+            artifact_type="rule",
+            target_path="",
+            error=str(exc),
+        )
+
+
+def _convert_hooks(
+    hooks_json_path: Path,
+    root: Path,
+    source_platform: str,
+    target_platform: str,
+    force: bool,
+    dry_run: bool,
+) -> ConversionResult:
+    """Convert a hooks.json file between platforms.
+
+    Translates canonical UAAPS hook event names between platform-specific
+    names using the mappings table.
+
+    Args:
+        hooks_json_path: Path to the source hooks.json file.
+        root: Project root directory.
+        source_platform: Source platform identifier.
+        target_platform: Target platform identifier.
+        force: If True, overwrite existing files.
+        dry_run: If True, do not write files.
+
+    Returns:
+        ConversionResult for the hooks file.
+    """
+    import json as _json
+
+    from aam_cli.converters.mappings import (
+        translate_hook_event,
+        translate_hook_event_from_platform,
+    )
+
+    rel_source = str(hooks_json_path.relative_to(root))
+
+    try:
+        source_hooks: dict[str, object] = _json.loads(
+            hooks_json_path.read_text(encoding="utf-8")
+        )
+        translated: dict[str, object] = {}
+        warnings: list[str] = []
+
+        for event_name, entries in source_hooks.items():
+            # -----
+            # Canonicalize from source platform, then translate to target
+            # -----
+            canonical = translate_hook_event_from_platform(event_name, source_platform)
+            if canonical is None:
+                # Already canonical or unknown — try using as-is
+                canonical = event_name
+
+            target_event = translate_hook_event(canonical, target_platform)
+            if target_event is None:
+                warnings.append(
+                    f"Hook event '{event_name}' has no equivalent on {target_platform} — dropped"
+                )
+                continue
+
+            translated[target_event] = entries
+
+        # -----
+        # Determine target path
+        # -----
+        if target_platform == "claude-code":
+            target_path = root / ".claude" / "hooks.json"
+        elif target_platform == "cursor":
+            target_path = root / ".cursor" / "hooks.json"
+        elif target_platform == "copilot":
+            target_path = root / ".github" / "copilot-hooks.json"
+        else:
+            return ConversionResult(
+                source_path=rel_source,
+                artifact_type="hooks",
+                target_path="",
+                skipped=True,
+                warnings=[f"Hooks not supported on {target_platform}"],
+            )
+
+        rel_target = str(target_path.relative_to(root))
+
+        if dry_run:
+            return ConversionResult(
+                source_path=rel_source,
+                artifact_type="hooks",
+                target_path=rel_target,
+                warnings=warnings,
+            )
+
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.is_file() and not force:
+            return ConversionResult(
+                source_path=rel_source,
+                artifact_type="hooks",
+                target_path=rel_target,
+                skipped=True,
+                warnings=warnings,
+            )
+
+        if target_path.is_file() and force:
+            _backup_file(target_path)
+
+        target_path.write_text(_json.dumps(translated, indent=2), encoding="utf-8")
+        return ConversionResult(
+            source_path=rel_source,
+            artifact_type="hooks",
+            target_path=rel_target,
+            warnings=warnings,
+        )
+
+    except Exception as exc:
+        logger.error(f"Failed to convert hooks '{hooks_json_path}': {exc}", exc_info=True)
+        return ConversionResult(
+            source_path=rel_source,
+            artifact_type="hooks",
+            target_path="",
+            error=str(exc),
+        )
+
+
+def _convert_mcp_config(
+    servers_path: Path,
+    root: Path,
+    source_platform: str,
+    target_platform: str,
+    force: bool,
+    dry_run: bool,
+) -> ConversionResult:
+    """Convert an MCP server configuration file between platform formats.
+
+    Maps between ``servers.json`` (UAAPS), ``.mcp.json`` (Claude/Cursor),
+    and ``.vscode/mcp.json`` (Copilot/VS Code) formats.
+
+    Args:
+        servers_path: Path to the source MCP config file.
+        root: Project root directory.
+        source_platform: Source platform identifier.
+        target_platform: Target platform identifier.
+        force: If True, overwrite existing files.
+        dry_run: If True, do not write files.
+
+    Returns:
+        ConversionResult for the MCP config file.
+    """
+    import json as _json
+
+    rel_source = str(servers_path.relative_to(root))
+
+    try:
+        source_data: dict[str, object] = _json.loads(
+            servers_path.read_text(encoding="utf-8")
+        )
+
+        # -----
+        # Normalize to { "mcpServers": {...} } internal structure
+        # -----
+        if "mcpServers" in source_data:
+            servers = source_data["mcpServers"]
+        elif "servers" in source_data:
+            servers = source_data["servers"]
+        else:
+            servers = source_data
+
+        # -----
+        # Format output per target platform
+        # -----
+        output: dict[str, object]
+        if target_platform in ("claude-code", "cursor"):
+            output = {"mcpServers": servers}
+            if target_platform == "claude-code":
+                target_path = root / ".mcp.json"
+            else:
+                target_path = root / ".cursor" / "mcp.json"
+        elif target_platform == "copilot":
+            output = {"servers": servers}
+            target_path = root / ".vscode" / "mcp.json"
+        else:
+            return ConversionResult(
+                source_path=rel_source,
+                artifact_type="mcp",
+                target_path="",
+                skipped=True,
+                warnings=[f"MCP config not supported on {target_platform}"],
+            )
+
+        rel_target = str(target_path.relative_to(root))
+
+        if dry_run:
+            return ConversionResult(
+                source_path=rel_source,
+                artifact_type="mcp",
+                target_path=rel_target,
+                warnings=[],
+            )
+
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.is_file() and not force:
+            return ConversionResult(
+                source_path=rel_source,
+                artifact_type="mcp",
+                target_path=rel_target,
+                skipped=True,
+                warnings=[],
+            )
+
+        if target_path.is_file() and force:
+            _backup_file(target_path)
+
+        target_path.write_text(_json.dumps(output, indent=2), encoding="utf-8")
+        return ConversionResult(
+            source_path=rel_source,
+            artifact_type="mcp",
+            target_path=rel_target,
+            warnings=[],
+        )
+
+    except Exception as exc:
+        logger.error(f"Failed to convert MCP config '{servers_path}': {exc}", exc_info=True)
+        return ConversionResult(
+            source_path=rel_source,
+            artifact_type="mcp",
+            target_path="",
+            error=str(exc),
+        )
+
+
 def run_conversion(
     project_root: Path,
     source_platform: str,
@@ -808,11 +1154,14 @@ def run_conversion(
 ) -> ConversionReport:
     """Run a full cross-platform conversion.
 
+    Supports instruction, agent, prompt, skill, rule, hooks, and mcp types.
+
     Args:
         project_root: Root directory of the project.
         source_platform: Source platform identifier.
         target_platform: Target platform identifier.
-        artifact_type: Optional filter (instruction, agent, prompt, skill).
+        artifact_type: Optional filter (instruction, agent, prompt, skill,
+            rule, hooks, mcp).
         dry_run: If True, do not write any files.
         force: If True, overwrite existing target files (with backup).
 
@@ -826,10 +1175,11 @@ def run_conversion(
 
     root = project_root.resolve()
 
-    types_to_convert = (
-        [artifact_type] if artifact_type
-        else ["instruction", "agent", "prompt", "skill"]
-    )
+    # Default types (instruction, agent, prompt, skill) match pre-UAAPS behavior.
+    # The new types (rule, hooks, mcp) are only run when explicitly requested to
+    # avoid double-processing files that overlap with instruction/prompt paths.
+    DEFAULT_TYPES = ["instruction", "agent", "prompt", "skill"]
+    types_to_convert = [artifact_type] if artifact_type else DEFAULT_TYPES
 
     # -----
     # Convert instructions
@@ -870,5 +1220,57 @@ def run_conversion(
                 src_dir, root, source_platform, target_platform, force, dry_run
             )
             report.results.append(result)
+
+    # -----
+    # Convert rules (UAAPS v0.4.0)
+    # -----
+    if "rule" in types_to_convert:
+        rule_files: list[Path] = []
+        if source_platform == "copilot":
+            rule_files = list(root.glob(".github/instructions/*.instructions.md"))
+        elif source_platform == "cursor":
+            rule_files = [
+                p for p in root.glob(".cursor/rules/*.mdc")
+                if not p.name.startswith("agent-")
+            ]
+        for src_file in rule_files:
+            result = _convert_rule(
+                src_file, root, source_platform, target_platform, force, dry_run
+            )
+            report.results.append(result)
+
+    # -----
+    # Convert hooks config (UAAPS v0.4.0)
+    # -----
+    if "hooks" in types_to_convert:
+        hooks_candidates: list[Path] = [
+            root / ".claude" / "hooks.json",
+            root / ".cursor" / "hooks.json",
+            root / ".github" / "copilot-hooks.json",
+        ]
+        for hooks_file in hooks_candidates:
+            if hooks_file.is_file():
+                result = _convert_hooks(
+                    hooks_file, root, source_platform, target_platform, force, dry_run
+                )
+                report.results.append(result)
+                break  # Process first match only
+
+    # -----
+    # Convert MCP server config (UAAPS v0.4.0)
+    # -----
+    if "mcp" in types_to_convert:
+        mcp_candidates: list[Path] = [
+            root / ".mcp.json",
+            root / ".cursor" / "mcp.json",
+            root / ".vscode" / "mcp.json",
+        ]
+        for mcp_file in mcp_candidates:
+            if mcp_file.is_file():
+                result = _convert_mcp_config(
+                    mcp_file, root, source_platform, target_platform, force, dry_run
+                )
+                report.results.append(result)
+                break  # Process first match only
 
     return report

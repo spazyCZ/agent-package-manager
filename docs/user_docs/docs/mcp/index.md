@@ -12,7 +12,7 @@ The Model Context Protocol (MCP) is an open standard that lets AI agents call to
 flowchart LR
     IDE["IDE / AI Agent<br/>(Cursor, Claude Desktop, etc.)"] -->|MCP protocol| AAM["AAM MCP Server<br/>(aam mcp serve)"]
     AAM -->|reads/writes| Config["~/.aam/config.yaml"]
-    AAM -->|manages| Packages["~/.aam/packages/"]
+    AAM -->|manages| Packages[".agent-packages/"]
     AAM -->|clones/fetches| Sources["~/.aam/cache/git/"]
 
     style IDE fill:#e3f2fd
@@ -106,9 +106,9 @@ Any client that supports the MCP stdio transport can connect by spawning `aam mc
 
 ## Available Tools
 
-AAM exposes **29 tools** split into two categories with a safety-first design: read tools are always available, write tools require explicit opt-in.
+AAM exposes **38 tools** split into two categories with a safety-first design: read tools are always available, write tools require explicit opt-in.
 
-### Read Tools (17 tools, always available)
+### Read Tools (23 tools, always available)
 
 These tools are safe to call at any time --- they never modify state.
 
@@ -122,11 +122,22 @@ These tools are safe to call at any time --- they never modify state.
 | `aam_info` | Show detailed package metadata |
 | `aam_recommend_skills` | Get AI-powered skill recommendations for the current project |
 
+#### Dependency Management
+
+| Tool | Description |
+|------|-------------|
+| `aam_tree` | Display the resolved dependency tree with optional depth limit |
+| `aam_check` | Verify all dependencies are installed and compatible |
+| `aam_audit` | Audit installed packages for integrity issues with severity filtering |
+| `aam_why` | Show why a specific package is installed (dependency provenance) |
+| `aam_dedupe` | Detect duplicate package installations (read-only by default, dry_run=True) |
+| `aam_prune` | Detect unlisted package directories (read-only by default, dry_run=True) |
+
 #### Package Integrity
 
 | Tool | Description |
 |------|-------------|
-| `aam_validate` | Validate a package manifest |
+| `aam_validate` | Validate a package manifest (`package.agent.json` or `aam.yaml`) |
 | `aam_verify` | Verify installed file checksums |
 | `aam_diff` | Show unified diffs for modified installed files |
 | `aam_outdated` | Check for outdated packages |
@@ -149,7 +160,7 @@ These tools are safe to call at any time --- they never modify state.
 | `aam_doctor` | Run health checks on the AAM installation |
 | `aam_init_info` | Get client initialization status |
 
-### Write Tools (12 tools, require `--allow-write`)
+### Write Tools (15 tools, require `--allow-write`)
 
 These tools modify state and are excluded by default for safety.
 
@@ -157,7 +168,7 @@ These tools modify state and are excluded by default for safety.
 
 | Tool | Description |
 |------|-------------|
-| `aam_install` | Install a package and its dependencies |
+| `aam_install` | Install a package and its dependencies (supports `--frozen`, `--minimal`, `--latest`, `--install-system-deps`) |
 | `aam_uninstall` | Remove an installed package |
 | `aam_upgrade` | Upgrade outdated packages |
 | `aam_publish` | Publish a package to a registry |
@@ -167,7 +178,14 @@ These tools modify state and are excluded by default for safety.
 | Tool | Description |
 |------|-------------|
 | `aam_create_package` | Create a new package from an existing project |
-| `aam_init_package` | Scaffold a new package from scratch |
+| `aam_init_package` | Scaffold a new package from scratch (generates `package.agent.json`) |
+
+#### Quality & Testing
+
+| Tool | Description |
+|------|-------------|
+| `aam_test` | Run deterministic tests for skills or hooks in the current package |
+| `aam_eval` | Run LLM-judged evaluations for skills in the current package |
 
 #### Source Management
 
@@ -185,6 +203,15 @@ These tools modify state and are excluded by default for safety.
 | `aam_registry_add` | Add a registry endpoint |
 | `aam_init` | Run first-time client initialization |
 
+#### Cache Management
+
+| Tool | Description |
+|------|-------------|
+| `aam_cache_clean` | Remove cached package archives (specific or all) |
+
+!!! note "Authentication is CLI-only"
+    Registry authentication (`aam login`, `aam logout`, `aam whoami`) is handled via the CLI and is not exposed as MCP tools, since authentication is an interactive operation.
+
 ---
 
 ## Available Resources
@@ -197,7 +224,7 @@ Resources provide passive, read-only data that agents can fetch at any time with
 | `aam://packages/installed` | List of all installed packages |
 | `aam://packages/{name}` | Detailed info for a specific package |
 | `aam://registries` | List of configured registries |
-| `aam://manifest` | Current directory's `aam.yaml` manifest |
+| `aam://manifest` | Current directory's `package.agent.json` (or `aam.yaml`) manifest |
 | `aam://sources` | List of configured git sources |
 | `aam://sources/{source_id}` | Detailed source info with discovered artifacts |
 | `aam://sources/{source_id}/candidates` | Unpackaged candidate artifacts from a source |
@@ -214,8 +241,8 @@ AAM's MCP server follows a **read-only-by-default** principle:
 
 | Mode | Read Tools | Write Tools | Use Case |
 |------|-----------|------------|----------|
-| Default (`aam mcp serve`) | 17 tools | Excluded | Safe exploration, search, diagnostics |
-| Write-enabled (`--allow-write`) | 17 tools | 12 tools | Full package management |
+| Default (`aam mcp serve`) | 23 tools | Excluded | Safe exploration, search, diagnostics |
+| Write-enabled (`--allow-write`) | 23 tools | 15 tools | Full package management |
 
 This design ensures that agents cannot accidentally install, remove, or publish packages unless explicitly authorized.
 

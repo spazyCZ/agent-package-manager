@@ -81,13 +81,13 @@ class TestMCPIntegration:
         _run_async(check())
 
     def test_integration_full_access_has_all_tools(self) -> None:
-        """Full-access server should list all 29 tools (spec 002–005)."""
+        """Full-access server should list all 35 tools (spec 002–005, UAAPS v0.4.0)."""
         server = create_mcp_server(allow_write=True)
 
         async def check() -> None:
             async with Client(server) as client:
                 tools = await client.list_tools()
-                assert len(tools) == 29
+                assert len(tools) == 40
 
         _run_async(check())
 
@@ -140,7 +140,7 @@ class TestMCPIntegration:
 
         with patch(
             "aam_cli.services.doctor_service.get_packages_dir",
-            return_value=tmp_workspace / ".aam" / "packages",
+            return_value=tmp_workspace / ".agent-packages",
         ):
             report = run_diagnostics(tmp_workspace)
 

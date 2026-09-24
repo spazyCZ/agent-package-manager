@@ -14,7 +14,7 @@ aam pkg validate [PATH]
 
 ## Description
 
-Validate the package manifest and artifacts. Checks that `aam.yaml` is syntactically correct, all required fields are present, artifact paths exist, and dependencies are properly declared.
+Validate the package manifest and artifacts. Checks that `package.agent.json` (or `aam.yaml`) is syntactically correct against the UAAPS schema, all required fields are present, artifact paths exist, and dependencies are properly declared.
 
 Run this before packing or publishing to catch errors early.
 
@@ -22,11 +22,13 @@ Run this before packing or publishing to catch errors early.
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| PATH | No | Path to package directory or aam.yaml (default: current directory) |
+| PATH | No | Path to package directory or manifest file (default: current directory) |
 
 ## Options
 
-This command has no command-specific options.
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--permissions` | | false | Run a security audit of declared permissions, reporting structured permission details (`fs.read`, `fs.write`, `network.hosts`, `shell.allow`, etc.) |
 
 ## Examples
 
@@ -116,7 +118,35 @@ Manifest:
 ✗ 3 errors found. Fix them before packing.
 ```
 
-### Example 5: No Manifest Found
+### Example 5: Permissions Audit
+
+```bash
+aam pkg validate --permissions
+```
+
+**Output:**
+```
+Validating my-package@1.0.0...
+
+Manifest:
+  ✓ name: valid format
+  ✓ version: valid semver
+  ✓ description: present
+
+Permissions audit:
+  fs.read:       ["./**"]
+  fs.write:      ["./output/**"]
+  network.hosts: ["api.example.com"]
+  network.schemes: ["https"]
+  shell.allow:   true
+  shell.binaries: ["ruff", "pytest"]
+
+⚠ Package requests shell access with 2 binaries. Review before installing.
+
+✓ Package is valid
+```
+
+### Example 6: No Manifest Found
 
 ```bash
 aam pkg validate ./empty-directory/
@@ -124,10 +154,10 @@ aam pkg validate ./empty-directory/
 
 **Output:**
 ```
-Error: No aam.yaml found. Run 'aam pkg create' or 'aam pkg init' first.
+Error: No package.agent.json or aam.yaml found. Run 'aam pkg create' or 'aam pkg init' first.
 ```
 
-### Example 6: Valid Package with Warnings
+### Example 7: Valid Package with Warnings
 
 ```bash
 aam pkg validate
@@ -164,11 +194,21 @@ Dependencies:
 
 ### Manifest Schema
 
+Validation covers the full UAAPS v0.4.0 schema. The CLI accepts both
+`package.agent.json` and `aam.yaml`, with JSON taking precedence when
+both exist.
+
 - **name** - Must match pattern `^(@[a-z0-9][a-z0-9_-]{0,63}/)?[a-z0-9][a-z0-9-]{0,63}$`
 - **version** - Must be valid semver (MAJOR.MINOR.PATCH)
 - **description** - Should not be empty
-- **artifacts** - Must declare at least one artifact
+- **artifacts** - Must declare at least one artifact (or use auto-discovery)
 - **dependencies** - Must use valid version constraints
+- **optionalDependencies** - Must use valid version constraints
+- **peerDependencies** - Must use valid version constraints
+- **systemDependencies** - Must declare valid system requirements
+- **env** - Environment variables must have valid schemas
+- **permissions** - Must use the structured format (`fs.read`, `fs.write`, `network.hosts`, `network.schemes`, `shell.allow`, `shell.binaries`)
+- **engines** - Must specify valid runtime constraints
 
 ### Artifact Paths
 
@@ -225,7 +265,7 @@ artifacts:
 
 ### Schema Errors vs. Path Errors
 
-- **Schema errors** - Problems with `aam.yaml` structure or content
+- **Schema errors** - Problems with `package.agent.json` / `aam.yaml` structure or content
 - **Path errors** - Declared artifacts that don't exist on disk
 
 Both must be fixed for the package to be valid.

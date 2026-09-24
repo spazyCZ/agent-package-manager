@@ -35,38 +35,64 @@ logger = logging.getLogger(__name__)
 
 SERVER_INSTRUCTIONS = """AAM (Agent Artifact Manager) MCP Server.
 
-This server exposes AAM CLI capabilities for managing AI agent packages
-(skills, agents, prompts, and instructions). Use the available tools to
-search registries, inspect installed packages, validate manifests, install
-new packages, manage configuration, and discover artifacts from remote
-git sources.
+Manages AI agent artifacts: skills, agents, commands, and instructions.
+Read-only tools are always available. Write tools require --allow-write.
 
-Read-only tools are always available. These include package operations
-(search, list, info, validate), configuration (config get, doctor),
-source discovery (source list, source scan, source candidates, source diff),
-integrity (verify, diff), and skill recommendation (aam_recommend_skills).
+## Tools by category
 
-Write tools (install, uninstall, publish, config set, registry add,
-source add, source remove, source update) are only available when the
-server is started with --allow-write.
+### Read-only (always available)
 
-Resources provide passive data access for project context without
-requiring tool calls.
+**Package Discovery:** search, list, available, info, recommend_skills
+**Dependency Analysis:** tree, why, check, audit, dedupe, prune
+**Package Integrity:** validate, verify, diff, outdated
+**Source Management:** source_list, source_scan, source_candidates, source_diff
+**Configuration & Diagnostics:** config_get, registry_list, doctor, init_info
+**Cache:** cache_ls
 
-## Skill recommendation (aam_recommend_skills)
+### Write (require --allow-write)
 
-When the user asks to find relevant skills for their repository, or which
-skills to use for a project (e.g., "what skills fit my React + Python LLM
-app?"), call aam_recommend_skills first. It analyzes the project structure
-and dependencies to recommend skills from configured sources.
+**Package Management:** install, uninstall, upgrade, publish
+**Package Authoring:** create_package, init_package, pack, convert
+**Source Management:** source_add, source_remove, source_update
+**Configuration:** config_set, registry_add, init
+**Testing:** test, eval
+**Cache:** cache_clean
 
-Optimal usage:
-1. Use default path (current directory) when the user is in the project root.
-2. Pass an explicit path if the user points to a specific project.
-3. Present the top recommendations with score and rationale.
-4. Suggest installing with: aam install <qualified_name>
-5. If sources are empty, suggest: aam source enable-defaults; aam source update --all
-6. Combine with aam_install (write) if --allow-write to install recommended skills.
+## Resources
+
+- `aam://config` — global AAM configuration
+- `aam://packages/installed` — all installed packages
+- `aam://packages/{name}` — single package detail (use `--` for scoped names)
+- `aam://registries` — configured registries
+- `aam://manifest` — current project manifest (package.agent.json, falling back to package.agent.yaml, then aam.yaml)
+- `aam://sources` — all configured git sources
+- `aam://sources/{source_id}` — single source detail
+- `aam://sources/{source_id}/candidates` — discoverable packages in a source
+- `aam://init_status` — workspace initialization status
+
+## Error format
+
+Tool errors return a dict with:
+- `error`: human-readable message
+- `error_code`: machine-readable code (e.g., AAM_SOURCE_NOT_FOUND, FILE_NOT_FOUND)
+
+## Workflow recipes
+
+**Discover and install:** search -> info -> install -> verify
+**Update packages:** outdated -> upgrade -> check
+**Explore sources:** source_list -> source_scan -> source_candidates -> source_add
+
+## Skill recommendation (recommend_skills)
+
+When the user asks which skills fit their project, call recommend_skills.
+It analyzes project structure and dependencies to rank skills from configured sources.
+
+- Use default path (current directory) when in the project root.
+- Pass an explicit path for a specific project.
+- Present top recommendations with score and rationale.
+- Suggest installing with: `aam install <qualified_name>`
+- If sources are empty, suggest: `aam source update --all`
+- Combine with install (write) to install recommended skills directly.
 """
 
 ################################################################################
@@ -118,12 +144,9 @@ def create_mcp_server(allow_write: bool = False) -> FastMCP:
     register_write_tools(mcp)
     register_resources(mcp)
 
-    # Read-only: 17 (includes aam_recommend_skills)
-    # Full access: 17 read + 12 write = 29
-    tool_count = 17 if not allow_write else 29
     logger.info(
-        f"MCP server created: tools={tool_count}, resources=8, "
-        f"allow_write={allow_write}"
+        f"MCP server created: allow_write={allow_write}, "
+        f"version={__version__}"
     )
 
     return mcp

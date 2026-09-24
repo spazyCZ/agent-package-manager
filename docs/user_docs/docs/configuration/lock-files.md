@@ -1,6 +1,14 @@
-# Lock Files Reference (aam-lock.yaml)
+# Lock Files Reference
 
-The lock file (`.aam/aam-lock.yaml`) records the exact versions of all installed packages and their dependencies, ensuring reproducible installations across different environments.
+The lock file (`package.agent.lock`) records the exact versions of
+all installed packages and their dependencies, ensuring reproducible
+installations across different environments. The file uses JSON format
+and lives at the project root.
+
+!!! note "Migration from `aam-lock.yaml`"
+    The old YAML lock file (`.aam/aam-lock.yaml`) is superseded by
+    `package.agent.lock` (JSON). AAM detects the old format and
+    offers to convert it automatically.
 
 ## Purpose
 
@@ -9,22 +17,24 @@ Lock files solve the "works on my machine" problem by:
 - **Freezing exact versions** - Every package version is recorded
 - **Recording checksums** - Verify package integrity on every install
 - **Capturing dependency tree** - Full resolution graph is preserved
+- **Recording system checks** - System dependency verification results
 - **Ensuring reproducibility** - Same lock file = identical installation
 
-## File Location
+## File location
 
 ```
 my-project/
-└── .aam/
-    └── aam-lock.yaml  ← Lock file (committed to git)
+├── package.agent.json      ← Manifest
+├── package.agent.lock      ← Lock file (committed to git)
+└── .agent-packages/        ← Installed packages (gitignored)
 ```
 
-## Version Control
+## Version control
 
 **Always commit lock files to Git.**
 
 ```bash
-git add .aam/aam-lock.yaml
+git add package.agent.lock
 git commit -m "Update dependencies"
 ```
 
@@ -60,43 +70,55 @@ Lock files are automatically created or updated by:
 | `checksum` | string | SHA-256 checksum (format: `sha256:<hex>`) |
 | `dependencies` | dict[string, string] | Resolved dependency versions |
 
-## Complete Example
+## Complete example
 
-```yaml
-# .aam/aam-lock.yaml — Lock file (commit to git)
-
-lockfile_version: 1
-resolved_at: "2026-02-09T14:32:15.123456Z"
-
-packages:
-  "@myorg/asvc-auditor":
-    version: "2.1.0"
-    source: "aam-central"
-    checksum: "sha256:a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456"
-    dependencies:
-      "@myorg/base-auditor": "3.0.2"
-      "@tools/report-generator": "2.1.5"
-      "common-prompts": "1.5.3"
-
-  "@myorg/base-auditor":
-    version: "3.0.2"
-    source: "aam-central"
-    checksum: "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-    dependencies:
-      "common-prompts": "1.5.3"
-
-  "@tools/report-generator":
-    version: "2.1.5"
-    source: "company-registry"
-    checksum: "sha256:fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321"
-    dependencies: {}
-
-  "common-prompts":
-    version: "1.5.3"
-    source: "aam-central"
-    checksum: "sha256:567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234"
-    dependencies: {}
+```json
+{
+  "lockfile_version": 2,
+  "resolved_at": "2026-02-20T14:32:15.123456Z",
+  "packages": {
+    "@myorg/asvc-auditor": {
+      "version": "2.1.0",
+      "source": "aam-central",
+      "checksum": "sha256:a1b2c3d4e5f6...",
+      "dependencies": {
+        "@myorg/base-auditor": "3.0.2",
+        "common-prompts": "1.5.3"
+      }
+    },
+    "@myorg/base-auditor": {
+      "version": "3.0.2",
+      "source": "aam-central",
+      "checksum": "sha256:1234567890ab...",
+      "dependencies": {
+        "common-prompts": "1.5.3"
+      }
+    },
+    "common-prompts": {
+      "version": "1.5.3",
+      "source": "aam-central",
+      "checksum": "sha256:567890abcdef...",
+      "dependencies": {}
+    }
+  },
+  "systemChecks": {
+    "python": {
+      "required": ">=3.11",
+      "found": "3.12.1",
+      "passed": true
+    },
+    "node": {
+      "required": ">=20",
+      "found": "20.11.0",
+      "passed": true
+    }
+  }
+}
 ```
+
+The `systemChecks` section records the outcome of system dependency
+pre-flight checks, providing an audit trail of what was available at
+install time.
 
 ## Field Reference
 
@@ -256,39 +278,44 @@ packages:
 
 All three packages are locked, ensuring the entire dependency tree is reproducible.
 
-## Reproducible Installs
+## Reproducible installs
 
-### Install from Lock File
+### Install from lock file
 
-When a lock file exists, `aam install` uses locked versions:
+When a lock file exists, `aam install` uses locked versions. Use
+`--frozen` to enforce strict lock file usage (fails if the lock file
+is missing or stale):
 
 ```bash
 # Team member clones repo
 git clone https://github.com/myteam/project
 cd project
 
-# Install uses .aam/aam-lock.yaml
+# Install uses package.agent.lock
 aam install
-# Installs exact versions from lock file
+
+# Or enforce exact versions (fail if lock file is stale)
+aam install --frozen
 ```
 
 **Result:** Identical package versions across all team members.
 
-### Install Without Lock File
+### Install without lock file
 
 If no lock file exists, AAM resolves dependencies fresh:
 
 ```bash
 aam install
-# 1. Reads aam.yaml dependencies
+# 1. Reads package.agent.json dependencies
 # 2. Resolves version constraints
-# 3. Downloads packages
-# 4. Creates .aam/aam-lock.yaml
+# 3. Runs system dependency pre-flight checks
+# 4. Downloads packages
+# 5. Creates package.agent.lock
 ```
 
 **Commit the generated lock file:**
 ```bash
-git add .aam/aam-lock.yaml
+git add package.agent.lock
 git commit -m "Add lock file for reproducible installs"
 ```
 
@@ -493,35 +520,36 @@ aam update
 # Updates lock file
 ```
 
-## Comparison with Other Package Managers
+## Comparison with other package managers
 
 | Feature | AAM | npm | pip |
 |---------|-----|-----|-----|
-| Lock file | `aam-lock.yaml` | `package-lock.json` | `requirements.txt` + hash |
-| Format | YAML | JSON | Text |
+| Lock file | `package.agent.lock` | `package-lock.json` | `requirements.txt` + hash |
+| Format | JSON | JSON | Text |
 | Checksums | Always | Yes | Optional |
+| System checks | Yes | No | No |
 | Auto-generated | Yes | Yes | No (manual) |
 | Commit to git | Yes | Yes | Yes |
 
 ## Best Practices
 
-### Always Commit Lock Files
+### Always commit lock files
 
 ```bash
 # .gitignore should NOT include:
-# .aam/aam-lock.yaml  ← DO NOT IGNORE
+# package.agent.lock  ← DO NOT IGNORE
 
 # Commit lock file
-git add .aam/aam-lock.yaml
+git add package.agent.lock
 git commit -m "Update dependencies"
 ```
 
-### Update Regularly
+### Update regularly
 
 ```bash
 # Weekly or monthly
 aam update
-git add .aam/aam-lock.yaml
+git add package.agent.lock
 git commit -m "Update dependencies to latest versions"
 ```
 
@@ -544,55 +572,77 @@ aam install  # Uses locked versions
 aam test     # Tests against exact versions
 ```
 
-### Don't Ignore Lock Files
+### Don't ignore lock files
 
 **Bad:**
 ```gitignore
 # .gitignore
-.aam/aam-lock.yaml  # ← DON'T DO THIS
+package.agent.lock  # ← DON'T DO THIS
 ```
 
 **Good:**
 ```gitignore
 # .gitignore
-.aam/packages/  # Ignore installed packages, but NOT lock file
+.agent-packages/  # Ignore installed packages, but NOT lock file
 ```
+
+## Global Lock File
+
+When packages are installed globally with `aam install -g`, AAM
+maintains a separate lock file at `~/.aam/global.lock`. This file
+tracks globally-installed packages independently from project-level
+lock files.
+
+```
+~/.aam/
+├── config.yaml
+├── global.lock          ← Global lock file (tracks -g installs)
+├── packages/            ← Globally-installed packages
+└── cache/
+```
+
+### Global lock file behavior
+
+| Scenario | Lock file used |
+|----------|---------------|
+| `aam install my-pkg` | `./package.agent.lock` (project-level) |
+| `aam install my-pkg -g` | `~/.aam/global.lock` |
+| `aam install --frozen -g` | `~/.aam/global.lock` (enforced) |
+
+The global lock file uses the same JSON schema as the project-level
+lock file. You generally do not need to commit the global lock file
+to version control since it reflects user-specific global state.
 
 ## Advanced Topics
 
-### Multiple Lock Files
+### Multiple lock files
 
-AAM supports only one lock file per project (`.aam/aam-lock.yaml`).
+AAM supports only one lock file per project (`package.agent.lock`).
 
 For multi-environment setups, use:
 - Different branches (e.g., `dev`, `staging`, `prod`)
 - Or different projects with their own lock files
 
-### Lock File Diff
+### Lock file diff
 
 Review lock file changes before committing:
 
 ```bash
-git diff .aam/aam-lock.yaml
+git diff package.agent.lock
 ```
 
-**Example diff:**
-```diff
-packages:
-  my-package:
--   version: "1.0.0"
-+   version: "1.5.0"
--   checksum: "sha256:abc123..."
-+   checksum: "sha256:def456..."
-```
+### Auditing lock file
 
-### Auditing Lock File
-
-Check what's locked:
+Use `aam tree` to visualize what is locked:
 
 ```bash
-aam list
-# Shows all locked packages with versions
+aam tree
+```
+
+Use `aam audit` to check integrity:
+
+```bash
+aam audit
 ```
 
 **Example output:**
@@ -622,7 +672,8 @@ Converting from `package.json`, `requirements.txt`, etc.:
 
 ## Next Steps
 
-- [Manifest Reference](manifest.md) - Define dependencies in `aam.yaml`
+- [Manifest Reference](manifest.md) - Define dependencies in `package.agent.json`
 - [CLI Reference: install](../cli/install.md) - Installing packages
-- [CLI Reference: source update](../cli/source-update.md) - Updating dependencies
+- [CLI Reference: tree](../cli/tree.md) - Visualize the dependency tree
+- [CLI Reference: audit](../cli/audit.md) - Audit package integrity
 - [Concepts: Dependency Resolution](../concepts/dependencies.md) - How resolution works

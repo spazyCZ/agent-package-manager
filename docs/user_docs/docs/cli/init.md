@@ -5,12 +5,15 @@
 ## Synopsis
 
 ```bash
-aam init [OPTIONS]
+aam init [NAME] [OPTIONS]
 ```
 
 ## Description
 
-Set up AAM for your project. Guides you through selecting your AI platform and registering community artifact sources. Run this once when you first start using AAM.
+Set up AAM client configuration.
+
+- `aam init` initializes **global** config (`~/.aam/config.yaml`) and can register community sources.
+- `aam init --project` initializes **project** config (`.aam/config.yaml`) in the current directory.
 
 If called with a NAME argument (e.g., `aam init my-package`), AAM assumes you mean the old package scaffolding command and delegates to [`aam pkg init`](pkg-init.md) with a deprecation warning.
 
@@ -19,10 +22,11 @@ If called with a NAME argument (e.g., `aam init my-package`), AAM assumes you me
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
 | `--yes` | `-y` | false | Non-interactive: use detected defaults |
+| `--project` | - | false | Create project-level `.aam/config.yaml` (overrides only) |
 
 ## Examples
 
-### Example 1: Interactive Setup
+### Example 1: Interactive Global Setup
 
 ```bash
 aam init
@@ -37,7 +41,7 @@ Register community artifact sources? [Y/n] y
 ✓ AAM initialized successfully.
   Platform:  cursor
   Config:    ~/.aam/config.yaml
-  Sources:   2 community source(s) added
+  Sources:   4 community source(s) added
 
 Next steps:
   aam search <query>   — Find packages to install
@@ -46,31 +50,57 @@ Next steps:
   aam pkg init          — Create a new package
 ```
 
-### Example 2: Non-Interactive with Defaults
+### Example 2: Interactive Project Setup
 
 ```bash
-aam init --yes
+aam init --project
 ```
 
-Uses the auto-detected platform (or `cursor` if none detected) and registers default sources without prompting.
+**Output:**
+```
+  Detected platform: cursor
+Choose default platform [cursor]:
 
-### Example 3: Reconfigure
+  Active platforms (comma-separated, default: cursor):
+Active platforms [cursor]: cursor, claude-code
+
+  Platform:         cursor
+  Active platforms: cursor, claude-code
+
+✓ Project config created.
+  Config: /path/to/project/.aam/config.yaml
+```
+
+This writes a sparse project override file with:
+
+- `default_platform`
+- `active_platforms`
+
+### Example 3: Non-Interactive Project Setup
 
 ```bash
-aam init
+aam init --project --yes
 ```
 
-If AAM is already configured, you'll be asked to confirm reconfiguration:
+Uses the auto-detected platform (or `cursor` if none detected), sets `active_platforms` to that same platform, and skips all prompts.
+
+### Example 4: Existing Project Config (Overwrite Prompt)
+
+```bash
+aam init --project
+```
+
+If `.aam/config.yaml` already exists, you'll be asked to confirm overwrite:
 
 ```
-AAM is already configured. Config: ~/.aam/config.yaml
-Reconfigure? [y/N]: y
-Choose platform [cursor]: copilot
-
-✓ AAM reconfigured successfully.
-  Platform:  copilot
-  Config:    ~/.aam/config.yaml
+Project config already exists. Config: /path/to/project/.aam/config.yaml
+Overwrite? [y/N]: y
+...
+✓ Project config updated.
+  Config: /path/to/project/.aam/config.yaml
 ```
+
+Use `-y` / `--yes` to skip this confirmation.
 
 ## Platform Detection
 
@@ -80,7 +110,7 @@ AAM auto-detects your AI platform from project directory indicators:
 |-----------|-------------------|
 | `.cursor/` directory | cursor |
 | `.github/copilot/` directory | copilot |
-| `CLAUDE.md` file | claude |
+| `CLAUDE.md` file | claude-code |
 | `.codex/` directory | codex |
 
 If no platform is detected, `cursor` is used as the default.
@@ -109,11 +139,18 @@ If no platform is detected, `cursor` is used as the default.
 
 ### Configuration File
 
-`aam init` writes to `~/.aam/config.yaml` (global configuration). This sets:
+`aam init` (without `--project`) writes to `~/.aam/config.yaml` (global configuration). This sets:
 
 - `default_platform`: Your selected AI platform
 - `sources`: Registered community artifact sources
 
+`aam init --project` writes to `.aam/config.yaml` in the current directory and stores only project overrides:
+
+- `default_platform`
+- `active_platforms`
+
+All other settings continue to inherit from global config.
+
 ### Community Sources
 
-When you accept default sources, AAM registers 4 curated community repositories that contain shared skills, agents, and prompts. You can manage sources later with `aam source add` and `aam source remove`. If you skipped default sources during init or removed them later, run `aam source enable-defaults` to restore them.
+When you accept default sources in global init mode, AAM registers 4 curated community repositories that contain shared skills, agents, and prompts. You can manage sources later with `aam source add` and `aam source remove`. If you skipped default sources during init or removed them later, run `aam source enable-defaults` to restore them.

@@ -396,6 +396,63 @@ def _find_source(config: AamConfig, name: str) -> SourceEntry | None:
     return None
 
 
+def _normalize_source_identity(url: str, path: str) -> tuple[str, str]:
+    """Normalize a source's repo URL and path for overlap comparison.
+
+    Strips ``.git`` suffixes, trailing slashes, and lowercases the URL
+    so that ``https://github.com/org/repo.git`` and
+    ``https://github.com/org/repo`` are treated as the same repo.
+
+    Args:
+        url: Clone URL.
+        path: Subdirectory scan scope.
+
+    Returns:
+        Tuple of ``(normalized_url, normalized_path)``.
+    """
+    norm_url = url.lower().rstrip("/")
+    if norm_url.endswith(".git"):
+        norm_url = norm_url[:-4]
+    norm_path = path.strip("/")
+    return (norm_url, norm_path)
+
+
+def _find_overlapping_source(
+    config: AamConfig,
+    url: str,
+    path: str,
+) -> SourceEntry | None:
+    """Find an existing source that covers the same repo and path scope.
+
+    Two sources overlap when they resolve to the same clone URL and
+    one path is a prefix of (or equal to) the other.
+
+    Args:
+        config: Loaded AAM configuration.
+        url: Clone URL of the new source.
+        path: Subdirectory scope of the new source.
+
+    Returns:
+        The first overlapping :class:`SourceEntry`, or ``None``.
+    """
+    new_url, new_path = _normalize_source_identity(url, path)
+
+    for entry in config.sources:
+        entry_url, entry_path = _normalize_source_identity(entry.url, entry.path)
+        if entry_url != new_url:
+            continue
+
+        # Same repo — check path overlap (equal or one contains the other)
+        if new_path == entry_path:
+            return entry
+        if new_path.startswith(entry_path + "/"):
+            return entry
+        if entry_path.startswith(new_path + "/"):
+            return entry
+
+    return None
+
+
 ################################################################################
 #                                                                              #
 # PUBLIC API: ADD SOURCE                                                       #
@@ -436,7 +493,7 @@ def add_source(
     parsed: GitSourceURL = parse(source_str, ref=ref, path=path, name=name)
 
     # -----
-    # Step 2: Check for duplicates
+    # Step 2: Check for duplicates (by name and by repo+path overlap)
     # -----
     config = load_config()
     existing = _find_source(config, parsed.display_name)
@@ -444,6 +501,15 @@ def add_source(
         raise ValueError(
             f"[AAM_SOURCE_ALREADY_EXISTS] Source '{parsed.display_name}' "
             f"already exists. Use 'aam source update' to refresh it."
+        )
+
+    overlapping = _find_overlapping_source(config, parsed.clone_url, parsed.path)
+    if overlapping is not None:
+        raise ValueError(
+            f"[AAM_SOURCE_OVERLAP] Source '{parsed.display_name}' overlaps "
+            f"with existing source '{overlapping.name}' (same repository "
+            f"and path scope). Remove '{overlapping.name}' first or use a "
+            f"non-overlapping --path."
         )
 
     # -----
@@ -1003,6 +1069,20 @@ def register_default_sources() -> dict[str, Any]:
             continue
 
         # -----
+        # Skip if overlaps with an existing user source
+        # -----
+        overlap = _find_overlapping_source(
+            config, default["url"], default.get("path", ""),
+        )
+        if overlap is not None:
+            logger.debug(
+                f"Default source '{name}' overlaps with "
+                f"existing source '{overlap.name}', skipping"
+            )
+            skipped.append(name)
+            continue
+
+        # -----
         # Register the default source (without cloning yet)
         # Clone will happen on first scan/update
         # -----
@@ -1059,6 +1139,20 @@ def enable_default_sources() -> dict[str, Any]:
         # -----
         if name in existing_names:
             logger.debug(f"Default source already present: {name}")
+            skipped.append(name)
+            continue
+
+        # -----
+        # Skip if overlaps with an existing user source
+        # -----
+        overlap = _find_overlapping_source(
+            config, default["url"], default.get("path", ""),
+        )
+        if overlap is not None:
+            logger.debug(
+                f"Default source '{name}' overlaps with "
+                f"existing source '{overlap.name}', skipping"
+            )
             skipped.append(name)
             continue
 
@@ -1161,15 +1255,29 @@ def materialize_source_packages(
     # -----
     # Step 3: Package and publish each artifact
     # -----
+    # Track which unqualified names have been published to handle
+    # cross-source duplicates (e.g. "copilot-sdk" in both
+    # microsoft/skills and github/awesome-copilot). First source wins.
     packages_created = 0
+    skipped_duplicates = 0
     errors: list[str] = []
+    published_names: set[str] = set()
 
     for vp in index.by_qualified_name.values():
+        if vp.name in published_names:
+            logger.debug(
+                f"Skipping duplicate '{vp.qualified_name}': "
+                f"'{vp.name}' already materialized from another source"
+            )
+            skipped_duplicates += 1
+            continue
+
         try:
             _publish_virtual_package_to_registry(
                 registry, vp, registry_dir,
             )
             packages_created += 1
+            published_names.add(vp.name)
         except (ValueError, OSError, FileNotFoundError) as exc:
             msg = f"Failed to materialize '{vp.name}': {exc}"
             logger.warning(msg)
@@ -1182,11 +1290,12 @@ def materialize_source_packages(
 
     logger.info(
         f"Materialization complete: packages={packages_created}, "
-        f"errors={len(errors)}"
+        f"skipped_duplicates={skipped_duplicates}, errors={len(errors)}"
     )
 
     return {
         "packages_created": packages_created,
+        "skipped_duplicates": skipped_duplicates,
         "errors": errors,
         "registry_path": str(registry_dir),
     }
@@ -1449,6 +1558,50 @@ def build_source_index(config: AamConfig | None = None) -> ArtifactIndex:
     )
 
     return index
+
+
+def list_available(config: AamConfig | None = None) -> dict[str, Any]:
+    """List all available artifacts grouped by source.
+
+    Args:
+        config: AAM configuration. Loads default if None.
+
+    Returns:
+        Dict with by_source, total_count, sources_indexed,
+        and build_timestamp.
+    """
+    logger.info("Listing available artifacts from sources")
+
+    if config is None:
+        config = load_config()
+
+    index = build_source_index(config)
+
+    # -----
+    # Group by source for structured output
+    # -----
+    by_source: dict[str, list[dict[str, Any]]] = {}
+    for _qname, vp in index.by_qualified_name.items():
+        source_group = by_source.setdefault(vp.source_name, [])
+        source_group.append({
+            "name": vp.name,
+            "qualified_name": vp.qualified_name,
+            "type": vp.type,
+            "path": vp.path,
+            "description": vp.description,
+        })
+
+    logger.info(
+        f"Available artifacts listed: total={index.total_count}, "
+        f"sources={index.sources_indexed}"
+    )
+
+    return {
+        "by_source": by_source,
+        "total_count": index.total_count,
+        "sources_indexed": index.sources_indexed,
+        "build_timestamp": index.build_timestamp,
+    }
 
 
 def resolve_artifact(

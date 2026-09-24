@@ -41,27 +41,102 @@ When you install `@author/asvc-auditor`, AAM automatically:
 
 ---
 
-## Declaring Dependencies
+## Dependency types
 
-Dependencies are declared in `aam.yaml`:
+AAM supports four dependency types, each with different install
+behavior:
 
-```yaml
-dependencies:
-  <package-name>: <version-constraint>
+| Type | Manifest key | Behavior |
+|------|-------------|----------|
+| **Required** | `dependencies` | Must resolve and install; install fails if missing |
+| **Optional** | `optionalDependencies` | Install continues gracefully if the package is unavailable |
+| **Peer** | `peerDependencies` | Must be satisfied by the host project; not auto-installed |
+| **System** | `systemDependencies` | OS-level pre-flight checks (runtimes, binaries, packages) |
+
+### Required dependencies
+
+Standard dependencies that must be present for the package to work:
+
+```json
+{
+  "dependencies": {
+    "@author/generic-auditor": ">=1.0.0",
+    "report-templates": "^2.0.0"
+  }
+}
 ```
 
-Both scoped (`@scope/name`) and unscoped (`name`) package names are supported.
+### Optional dependencies
 
-### Example
+Enhance the package but are not required. Install continues if they
+cannot be resolved:
 
-```yaml
-dependencies:
-  "@author/generic-auditor": ">=1.0.0"
-  report-templates: "^2.0.0"
-  python-linter: "~1.5.0"
-  code-formatter: "2.1.0"
-  optional-helper: "*"
+```json
+{
+  "optionalDependencies": {
+    "advanced-reporter": "^1.0.0"
+  }
+}
 ```
+
+### Peer dependencies
+
+Must be present in the consuming project. AAM warns if they are
+missing but does not auto-install them:
+
+```json
+{
+  "peerDependencies": {
+    "base-framework": "^2.0.0"
+  }
+}
+```
+
+### System dependencies
+
+OS-level requirements verified by pre-flight checks before any
+package files are placed. See
+[System dependency pre-flight checks](#system-dependency-pre-flight-checks)
+below.
+
+```json
+{
+  "systemDependencies": {
+    "python": ">=3.11",
+    "node": ">=20",
+    "packages": {
+      "pip": ["jinja2>=3.0"],
+      "npm": ["prettier"],
+      "brew": ["jq"],
+      "apt": ["jq"]
+    },
+    "binaries": ["ruff", "git"],
+    "mcp_servers": ["filesystem"]
+  }
+}
+```
+
+## Declaring dependencies
+
+Dependencies are declared in `package.agent.json` (or `aam.yaml`):
+
+```json
+{
+  "dependencies": {
+    "@author/generic-auditor": ">=1.0.0",
+    "report-templates": "^2.0.0"
+  },
+  "optionalDependencies": {
+    "advanced-reporter": "^1.0.0"
+  },
+  "peerDependencies": {
+    "base-framework": "^2.0.0"
+  }
+}
+```
+
+Both scoped (`@scope/name`) and unscoped (`name`) package names are
+supported across all dependency types.
 
 ---
 
@@ -126,42 +201,54 @@ dependencies:
 
 ---
 
-## Resolution Algorithm
+## Resolution algorithm
 
-AAM uses a **greedy breadth-first search (BFS)** algorithm with conflict detection. This is simpler than npm's nested dependencies but more flexible than pip's strict single-version resolution.
+AAM uses a **greedy breadth-first search (BFS)** algorithm with
+**dependency hoisting**, **circular dependency detection**, and
+conflict reporting. This is simpler than npm's nested dependencies
+but more flexible than pip's strict single-version resolution.
 
-### Algorithm Overview
-
-```python
-def resolve(root_package):
-    queue = [root_package]
-    resolved = {}
-
-    while queue:
-        package = queue.pop(0)
-
-        for dep_name, constraint in package.dependencies:
-            if dep_name in resolved:
-                # Already resolved — check compatibility
-                if resolved[dep_name].version satisfies constraint:
-                    continue  # Compatible, skip
-                else:
-                    raise ConflictError  # Incompatible versions
-
-            # Find best matching version
-            version = find_best_match(dep_name, constraint)
-            resolved[dep_name] = version
-            queue.append(version)  # Resolve transitive deps
-
-    return resolved
-```
-
-### Key Principles
+### Key principles
 
 1. **Single version per dependency** — No nested dependencies like npm
-2. **Greedy selection** — Always pick the highest compatible version
-3. **Fail on conflict** — Report conflicts clearly, don't try to resolve automatically
-4. **Breadth-first** — Process dependencies level-by-level
+2. **Dependency hoisting** — Compatible shared transitive dependencies
+   are flattened to the install root to minimize duplication
+3. **Circular dependency detection** — Cycles in the dependency graph
+   are detected and reported as errors before installation
+4. **Fail on conflict** — Report conflicts clearly, don't try to
+   resolve automatically
+5. **Breadth-first** — Process dependencies level-by-level
+
+### Resolution strategies
+
+You can control how the resolver selects versions using flags on
+`aam install`:
+
+| Flag | Behavior |
+|------|----------|
+| *(default)* | Select the highest compatible version |
+| `--frozen` | Use exact versions from `package.agent.lock`; fail if the lock file is missing or stale |
+| `--minimal` | Select the lowest version satisfying each constraint (most conservative) |
+| `--latest` | Select the highest available version for each package, ignoring lock file |
+| `--dry-run` | Resolve and display the dependency tree without installing |
+
+These flags are mutually exclusive (except `--dry-run`, which
+combines with any strategy).
+
+### Version overrides (`resolutions`)
+
+You can force a specific version for any transitive dependency using
+the `resolutions` field in `package.agent.json`:
+
+```json
+{
+  "resolutions": {
+    "problematic-package": "1.2.3"
+  }
+}
+```
+
+This bypasses normal constraint resolution for the specified package.
 
 ### `find_best_match` Logic
 
@@ -323,123 +410,66 @@ Unlike npm (which allows multiple versions of the same package via nested `node_
 
 ---
 
-## Lock File: `aam-lock.yaml`
+## Lock file: `package.agent.lock`
 
-The lock file records the **exact versions** resolved during installation. This ensures reproducible installs across machines and time.
+The lock file records the **exact versions** resolved during
+installation. This ensures reproducible installs across machines and
+time. The lock file uses JSON format and is located at the project
+root as `package.agent.lock`.
 
-### Lock File Schema
+!!! note "Migration from `aam-lock.yaml`"
+    The old `aam-lock.yaml` format is superseded by
+    `package.agent.lock` (JSON). AAM detects the old format and
+    offers to convert it automatically.
 
-```yaml
-# aam-lock.yaml — DO NOT EDIT MANUALLY
-lockfile_version: 1
-resolved_at: "2026-02-05T14:30:00Z"
+### Lock file schema
 
-packages:
-  "@author/asvc-auditor":
-    version: 1.0.0
-    source: aam-central
-    checksum: sha256:abc123...
-    dependencies:
-      "@author/generic-auditor": 1.2.3
-      report-templates: 2.1.0
-
-  "@author/generic-auditor":
-    version: 1.2.3
-    source: aam-central
-    checksum: sha256:def456...
-    dependencies: {}
-
-  report-templates:
-    version: 2.1.0
-    source: aam-central
-    checksum: sha256:789ghi...
-    dependencies: {}
+```json
+{
+  "lockfile_version": 2,
+  "resolved_at": "2026-02-20T14:30:00Z",
+  "packages": {
+    "@author/asvc-auditor": {
+      "version": "1.0.0",
+      "source": "aam-central",
+      "checksum": "sha256:abc123...",
+      "dependencies": {
+        "@author/generic-auditor": "1.2.3",
+        "report-templates": "2.1.0"
+      }
+    }
+  },
+  "systemChecks": {
+    "python": { "required": ">=3.11", "found": "3.12.1" },
+    "node": { "required": ">=20", "found": "20.11.0" }
+  }
+}
 ```
 
-**Fields:**
+The `systemChecks` section records the results of system dependency
+verification, providing an audit trail of what was available at
+install time.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `lockfile_version` | integer | Lock file format version |
-| `resolved_at` | string | ISO 8601 timestamp of resolution |
-| `packages` | dict | Map of package name → locked version info |
-
-**Per-package fields:**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `version` | string | Exact version installed |
-| `source` | string | Registry name where package was found |
-| `checksum` | string | SHA-256 hash of package archive |
-| `dependencies` | dict | Resolved dependency versions (exact, not constraints) |
-
-### When the Lock File is Generated
-
-The lock file is created/updated in these scenarios:
-
-1. **`aam install <package>`** — First install or adding new package
-2. **`aam update`** — Updating to newer versions
-3. **Dependency resolution changes** — When resolved versions differ from lock file
-
-### Lock File Workflow
+### Lock file workflow
 
 ```bash
-# Developer A: Create package and install dependencies
-cd my-project
+# Developer A: Install and commit lock file
 aam install @author/asvc-auditor
-
-# Lock file created: .aam/aam-lock.yaml
-# Contains exact versions: generic-auditor@1.2.3, report-templates@2.1.0
-
-# Commit lock file to git
-git add .aam/aam-lock.yaml
+git add package.agent.lock
 git commit -m "Add ASVC auditor and dependencies"
-git push
 
-# Developer B: Clone project and install
+# Developer B: Clone and install exact versions
 git clone https://github.com/myorg/my-project.git
 cd my-project
-aam install
-
-# AAM reads aam-lock.yaml and installs EXACT same versions
-# generic-auditor@1.2.3, report-templates@2.1.0 (not 1.2.4 or 2.1.1)
+aam install --frozen  # Use exact locked versions
 ```
 
-### Why Lock Files Matter
-
-Without lock files:
-
-- **Time A:** `aam install` resolves `^1.0.0` → `1.2.3`
-- **Time B:** (2 weeks later) `aam install` resolves `^1.0.0` → `1.2.4`
-- **Result:** Different versions installed, potential bugs
-
-With lock files:
-
-- **Time A:** `aam install` resolves `^1.0.0` → `1.2.3`, writes lock file
-- **Time B:** `aam install` reads lock file → installs `1.2.3` (exact)
-- **Result:** Consistent installs
-
-### Updating Dependencies
-
-To update to newer versions:
-
-```bash
-# Update all packages to latest compatible versions
-aam update
-
-# Update specific package
-aam update @author/generic-auditor
-
-# Lock file is updated with new versions
-```
-
-### Lock File Best Practices
+### Lock file best practices
 
 1. **Always commit lock files** — Ensures reproducible builds
-2. **Review lock file changes** — Understand what's being updated
+2. **Use `--frozen` in CI** — Fail fast if lock file is stale
 3. **Don't edit manually** — Let AAM manage it
 4. **Update regularly** — Keep dependencies current with `aam update`
-5. **CI/CD uses lock file** — Install from lock file in automated environments
 
 ---
 
@@ -483,21 +513,28 @@ When you run `aam install`, AAM installs:
 - `js-linter` (transitive)
 - `ast-parser` (transitive)
 
-### Viewing Dependency Trees
+### Viewing dependency trees
 
 ```bash
-# List installed packages with tree view
-aam list --tree
+aam tree
 ```
 
 **Output:**
 
 ```
-my-agent@1.0.0
-└── code-reviewer@1.5.0
-    ├── python-linter@2.3.0
-    │   └── ast-parser@1.2.0
-    └── js-linter@3.1.0
+project (5 packages)
+├── my-agent@1.0.0
+│   └── code-reviewer@1.5.0
+│       ├── python-linter@2.3.0
+│       │   └── ast-parser@1.2.0
+│       └── js-linter@3.1.0
+```
+
+Use `aam why <package>` to understand why a specific transitive
+dependency is installed:
+
+```bash
+aam why ast-parser
 ```
 
 ---
@@ -536,7 +573,7 @@ flowchart TD
     MoreDeps -->|No| CheckQueue
 
     WriteLock --> Download[Download all packages]
-    Download --> Extract[Extract to .aam/packages/]
+    Download --> Extract[Extract to .agent-packages/]
     Extract --> Deploy[Deploy to platforms]
     Deploy --> Done[Installation complete]
 
@@ -548,6 +585,83 @@ flowchart TD
     style Conflict fill:#ffebee
     style Error fill:#ffebee
     style End fill:#ffebee
+```
+
+---
+
+## System dependency pre-flight checks
+
+When a package declares `systemDependencies`, AAM runs pre-flight
+checks before installing any package files. This catches missing
+runtimes, binaries, and package manager packages early.
+
+### What is checked
+
+| Category | Example | Check method |
+|----------|---------|-------------|
+| Runtime versions | `python >= 3.11` | Version command output |
+| OS binaries | `ruff`, `git`, `jq` | `$PATH` lookup |
+| pip packages | `jinja2>=3.0` | `pip show` |
+| npm packages | `prettier` | `npm list -g` |
+| brew packages | `jq` | `brew list` |
+| apt packages | `jq` | `dpkg -s` |
+| MCP servers | `filesystem` | MCP registry lookup |
+
+### Auto-install behavior
+
+| Flag | pip/npm | brew/apt |
+|------|---------|----------|
+| *(none)* | Prompt user | Prompt user |
+| `--install-system-deps` | Auto-install | Prompt user |
+| `--install-system-deps --allow-sudo` | Auto-install | Auto-install |
+| `--skip-checks` | Skip all checks | Skip all checks |
+
+### Standalone check
+
+You can verify system dependencies at any time without installing:
+
+```bash
+aam check --system
+```
+
+---
+
+## Dependency hoisting and deduplication
+
+AAM hoists compatible shared transitive dependencies to the install
+root (`.agent-packages/`) to minimize duplication. When two packages
+require compatible versions of the same dependency, only one copy is
+installed.
+
+If duplication occurs (for example, after a migration), use
+`aam dedupe` to flatten the tree:
+
+```bash
+aam dedupe --dry-run   # Preview
+aam dedupe             # Apply
+```
+
+Use `aam prune` to remove directories not tracked in the lock file:
+
+```bash
+aam prune --dry-run    # Preview
+aam prune              # Apply
+```
+
+---
+
+## Circular dependency detection
+
+AAM treats circular dependency graphs as hard errors. If package A
+depends on B and B depends on A, the resolver reports the cycle path
+and refuses to install:
+
+```
+ERROR: Circular dependency detected
+
+  A@1.0.0 → B@2.0.0 → A@1.0.0
+
+Remove the cycle before installing.
 ```
 
 ---
@@ -601,7 +715,8 @@ flowchart TD
 
 ## Next Steps
 
-- **Learn about lock files:** See [Workspaces](workspaces.md) for lock file management
+- **Learn about lock files:** See [Lock Files](../configuration/lock-files.md) for lock file management
 - **Understand security:** See [Security](security.md) for dependency verification
+- **Manage your tree:** See [`aam tree`](../cli/tree.md), [`aam why`](../cli/why.md), [`aam check`](../cli/check.md)
 - **Create packages:** See [Tutorial: Create a Package](../tutorials/package-existing-skills.md)
 - **Deploy artifacts:** See [Platform Adapters](platform-adapters.md)

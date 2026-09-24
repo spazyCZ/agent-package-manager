@@ -1,0 +1,24 @@
+{
+  "name": "@aam/registry-storybook",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build --output-dir ../../dist/apps/aam-registry-storybook",
+    "lint": "eslint src --ext ts,tsx"
+  },
+  "devDependencies": {
+    "@chromatic-com/storybook": "^3.0.0",
+    "@storybook/addon-essentials": "^8.0.0",
+    "@storybook/addon-interactions": "^8.0.0",
+    "@storybook/addon-links": "^8.0.0",
+    "@storybook/addon-a11y": "^8.0.0",
+    "@storybook/blocks": "^8.0.0",
+    "@storybook/core-server": "^8.0.0",
+    "@storybook/react": "^8.0.0",
+    "@storybook/react-vite": "^8.0.0",
+    "@storybook/test": "^8.0.0",
+    "storybook": "^8.0.0"
+  }
+}

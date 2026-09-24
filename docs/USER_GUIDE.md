@@ -23,6 +23,8 @@ This guide walks you through creating, publishing, and installing AAM packages w
 12. [MCP Server Integration](#12-mcp-server-integration)
 13. [Environment Diagnostics (aam doctor)](#13-environment-diagnostics-aam-doctor)
 14. [Cross-Platform Conversion (aam convert)](#14-cross-platform-conversion-aam-convert)
+15. [Dependency Management](#15-dependency-management)
+16. [Migration Guide (UAAPS v0.4.0)](#16-migration-guide-uaaps-v040)
 
 ---
 
@@ -1635,6 +1637,49 @@ Removing deployed artifacts from cursor...
   ✓ Removed .cursor/rules/python-standards.mdc
 
 ✓ Uninstalled python-best-practices
+```
+
+### 5.8 Resolution Strategies
+
+Use resolution strategy flags to control which version of each dependency
+gets installed. These flags are mutually exclusive.
+
+```bash
+# Preview the full install without writing any files
+aam install @author/my-agent --dry-run
+
+# Use exact versions recorded in package.agent.lock (fails if no lock file)
+aam install @author/my-agent --frozen
+
+# Select the lowest version that satisfies each constraint
+aam install @author/my-agent --minimal
+
+# Select the latest available version for each package
+aam install @author/my-agent --latest
+```
+
+The `--frozen` flag is useful in CI pipelines to guarantee reproducible
+installs. It fails immediately if `package.agent.lock` is missing or
+out-of-date, which surfaces accidental lock file drift.
+
+### 5.9 System Dependency Pre-flight
+
+Packages can declare OS-level requirements (Python version, Node.js, CLI
+binaries, pip/npm packages, MCP server configs) in their manifest. AAM
+checks these before installing and warns you about anything missing.
+
+```bash
+# Auto-install any missing pip/npm packages declared by the package
+aam install @author/my-agent --install-system-deps
+
+# Also allow brew/apt installs that need elevated privileges
+aam install @author/my-agent --install-system-deps --allow-sudo
+
+# Skip system checks entirely (useful in CI where deps are pre-provisioned)
+aam install @author/my-agent --skip-checks
+
+# Check system deps for currently installed packages without installing
+aam check --system
 ```
 
 ---
@@ -3539,6 +3584,7 @@ aam doctor
 |-------|-------------|
 | **Python version** | Verifies Python >= 3.11 |
 | **Configuration** | Loads and validates `~/.aam/config.yaml` and `.aam/config.yaml` |
+| **Default platform** | Reports the configured `default_platform` and `active_platforms`; warns if the platform is unrecognised |
 | **Registries** | Checks each configured registry is accessible |
 | **Package integrity** | Verifies installed package manifests are valid |
 | **Incomplete installs** | Detects leftover staging directories from interrupted installs |
@@ -3550,13 +3596,14 @@ AAM Environment Diagnostics
 
   ✓ Python 3.12.1
   ✓ Configuration loaded (2 registries configured)
+  ✓ Default platform: cursor — active: cursor, claude
   ✓ Registry 'local' accessible at /home/user/my-registry
   ⚠ Registry 'team' path not found: /shared/packages
       Run 'aam registry init /shared/packages' to create it, or 'aam registry remove team' to remove it.
   ✓ Package 'asvc-auditor@1.0.0' — manifest valid, 3 artifacts
   ✓ No incomplete installations detected
 
-5/6 checks passed, 1 warnings
+6/7 checks passed, 1 warnings
 ```
 
 ### 13.4 Fixing Common Issues
@@ -3593,9 +3640,25 @@ aam convert -s cursor -t copilot --dry-run
 | Artifact Type | Behavior |
 |---------------|----------|
 | **Skills** | Direct copy — universal `SKILL.md` format works everywhere |
-| **Instructions** | Field mapping (e.g. Cursor `globs` ↔ Copilot `applyTo`). Platform-only fields generate warnings |
+| **Instructions** | Field mapping (for example, Cursor `globs` ↔ Copilot `applyTo`). Platform-only fields generate warnings |
 | **Agents** | Metadata filtered to target platform's supported fields. Codex gets AGENTS.md sections |
 | **Prompts** | Frontmatter stripped or added as needed. Codex gets AGENTS.md sections |
+| **Rules** | `globs` (Cursor) ↔ `applyTo` (Copilot). Claude and Codex receive a markdown section in their global config file |
+| **Hooks** | Event names translated between platforms (for example, `pre_tool_use` → Claude's `PreToolUse`, Cursor's `beforeShellCommand`, Copilot's `preToolUse`). Unsupported events are dropped with a warning |
+| **MCP configs** | Server entries restructured: `mcpServers` (Claude/Cursor) ↔ `servers` (Copilot/VS Code). Codex receives a warning because it has limited MCP support |
+
+To convert only a specific new artifact type:
+
+```bash
+# Convert rules only
+aam convert -s cursor -t copilot --type rule
+
+# Convert hooks only
+aam convert -s claude -t cursor --type hooks
+
+# Convert MCP server configs only
+aam convert -s cursor -t copilot --type mcp
+```
 
 ### 14.3 Handling Lossy Conversions
 
@@ -3654,6 +3717,253 @@ aam convert -s cursor -t claude
 ```bash
 aam convert -s codex -t cursor --force
 ```
+
+---
+
+## 15. Dependency Management
+
+AAM provides six commands for inspecting and maintaining the health of your
+installed packages. All commands read from `package.agent.lock` and the
+`.agent-packages/` directory in your project.
+
+### 15.1 Visualize the dependency tree (`aam tree`)
+
+`aam tree` displays the full resolved dependency graph for your project,
+read directly from `package.agent.lock`.
+
+```bash
+# Show the full tree
+aam tree
+
+# Limit display to 2 levels deep
+aam tree --depth 2
+
+# Show tree for a different project directory
+aam tree --project ./my-project
+```
+
+Example output:
+
+```
+my-project dependency tree
+├── @author/python-best-practices@1.1.0
+│   └── @author/code-analysis@2.0.0
+│       └── @author/common-prompts@1.0.0
+└── @org/linting-rules@3.2.1
+```
+
+### 15.2 Explain why a package is installed (`aam why`)
+
+`aam why` traces which other packages depend on a given package, so you
+can understand whether it's a direct or transitive dependency.
+
+```bash
+aam why @author/common-prompts
+```
+
+Example output:
+
+```
+@author/common-prompts@1.0.0 is a dependency of:
+  @author/code-analysis@2.0.0 (direct dependency of your project)
+```
+
+### 15.3 Check installation health (`aam check`)
+
+`aam check` verifies that every package in `package.agent.lock` has a
+corresponding directory in `.agent-packages/`. Use `--system` to also run
+pre-flight checks against OS-level dependencies declared by installed
+packages.
+
+```bash
+# Check that all locked packages are present on disk
+aam check
+
+# Also check system dependencies (python, node, binaries, pip/npm packages)
+aam check --system
+```
+
+Example output:
+
+```
+Package installation check
+  ✓ @author/python-best-practices@1.1.0 — present
+  ✗ @author/code-analysis@2.0.0        — directory missing
+  ✓ @org/linting-rules@3.2.1           — present
+
+1 issue found. Run 'aam install' to repair.
+```
+
+### 15.4 Audit integrity (`aam audit`)
+
+`aam audit` computes a hash of each installed package directory and
+compares it against the checksum stored in `package.agent.lock`. It
+reports any tampering or corruption as a finding.
+
+```bash
+# Audit all packages (default: report all severity levels)
+aam audit
+
+# Report only critical findings
+aam audit --severity critical
+
+# Exit code is 0 only if no findings at or above the given severity
+aam audit --severity high && echo "No integrity issues"
+```
+
+Example output:
+
+```
+Audit findings
+  CRITICAL @author/python-best-practices@1.1.0 — hash mismatch
+           expected: sha256:a1b2c3...  actual: sha256:deadbeef...
+  INFO     @org/linting-rules@3.2.1   — ok
+
+1 critical finding. Run 'aam install --force' to reinstall affected packages.
+```
+
+### 15.5 Remove duplicates (`aam dedupe`)
+
+`aam dedupe` scans `.agent-packages/` for the same package installed in
+multiple locations and removes the duplicates, keeping the root-level
+copy. Use `--dry-run` first to preview.
+
+```bash
+# Preview what would be removed
+aam dedupe --dry-run
+
+# Remove duplicates
+aam dedupe
+```
+
+### 15.6 Prune unlocked packages (`aam prune`)
+
+`aam prune` removes any directories in `.agent-packages/` that are not
+tracked in `package.agent.lock`. This is useful after a failed install or
+after manually modifying the lock file. Use `--dry-run` first to preview.
+
+```bash
+# Preview what would be removed
+aam prune --dry-run
+
+# Remove unlocked directories
+aam prune
+```
+
+---
+
+## 16. Migration Guide (UAAPS v0.4.0)
+
+UAAPS v0.4.0 introduces a new manifest format, lock file, and package
+directory name. Existing `aam.yaml`-based packages continue to work, but
+you can migrate incrementally.
+
+### 16.1 File format changes
+
+| Old file | New file | Notes |
+|----------|----------|-------|
+| `aam.yaml` | `package.agent.json` | JSON is now the primary format |
+| `aam-lock.yaml` | `package.agent.lock` | JSON lock file with richer metadata |
+| `.aam/packages/` | `.agent-packages/` | New package directory name |
+
+All three old formats remain supported during the transition period. AAM
+reads whichever file is present, preferring `package.agent.json` over
+`package.agent.yaml` over `aam.yaml`.
+
+### 16.2 Migrating your manifest
+
+Run `aam pkg init --migrate` in a directory that contains `aam.yaml` to
+generate a new `package.agent.json` based on your existing manifest:
+
+```bash
+cd my-package/
+aam pkg init --migrate
+```
+
+The migration adds the new optional fields with empty defaults. Review the
+generated file and add values as needed.
+
+### 16.3 New dependency types
+
+`package.agent.json` supports three dependency types:
+
+```json
+{
+  "dependencies": {
+    "@author/required-dep": "^1.0.0"
+  },
+  "optionalDependencies": {
+    "@author/optional-dep": "^2.0.0"
+  },
+  "peerDependencies": {
+    "@author/peer-dep": ">=1.0.0"
+  }
+}
+```
+
+- **`dependencies`**: Required. Install fails if unresolvable.
+- **`optionalDependencies`**: Best-effort. Install continues if unavailable.
+- **`peerDependencies`**: Must already be installed. AAM warns if missing
+  but does not install them automatically.
+
+### 16.4 System dependency declarations
+
+Packages can declare OS-level requirements that AAM checks before
+installing:
+
+```json
+{
+  "systemDependencies": {
+    "python": ">=3.11",
+    "node": ">=20",
+    "binaries": ["git", "docker"],
+    "packages": {
+      "pip": ["httpx>=0.27"],
+      "npm": ["typescript"]
+    }
+  }
+}
+```
+
+### 16.5 New artifact types
+
+In addition to `skills`, `agents`, `prompts`, and `instructions`, packages
+can now declare:
+
+```json
+{
+  "artifacts": {
+    "commands": [
+      { "name": "deploy", "path": "commands/deploy.md",
+        "description": "Deploy to production" }
+    ],
+    "rules": [
+      { "name": "style-guide", "path": "rules/style-guide.md",
+        "description": "Coding style guide" }
+    ],
+    "hooksPath": "hooks",
+    "mcpPath": "mcp"
+  }
+}
+```
+
+`hooksPath` points to a directory containing `hooks.json` — a map of
+canonical event names (for example, `pre_tool_use`) to hook configurations.
+`mcpPath` points to a directory containing `servers.json` — a map of
+MCP server names to their configurations.
+
+### 16.6 Lock file migration
+
+The first time you run `aam install` after upgrading, AAM detects an
+existing `aam-lock.yaml` and prompts you to migrate:
+
+```
+Found legacy lock file 'aam-lock.yaml'.
+Migrate to 'package.agent.lock' (recommended)? [y/N]
+```
+
+Accepting creates `package.agent.lock` and renames the old file to
+`aam-lock.yaml.bak` so you can roll back if needed.
 
 ---
 

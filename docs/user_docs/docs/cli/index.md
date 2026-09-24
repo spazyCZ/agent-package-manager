@@ -22,6 +22,17 @@ Complete command reference for the AAM (Agent Artifact Manager) command-line int
 | [`aam list`](list.md) | List installed packages (`--available` for sources) |
 | [`aam info`](info.md) | Show detailed package information |
 
+### Dependency Management
+
+| Command | Description |
+|---------|-------------|
+| [`aam tree`](tree.md) | Display the resolved dependency tree |
+| [`aam why`](why.md) | Show why a package is installed |
+| [`aam check`](check.md) | Verify all dependencies are installed and compatible |
+| [`aam audit`](audit.md) | Audit installed packages for integrity issues |
+| [`aam dedupe`](dedupe.md) | Flatten duplicate package installations |
+| [`aam prune`](prune.md) | Remove unlisted package directories |
+
 ### Package Integrity
 
 | Command | Description |
@@ -68,6 +79,28 @@ Complete command reference for the AAM (Agent Artifact Manager) command-line int
 | [`aam config set`](config-set.md) | Set a configuration value |
 | [`aam config get`](config-get.md) | Get a configuration value |
 | [`aam config list`](config-list.md) | List all configuration values |
+
+### Quality & Testing
+
+| Command | Description |
+|---------|-------------|
+| [`aam test`](test.md) | Run all package tests declared in `quality.tests` |
+| [`aam eval`](eval.md) | Run all package evaluations declared in `quality.evals` |
+
+### Authentication
+
+| Command | Description |
+|---------|-------------|
+| [`aam login`](login.md) | Authenticate with an HTTP registry |
+| [`aam logout`](logout.md) | Remove stored credentials for a registry |
+| [`aam whoami`](whoami.md) | Show the currently authenticated user |
+
+### Cache Management
+
+| Command | Description |
+|---------|-------------|
+| [`aam cache clean`](cache-clean.md) | Remove all cached package archives |
+| [`aam cache ls`](cache-ls.md) | List cached package archives |
 
 ### Utilities
 

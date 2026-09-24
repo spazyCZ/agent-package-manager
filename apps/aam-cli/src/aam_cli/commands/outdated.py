@@ -19,9 +19,9 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from aam_cli.core.config import AamConfig, load_config
-from aam_cli.core.workspace import LockFile, read_lock_file
-from aam_cli.services.upgrade_service import OutdatedPackage, OutdatedResult
+from aam_cli.core.config import load_config
+from aam_cli.core.workspace import read_lock_file
+from aam_cli.services.upgrade_service import check_outdated
 from aam_cli.utils.paths import resolve_project_dir
 
 ################################################################################
@@ -159,110 +159,3 @@ def outdated(ctx: click.Context, output_json: bool, is_global: bool) -> None:
     console.print()
 
 
-################################################################################
-#                                                                              #
-# OUTDATED CHECK LOGIC                                                         #
-#                                                                              #
-################################################################################
-
-
-def check_outdated(
-    lock: LockFile,
-    config: AamConfig,
-) -> OutdatedResult:
-    """Compare installed source packages against source HEAD commits.
-
-    Groups packages by source for efficient cache reads.
-
-    Args:
-        lock: Parsed lock file.
-        config: AAM configuration.
-
-    Returns:
-        :class:`OutdatedResult` with categorized packages.
-    """
-    from datetime import UTC, datetime
-
-    from aam_cli.services.git_service import get_cache_dir, get_head_sha, validate_cache
-    from aam_cli.utils.git_url import parse
-
-    logger.info(f"Checking outdated: packages={len(lock.packages)}")
-
-    result = OutdatedResult()
-
-    # -----
-    # Build source HEAD SHA cache (one read per source)
-    # -----
-    source_head_cache: dict[str, str] = {}
-    stale_threshold_days = 7
-
-    for source_entry in config.sources:
-        try:
-            parsed = parse(source_entry.url)
-            cache_dir = get_cache_dir(parsed.host, parsed.owner, parsed.repo)
-
-            if validate_cache(cache_dir):
-                source_head_cache[source_entry.name] = get_head_sha(cache_dir)
-
-            # -----
-            # Check for stale sources
-            # -----
-            if source_entry.last_fetched:
-                fetched_dt = datetime.fromisoformat(source_entry.last_fetched)
-                now = datetime.now(UTC)
-                if (now - fetched_dt).days > stale_threshold_days:
-                    result.stale_sources.append(source_entry.name)
-
-        except (ValueError, OSError) as e:
-            logger.warning(
-                f"Cannot read HEAD for source '{source_entry.name}': {e}"
-            )
-
-    # -----
-    # Compare each installed package
-    # -----
-    for pkg_name, locked in lock.packages.items():
-        if not locked.source_name or not locked.source_commit:
-            result.no_source.append(pkg_name)
-            continue
-
-        head_sha = source_head_cache.get(locked.source_name)
-
-        if not head_sha:
-            # Source cache missing — can't determine status
-            result.no_source.append(pkg_name)
-            continue
-
-        if locked.source_commit == head_sha:
-            result.up_to_date.append(pkg_name)
-        else:
-            # -----
-            # Check for local modifications
-            # -----
-            has_mods = False
-            try:
-                from aam_cli.services.checksum_service import check_modifications
-
-                mod_result = check_modifications(pkg_name)
-                has_mods = mod_result.get("has_modifications", False)
-            except Exception:
-                pass
-
-            result.outdated.append(
-                OutdatedPackage(
-                    name=pkg_name,
-                    current_commit=locked.source_commit[:7],
-                    latest_commit=head_sha[:7],
-                    source_name=locked.source_name,
-                    has_local_modifications=has_mods,
-                )
-            )
-
-    result.total_outdated = len(result.outdated)
-
-    logger.info(
-        f"Outdated check complete: outdated={result.total_outdated}, "
-        f"up_to_date={len(result.up_to_date)}, no_source={len(result.no_source)}"
-    )
-
-    return result

@@ -10,7 +10,7 @@ my-project/
     └── config.yaml  ← Project configuration
 ```
 
-Created automatically by `aam init`.
+Created automatically by `aam init --project`.
 
 ## When to Use Project Config
 
@@ -374,12 +374,18 @@ registries:
 
 ### Automatic Creation
 
-Created automatically by `aam init`:
+Create project config with:
 
 ```bash
 cd my-project
-aam init
-# Creates .aam/config.yaml with defaults
+aam init --project
+# Creates .aam/config.yaml with project overrides
+```
+
+Non-interactive:
+
+```bash
+aam init --project --yes
 ```
 
 ### Manual Creation
@@ -398,10 +404,11 @@ default_platform: cursor
 ### Using CLI
 
 ```bash
-# Set project-level values (from project root)
-aam config set --project default_platform cursor
-aam config set --project platforms.cursor.skill_scope project
+# Initialize project-level config from project root
+aam init --project
 ```
+
+After creation, edit `.aam/config.yaml` directly for additional project-specific keys.
 
 ## Validating Project Config
 

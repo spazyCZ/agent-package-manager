@@ -71,7 +71,7 @@ def test(
     if hooks:
         suites = run_hook_tests(package_dir, event_name=event, case_name=case)
     else:
-        suites = run_skill_tests(package_dir, skill_name=skill_name)
+        suites = run_skill_tests(package_dir, skill_name=skill_name, case_name=case)
 
     if not suites:
         console.print("[yellow]No test suites found.[/yellow]")

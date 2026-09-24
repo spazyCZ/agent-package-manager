@@ -264,17 +264,22 @@ def _run_test_case(
 def run_skill_tests(
     package_dir: Path,
     skill_name: str | None = None,
+    case_name: str | None = None,
 ) -> list[TestSuiteResult]:
     """Run tests for skills in a package.
 
     Args:
         package_dir: Root directory of the AAM package.
         skill_name: Optional specific skill to test.
+        case_name: Optional case name filter.
 
     Returns:
         List of test suite results.
     """
-    logger.info(f"Running skill tests: package={package_dir}, skill={skill_name}")
+    logger.info(
+        f"Running skill tests: package={package_dir}, "
+        f"skill={skill_name}, case={case_name}"
+    )
     results: list[TestSuiteResult] = []
 
     skills_dir = package_dir / "skills"
@@ -299,6 +304,8 @@ def run_skill_tests(
         cases = _discover_test_cases(tests_dir)
 
         for case_path in cases:
+            if case_name and case_path.stem != case_name:
+                continue
             case_result = _run_test_case(case_path, config, package_dir)
             suite.cases.append(case_result)
 

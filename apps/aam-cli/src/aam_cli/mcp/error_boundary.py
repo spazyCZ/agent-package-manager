@@ -16,6 +16,8 @@ import functools
 import logging
 from typing import Any, Callable
 
+from aam_cli.services.governance_service import PolicyViolationError
+
 ################################################################################
 #                                                                              #
 # LOGGING                                                                      #
@@ -91,6 +93,15 @@ def mcp_error_boundary(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         try:
             return func(*args, **kwargs)
+        except PolicyViolationError as exc:
+            logger.warning(
+                "MCP tool %s returned PolicyViolationError: %s",
+                func.__name__, exc,
+            )
+            return {
+                "error": exc.violation.message,
+                "error_code": f"AAM_POLICY_VIOLATION_{exc.violation.rule.upper()}",
+            }
         except ValueError as exc:
             logger.warning(
                 "MCP tool %s returned ValueError: %s",

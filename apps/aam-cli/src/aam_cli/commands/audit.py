@@ -105,13 +105,9 @@ def audit(
             "info": "dim",
         }
 
-        has_critical_or_high = False
-
         for finding in findings:
             sev = finding.get("severity", "info")
             color = severity_colors.get(sev, "white")
-            if sev in ("critical", "high"):
-                has_critical_or_high = True
 
             table.add_row(
                 finding.get("package_name", "?"),
@@ -127,10 +123,10 @@ def audit(
         )
 
         # -----
-        # Exit code 1 if findings at or above requested severity
+        # Exit code 1 if any findings — audit_deps() already filters
+        # findings to those at or above the requested --severity
         # -----
-        if severity == "all" or has_critical_or_high:
-            ctx.exit(1)
+        ctx.exit(1)
     else:
         console.print(
             f"[green]✓[/green] All {total_checked} packages passed integrity audit"

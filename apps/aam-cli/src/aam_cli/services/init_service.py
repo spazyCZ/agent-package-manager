@@ -33,7 +33,10 @@ logger = logging.getLogger(__name__)
 #                                                                              #
 ################################################################################
 
-VALID_ARTIFACT_TYPES: list[str] = ["skills", "agents", "prompts", "instructions"]
+VALID_ARTIFACT_TYPES: list[str] = ["skills", "agents", "prompts", "commands", "instructions"]
+
+# Default artifact types scaffolded when none are explicitly requested.
+DEFAULT_ARTIFACT_TYPES: list[str] = ["skills", "agents", "prompts", "instructions"]
 VALID_PLATFORMS: list[str] = ["cursor", "claude-code", "copilot", "codex"]
 
 # Default platform-specific configurations
@@ -111,7 +114,7 @@ def init_package(
     # Step 2: Validate and default artifact types
     # -----
     if artifact_types is None:
-        selected_types = list(VALID_ARTIFACT_TYPES)
+        selected_types = list(DEFAULT_ARTIFACT_TYPES)
     else:
         invalid = [t for t in artifact_types if t not in VALID_ARTIFACT_TYPES]
         if invalid:

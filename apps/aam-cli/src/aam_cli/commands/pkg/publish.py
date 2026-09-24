@@ -1,6 +1,8 @@
 """``aam pkg publish`` — Publish archive to a registry.
 
-Delegates to the existing publish command logic.
+Delegates to :mod:`aam_cli.services.publish_service`, which loads the
+universal manifest (``package.agent.json`` / ``package.agent.yaml`` /
+``aam.yaml``) and enforces ``governance.publish_policy`` before publishing.
 
 Reference: spec 004 US7.
 """
@@ -17,10 +19,9 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from aam_cli.core.config import load_config
-from aam_cli.core.manifest import load_manifest
-from aam_cli.registry.factory import create_registry
-from aam_cli.utils.checksum import calculate_sha256
+from aam_cli.core.manifest import load_manifest_universal
+from aam_cli.services.governance_service import PolicyViolationError
+from aam_cli.services.publish_service import publish_package
 
 ################################################################################
 #                                                                              #
@@ -56,7 +57,8 @@ def pkg_publish(
 ) -> None:
     """Publish a packed archive to a registry.
 
-    Must be run from the package directory containing ``aam.yaml``.
+    Must be run from the package directory containing a manifest
+    (``package.agent.json``, ``package.agent.yaml``, or ``aam.yaml``).
 
     Examples::
 
@@ -68,13 +70,13 @@ def pkg_publish(
     pkg_path = Path.cwd()
 
     # -----
-    # Step 1: Load manifest to get package name and version
+    # Step 1: Load manifest just to report name/version and support dry-run
     # -----
     try:
-        manifest = load_manifest(pkg_path)
+        manifest = load_manifest_universal(pkg_path)
     except FileNotFoundError:
         console.print(
-            "[red]Error:[/red] No aam.yaml found. Run 'aam init' or 'aam create-package' first."
+            "[red]Error:[/red] No manifest found. Run 'aam pkg init' first."
         )
         ctx.exit(1)
         return
@@ -83,70 +85,41 @@ def pkg_publish(
         ctx.exit(1)
         return
 
-    # -----
-    # Step 2: Find the .aam archive
-    # -----
-    archive_candidates = list(pkg_path.glob("*.aam"))
-    if not archive_candidates:
-        console.print("[red]Error:[/red] No archive found. Run 'aam pack' first.")
-        ctx.exit(1)
-        return
-
-    archive_path = archive_candidates[0]
-
-    # -----
-    # Step 3: Get the target registry
-    # -----
-    config = load_config()
-
-    if registry_name:
-        reg_source = config.get_registry_by_name(registry_name)
-        if not reg_source:
-            console.print(
-                f"[red]Error:[/red] Registry '{registry_name}' not found. Run 'aam registry list'."
-            )
-            ctx.exit(1)
-            return
-    else:
-        reg_source = config.get_default_registry()
-        if not reg_source:
-            console.print(
-                "[red]Error:[/red] No registries configured. Run 'aam registry init' to create one."
-            )
-            ctx.exit(1)
-            return
-
-    console.print(
-        f"Publishing [bold]{manifest.name}@{manifest.version}[/bold] to {reg_source.name}..."
-    )
-
-    # -----
-    # Step 4: Verify checksum
-    # -----
-    checksum = calculate_sha256(archive_path)
-    console.print(f"\n  [green]✓[/green] Archive verified: {checksum}")
+    console.print(f"Publishing [bold]{manifest.name}@{manifest.version}[/bold]...")
 
     if dry_run:
         console.print("\n[yellow]\\[Dry run — package not published][/yellow]")
         return
 
     # -----
-    # Step 5: Publish
+    # Step 2: Publish via the shared service (universal manifest loading +
+    # governance publish_policy enforcement)
     # -----
     try:
-        registry_client = create_registry(reg_source)
-        registry_client.publish(archive_path)
+        result = publish_package(
+            registry_name=registry_name,
+            tag=tag,
+            project_dir=pkg_path,
+        )
+    except PolicyViolationError as exc:
+        console.print(f"[red]Error:[/red] {exc.violation.message}")
+        ctx.exit(1)
+        return
     except ValueError as exc:
         console.print(f"[red]Error:[/red] {exc}")
         ctx.exit(1)
         return
 
+    console.print(f"\n  [green]✓[/green] Archive verified: {result['checksum']}")
     console.print("  [green]✓[/green] Copied to registry")
     console.print("  [green]✓[/green] Updated metadata.yaml")
     console.print("  [green]✓[/green] Rebuilt index.yaml")
     console.print(f"  [green]✓[/green] Tagged as '{tag}'")
-    console.print(f"\n[green]✓[/green] Published {manifest.name}@{manifest.version}")
+    console.print(
+        f"\n[green]✓[/green] Published {result['package_name']}@{result['version']}"
+    )
 
     logger.info(
-        f"Published {manifest.name}@{manifest.version} to registry '{reg_source.name}'"
+        f"Published {result['package_name']}@{result['version']} "
+        f"to registry '{result['registry']}'"
     )

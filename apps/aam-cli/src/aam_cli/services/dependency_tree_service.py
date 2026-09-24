@@ -23,7 +23,7 @@ from aam_cli.core.resolver import DependencyType
 from aam_cli.core.workspace import (
     read_universal_lock_file,
 )
-from aam_cli.utils.paths import get_packages_dir
+from aam_cli.utils.paths import get_packages_dir, get_universal_lock_file_path
 
 ################################################################################
 #                                                                              #
@@ -194,7 +194,18 @@ def get_tree(
 
         return node
 
+    # -----
+    # Root nodes are direct dependencies only — exclude any package that
+    # is referenced as a transitive dependency of another locked package,
+    # so it doesn't appear duplicated at both the root and nested levels.
+    # -----
+    referenced: set[str] = set()
+    for locked_pkg in lock.packages.values():
+        referenced.update(locked_pkg.dependencies)
+
     for pkg_name in lock.packages:
+        if pkg_name in referenced:
+            continue
         node = _build_node(pkg_name, 1, set())
         if node:
             root.children.append(node)
@@ -478,7 +489,20 @@ def audit_deps(
         pkg_dir = packages_dir / fs_name
 
         if not pkg_dir.is_dir():
-            logger.debug(f"Package directory missing: '{pkg_dir}' — skipping audit")
+            finding = AuditFinding(
+                package_name=pkg_name,
+                version=locked.version,
+                severity="high",
+                title="Missing package directory",
+                description=(
+                    f"Package '{pkg_name}@{locked.version}' is listed in "
+                    f"the lock file but its directory '{pkg_dir}' does not "
+                    "exist. Reinstall the package or run 'aam prune'."
+                ),
+                finding_type="integrity",
+            )
+            findings.append(finding)
+            logger.warning(f"Package directory missing: '{pkg_dir}'")
             continue
 
         # -----
@@ -651,6 +675,17 @@ def prune_deps(
             "packages_removed": 0,
             "dry_run": dry_run,
         }
+
+    # -----
+    # Refuse to prune against a missing lock file: read_universal_lock_file()
+    # returns an empty lock when none exists, which would otherwise make
+    # every installed package look unlisted and get deleted.
+    # -----
+    if not get_universal_lock_file_path(eff_dir).is_file():
+        raise ValueError(
+            "[AAM_LOCK_FILE_NOT_FOUND] No package.agent.lock found. "
+            "Run 'aam install' first, or restore the lock file before pruning."
+        )
 
     lock = read_universal_lock_file(eff_dir)
 

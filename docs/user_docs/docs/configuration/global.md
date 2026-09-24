@@ -285,37 +285,46 @@ operation.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `allowed_scopes` | list[string] | `[]` (allow all) | Scopes allowed for install (empty = no restriction) |
-| `require_signature` | bool | `false` | Block unsigned packages |
-| `require_tag` | string | `null` | Require a specific dist-tag (e.g., `stable`) |
-| `blocked_packages` | list[string] | `[]` | Package names blocked from install |
+| `install_policy` | InstallPolicy | `{}` | Install-specific policies (see below) |
+| `install_policy.allowed_scopes` | list[string] | `[]` (allow all) | Scopes allowed for install (empty = no restriction) |
+| `install_policy.require_signature` | bool | `false` | Block unsigned packages |
+| `install_policy.require_tag` | string | `null` | Require a specific dist-tag (e.g., `stable`) |
+| `install_policy.blocked_packages` | list[string] | `[]` | Package names blocked from install |
 | `publish_policy` | PublishPolicy | `{}` | Publish-specific policies |
+
+!!! warning
+    Install policy fields must be nested under `governance.install_policy`,
+    not directly under `governance`. Fields written directly under
+    `governance` (other than `install_policy` / `publish_policy`) are
+    silently ignored by Pydantic, leaving governance disabled.
 
 ### Example: Enterprise governance
 
 ```yaml
 governance:
-  allowed_scopes:
-    - "@mycompany"
-    - "@approved-vendor"
-  require_signature: true
-  require_tag: "stable"
-  blocked_packages:
-    - "known-malicious-package"
-    - "deprecated-tool"
+  install_policy:
+    allowed_scopes:
+      - "@mycompany"
+      - "@approved-vendor"
+    require_signature: true
+    require_tag: "stable"
+    blocked_packages:
+      - "known-malicious-package"
+      - "deprecated-tool"
   publish_policy:
     require_signature: true
 ```
 
-### Field: `governance.allowed_scopes`
+### Field: `governance.install_policy.allowed_scopes`
 
 When configured, only packages from listed scopes can be installed.
 An empty list means no restriction.
 
 ```yaml
 governance:
-  allowed_scopes:
-    - "@mycompany"
+  install_policy:
+    allowed_scopes:
+      - "@mycompany"
 ```
 
 Attempting to install `@other/package` produces:
@@ -325,23 +334,25 @@ Error: Package '@other/package' blocked by governance policy:
   allowed_scopes does not include '@other'
 ```
 
-### Field: `governance.blocked_packages`
+### Field: `governance.install_policy.blocked_packages`
 
 Package names that are unconditionally blocked from installation.
 
 ```yaml
 governance:
-  blocked_packages:
-    - "known-malicious-package"
+  install_policy:
+    blocked_packages:
+      - "known-malicious-package"
 ```
 
-### Field: `governance.require_tag`
+### Field: `governance.install_policy.require_tag`
 
 Requires installed packages to carry a specific dist-tag.
 
 ```yaml
 governance:
-  require_tag: "stable"
+  install_policy:
+    require_tag: "stable"
 ```
 
 ### Publish policy

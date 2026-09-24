@@ -72,7 +72,12 @@ def prune(
 
     logger.info(f"Running prune: dry_run={dry_run}")
 
-    result = prune_deps(project_dir=project_dir, dry_run=dry_run)
+    try:
+        result = prune_deps(project_dir=project_dir, dry_run=dry_run)
+    except ValueError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        ctx.exit(1)
+        return
 
     # -----
     # Display results

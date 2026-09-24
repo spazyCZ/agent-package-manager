@@ -14,9 +14,9 @@
     },
     "build-storybook": {
       "executor": "@nx/storybook:build",
-      "outputs": ["{options.outputPath}"],
+      "outputs": ["{options.outputDir}"],
       "options": {
-        "outputPath": "dist/apps/aam-registry-storybook",
+        "outputDir": "dist/apps/aam-registry-storybook",
         "configDir": "apps/aam-registry-storybook/.storybook"
       }
     },

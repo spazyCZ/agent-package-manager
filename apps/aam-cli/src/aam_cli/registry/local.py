@@ -33,7 +33,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from aam_cli.core.manifest import PackageManifest, load_manifest
+from aam_cli.core.manifest import PackageManifest, load_manifest_universal
 from aam_cli.registry.base import (
     PackageIndexEntry,
     PackageMetadata,
@@ -300,7 +300,7 @@ class LocalRegistry:
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
             extract_archive(archive_path, tmp_path)
-            manifest = load_manifest(tmp_path)
+            manifest = load_manifest_universal(tmp_path)
 
         # -----
         # Step 2: Check for duplicate version

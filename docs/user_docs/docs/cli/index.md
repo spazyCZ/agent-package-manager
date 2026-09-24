@@ -91,16 +91,16 @@ Complete command reference for the AAM (Agent Artifact Manager) command-line int
 
 | Command | Description |
 |---------|-------------|
-| `aam login` | Authenticate with an HTTP registry |
-| `aam logout` | Remove stored credentials for a registry |
-| `aam whoami` | Show the currently authenticated user |
+| [`aam login`](login.md) | Authenticate with an HTTP registry |
+| [`aam logout`](logout.md) | Remove stored credentials for a registry |
+| [`aam whoami`](whoami.md) | Show the currently authenticated user |
 
 ### Cache Management
 
 | Command | Description |
 |---------|-------------|
-| `aam cache clean` | Remove all cached package archives |
-| `aam cache ls` | List cached package archives |
+| [`aam cache clean`](cache-clean.md) | Remove all cached package archives |
+| [`aam cache ls`](cache-ls.md) | List cached package archives |
 
 ### Utilities
 

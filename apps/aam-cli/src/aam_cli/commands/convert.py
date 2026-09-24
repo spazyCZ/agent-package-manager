@@ -97,7 +97,7 @@ def convert(
     """Convert AI agent configurations between platforms.
 
     Reads artifacts from one platform's format and writes them in
-    another's format. Supports Cursor, Copilot, Claude, and Codex.
+    another's format. Supports Cursor, Copilot, Claude Code, and Codex.
 
     Supported artifact types:
 
@@ -113,11 +113,11 @@ def convert(
     Examples::
 
         aam convert -s cursor -t copilot
-        aam convert -s copilot -t claude --type instruction --dry-run
+        aam convert -s copilot -t claude-code --type instruction --dry-run
         aam convert -s codex -t cursor --force
         aam convert -s copilot -t cursor --type rule
-        aam convert -s claude -t cursor --type hooks --dry-run
-        aam convert -s claude -t copilot --type mcp
+        aam convert -s claude-code -t cursor --type hooks --dry-run
+        aam convert -s claude-code -t copilot --type mcp
     """
     console: Console = ctx.obj["console"]
     project_dir = Path.cwd()

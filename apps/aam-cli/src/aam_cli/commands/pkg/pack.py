@@ -11,16 +11,18 @@ Reference: spec 004 US7.
 #                                                                              #
 ################################################################################
 
+import json
 import logging
 from pathlib import Path
 
 import click
 from rich.console import Console
 
-from aam_cli.core.manifest import load_manifest
+from aam_cli.core.manifest import load_manifest_universal
 from aam_cli.services.checksum_service import compute_file_checksums
 from aam_cli.utils.archive import create_archive
 from aam_cli.utils.checksum import calculate_sha256
+from aam_cli.utils.paths import MANIFEST_JSON, MANIFEST_LEGACY, MANIFEST_YAML
 from aam_cli.utils.yaml_utils import dump_yaml, load_yaml
 
 ################################################################################
@@ -59,10 +61,10 @@ def pkg_pack(ctx: click.Context, path: str) -> None:
     # Step 1: Load and validate the manifest
     # -----
     try:
-        manifest = load_manifest(pkg_path)
+        manifest = load_manifest_universal(pkg_path)
     except FileNotFoundError:
         console.print(
-            "[red]Error:[/red] No aam.yaml found. Run 'aam init' or 'aam create-package' first."
+            "[red]Error:[/red] No manifest found. Run 'aam pkg init' first."
         )
         ctx.exit(1)
         return
@@ -101,15 +103,30 @@ def pkg_pack(ctx: click.Context, path: str) -> None:
 
     if file_checksums:
         # -----
-        # Write checksums into aam.yaml so they are included in the archive
+        # Write checksums back into whichever manifest format was loaded
+        # so they are included in the archive
         # -----
-        manifest_yaml_path = pkg_path / "aam.yaml"
-        manifest_raw = load_yaml(manifest_yaml_path)
-        manifest_raw["file_checksums"] = {
-            "algorithm": "sha256",
-            "files": file_checksums,
-        }
-        dump_yaml(manifest_raw, manifest_yaml_path)
+        if manifest.manifest_format == "json":
+            manifest_file_path = pkg_path / MANIFEST_JSON
+            manifest_raw = json.loads(manifest_file_path.read_text(encoding="utf-8"))
+            manifest_raw["file_checksums"] = {
+                "algorithm": "sha256",
+                "files": file_checksums,
+            }
+            manifest_file_path.write_text(
+                json.dumps(manifest_raw, indent=2) + "\n", encoding="utf-8"
+            )
+        else:
+            manifest_file_name = (
+                MANIFEST_YAML if manifest.manifest_format == "yaml" else MANIFEST_LEGACY
+            )
+            manifest_file_path = pkg_path / manifest_file_name
+            manifest_raw = load_yaml(manifest_file_path)
+            manifest_raw["file_checksums"] = {
+                "algorithm": "sha256",
+                "files": file_checksums,
+            }
+            dump_yaml(manifest_raw, manifest_file_path)
 
         console.print(
             f"  [dim]{len(file_checksums)} file checksum(s) computed[/dim]"
@@ -121,7 +138,8 @@ def pkg_pack(ctx: click.Context, path: str) -> None:
     # -----
     # Step 4: Log what's being added
     # -----
-    console.print("  Adding aam.yaml")
+    manifest_file_names = {"json": MANIFEST_JSON, "yaml": MANIFEST_YAML, "legacy": MANIFEST_LEGACY}
+    console.print(f"  Adding {manifest_file_names[manifest.manifest_format]}")
     for _artifact_type, ref in manifest.all_artifacts:
         console.print(f"  Adding {ref.path}")
 

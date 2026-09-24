@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 ################################################################################
 
 # Artifact type ordering for display
-TYPE_ORDER: list[str] = ["skill", "agent", "prompt", "instruction"]
+TYPE_ORDER: list[str] = ["skill", "agent", "command", "prompt", "instruction"]
 
 # Rich colour for each platform badge
 PLATFORM_COLORS: dict[str, str] = {
@@ -277,6 +277,7 @@ def _artifact_target_path(art: DetectedArtifact, organize: str) -> str:
     type_dirs = {
         "skill": "skills",
         "agent": "agents",
+        "command": "commands",
         "prompt": "prompts",
         "instruction": "instructions",
     }
@@ -300,6 +301,7 @@ def _generate_manifest_dict(
     grouped: dict[str, list[dict[str, str]]] = {
         "agents": [],
         "skills": [],
+        "commands": [],
         "prompts": [],
         "instructions": [],
     }
@@ -770,7 +772,9 @@ def _create_from_source(
     "-t",
     "artifact_types",
     multiple=True,
-    type=click.Choice(["skill", "agent", "prompt", "instruction"], case_sensitive=False),
+    type=click.Choice(
+        ["skill", "agent", "command", "prompt", "instruction"], case_sensitive=False
+    ),
     help="Filter detection to specific artifact types",
 )
 @click.option(
@@ -792,7 +796,9 @@ def _create_from_source(
 )
 @click.option(
     "--include-as",
-    type=click.Choice(["skill", "agent", "prompt", "instruction"], case_sensitive=False),
+    type=click.Choice(
+        ["skill", "agent", "command", "prompt", "instruction"], case_sensitive=False
+    ),
     default=None,
     help="Artifact type for --include",
 )

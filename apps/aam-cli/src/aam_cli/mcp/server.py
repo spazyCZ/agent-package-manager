@@ -64,7 +64,7 @@ Read-only tools are always available. Write tools require --allow-write.
 - `aam://packages/installed` — all installed packages
 - `aam://packages/{name}` — single package detail (use `--` for scoped names)
 - `aam://registries` — configured registries
-- `aam://manifest` — current project manifest (package.agent.yaml)
+- `aam://manifest` — current project manifest (package.agent.json, falling back to package.agent.yaml, then aam.yaml)
 - `aam://sources` — all configured git sources
 - `aam://sources/{source_id}` — single source detail
 - `aam://sources/{source_id}/candidates` — discoverable packages in a source
